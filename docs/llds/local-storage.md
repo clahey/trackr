@@ -1,0 +1,180 @@
+# Local Storage
+
+## Context and Design Philosophy
+
+This segment implements the persistence layer using Room (SQLite). It owns: the Room database, entities, DAOs, TypeConverters, entity↔domain mappers, and `LocalTrackrRepository` — the concrete implementation of `TrackrRepository`.
+
+The `TrackrRepository` interface is also defined here; it is the sole seam between the domain/UI layers and storage. Everything above the interface speaks domain types (`Category`, `Event`, `EventValue`); everything below speaks Room entities and SQL.
+
+Image files are a second resource managed by this segment. File lifecycle (write on capture, delete on event/category deletion, orphan recovery at startup) is the repository's responsibility, not the UI's.
+
+## TrackrRepository Interface
+
+```kotlin
+interface TrackrRepository {
+    // Categories
+    fun getCategories(): Flow<List<Category>>
+    fun getCategoryById(id: String): Flow<Category?>
+    suspend fun saveCategory(category: Category)   // upsert; caller sets sortOrder
+    suspend fun deleteCategory(id: String)
+    suspend fun reorderCategories(orderedIds: List<String>)  // reassigns sortOrder to match list
+    fun getEventCountForCategory(categoryId: String): Flow<Int>
+
+    // Events
+    fun getEvents(start: Long? = null, end: Long? = null): Flow<List<Event>>
+    fun getEventsByCategory(categoryId: String): Flow<List<Event>>
+    fun getEventById(id: String): Flow<Event?>
+    suspend fun saveEvent(event: Event)            // upsert
+    suspend fun deleteEvent(id: String)
+
+    // Lifecycle
+    suspend fun onStartup()
+}
+```
+
+All reads return `Flow`. Writes are `suspend`. `saveCategory` and `saveEvent` are upserts. `getEvents` accepts optional epoch-millis bounds; null = unbounded.
+
+## Room Entities
+
+Entities mirror domain models with Room annotations. They are package-private to the `local` package and never exposed above the repository.
+
+### CategoryEntity
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `String` PK | UUID |
+| `name` | `String` | |
+| `emoji` | `String` | single emoji |
+| `color` | `Long` | ARGB packed |
+| `valueType` | `String` | `ValueType` serialized via `ValueTypeConverter` |
+| `unit` | `String?` | meaningful only when valueType = Number |
+| `allowEmptyText` | `Boolean` | meaningful only when valueType = Text |
+| `sortOrder` | `Int` | ascending; lower = higher in list; indexed |
+| `createdAt` | `Long` | epoch millis |
+
+### EventEntity
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `String` PK | UUID |
+| `categoryId` | `String` FK → categories(id) CASCADE DELETE | indexed |
+| `timestamp` | `Long` | epoch millis; user-editable; indexed |
+| `value` | `String?` | `EventValue?` as JSON; null for None-type events |
+| `notes` | `String?` | |
+| `imagePaths` | `String` | `List<String>` as JSON array; `"[]"` when empty |
+| `createdAt` | `Long` | epoch millis; indexed |
+
+## TypeConverters
+
+### EventValueConverter
+
+Contract: `EventValue?` ↔ `String?`. Null passes through. See `docs/llds/data-model.md § TypeConverter` for full encode/decode logic including `ErrorValue` repair and forward-compat round-trip.
+
+### StringListConverter
+
+Contract: `List<String>` ↔ non-null `String` (JSON array). On decode failure, returns `emptyList()` — corrupt `imagePaths` treated as no images rather than crashing.
+
+### ValueTypeConverter
+
+Contract: `ValueType` ↔ `String`.
+
+- **Encode:** known variants serialize to a fixed lowercase name string (`"none"`, `"scale"`, etc.); `Unknown(raw)` serializes to `raw` verbatim — preserving the original string for round-trip.
+- **Decode:** matches against known names; unrecognized string → `ValueType.Unknown(raw)`.
+
+This mirrors the `ErrorValue` forward-compatibility contract: an old app version reading a category with an unknown `ValueType` stores `Unknown(raw)` and writes `raw` back unchanged.
+
+## DAOs
+
+### CategoryDao
+
+| Method | Return | Notes |
+|---|---|---|
+| `getAll()` | `Flow<List<CategoryEntity>>` | ordered by `sortOrder ASC` |
+| `getById(id)` | `Flow<CategoryEntity?>` | |
+| `getByIdOnce(id)` | `CategoryEntity?` | suspend; for pre-deletion cleanup |
+| `getMinSortOrder()` | `Int?` | suspend; null if no categories exist; used when inserting new category at top |
+| `updateSortOrders(ids: List<String>)` | `Unit` | suspend; reassigns sequential sortOrder values (0, 1, 2…) matching the provided order |
+| `upsert(entity)` | `Unit` | suspend |
+| `deleteById(id)` | `Unit` | suspend |
+
+### EventDao
+
+| Method | Return | Notes |
+|---|---|---|
+| `getAll(start, end)` | `Flow<List<EventEntity>>` | nullable Long bounds; ordered `timestamp DESC, createdAt DESC, id ASC` |
+| `getByCategory(categoryId)` | `Flow<List<EventEntity>>` | same order |
+| `getById(id)` | `Flow<EventEntity?>` | |
+| `getByIdOnce(id)` | `EventEntity?` | suspend; for pre-deletion cleanup |
+| `getByCategoryOnce(categoryId)` | `List<EventEntity>` | suspend; for category deletion cleanup |
+| `getAllOnce()` | `List<EventEntity>` | suspend; for startup orphan scan |
+| `countByCategory(categoryId)` | `Flow<Int>` | live count; for edit screen UI state |
+| `upsert(entity)` | `Unit` | suspend |
+| `deleteById(id)` | `Unit` | suspend |
+
+Sort order (`timestamp DESC, createdAt DESC, id ASC`) matches the canonical ordering in `data-model.md § Same-timestamp ordering`.
+
+## Entity ↔ Domain Mappers
+
+Extension functions in the `local` package. `CategoryEntity.toDomain()`, `Category.toEntity()`, `EventEntity.toDomain()`, `Event.toEntity()`. Each maps field-for-field, delegating type conversion to the converters above.
+
+## LocalTrackrRepository
+
+Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `ImageStore`.
+
+**Deletion order (DB first, files after):** DB deletion is atomic via Room; file deletion follows. If the process dies between the two, orphaned files are recovered at next startup. The reverse order (files first) risks unrecoverable data loss if the DB write fails.
+
+**`saveEvent` image diffing:** reads the old entity before upserting, computes removed paths (`old - new`), upserts, then deletes removed files. Upsert-before-delete ensures a failed upsert leaves storage intact; orphaned files from a crash after upsert are recovered at startup.
+
+**`deleteCategory`:** collects image paths for all child events, deletes the DB row (Room CASCADE removes child rows atomically), then deletes files.
+
+**`onStartup`:** called once at app startup. `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row. Future implementations may use it for different initialization behavior (sync, token refresh, etc.).
+
+## ImageStore
+
+A thin `@Singleton` wrapper around `context.filesDir/images`. Responsibilities:
+
+- `newFile(extension)` — returns a new `File` with a UUID name for the UI to write to
+- `delete(absolutePath)` — deletes a file; no-op if already gone
+- `allStoredPaths()` — returns all file paths in the image directory (used by `onStartup` orphan scan)
+
+Image files are written by the UI before calling `saveEvent`. Deletion is always the repository's responsibility.
+
+## Room Database
+
+Two entities (`CategoryEntity`, `EventEntity`), version 1, `exportSchema = true`. Three TypeConverters registered at the database level. Destructive migration disabled — data loss on schema change is never acceptable.
+
+## Migration Strategy
+
+Version 1; no prior version. Future migrations added via `addMigrations()` on the builder.
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives Considered | Rationale |
+|---|---|---|---|
+| Repository interface location | Defined in this segment | Separate `domain` module | No separate module at this scale; the interface is the seam, not the module boundary |
+| DAO write style | `@Upsert` (Room 2.5+) | `@Insert(onConflict = REPLACE)`; separate insert/update | `@Upsert` is correct and idiomatic; REPLACE deletes-then-inserts which resets FKs |
+| Flow vs. suspend for reads | `Flow` | `suspend` returning snapshot | `Flow` gives reactive UI updates for free |
+| ValueType storage | Sealed class serialized to name string; `Unknown(raw)` round-trips verbatim | Enum ordinal; enum name with TEXT fallback | Sealed class enables lossless round-trip of unknown future variants; TEXT fallback silently loses the original value |
+| `imagePaths` storage | JSON string via `StringListConverter` | Join table (`event_images`); native Room collection support (not available) | Room has no native collection type; JSON string avoids a join for a simple ordered list always loaded with the event. May revisit with a join table if ordering or querying per-image becomes necessary. |
+| `imagePaths` null vs. empty | Non-null `"[]"` | Nullable column | Avoids null-vs-empty ambiguity |
+| Deletion order | DB first, files after | Files first | DB is atomic; file orphans are recoverable. Reversed order risks unrecoverable loss if DB write fails after file delete. |
+| Orphaned file recovery | Startup scan | Journal; periodic background job | Simple and correct; journal adds per-save overhead; background job adds scheduling complexity |
+| `saveEvent` image diff order | Read → upsert → delete removed files | Read → delete → upsert | Upsert-first leaves storage intact on failure; delete-first risks missing files if upsert fails |
+| `imagePaths` decode failure | Return `emptyList()` | Crash; propagate exception | Data-loss acceptable vs. crash for image paths; events remain accessible |
+| Startup lifecycle hook name | `onStartup()` on `TrackrRepository` | `cleanupOrphanedImages()`; `initialize()` | Generic name keeps the interface implementation-agnostic; future backends (GraphQL, sync) can use the same hook for different startup behavior without renaming |
+| Category sort order | `sortOrder: Int ASC`; new = `currentMin - 1`; reorder reassigns sequentially | `createdAt ASC`; alphabetical; linked-list prev/next | `sortOrder` int is simple to query and reorder; linked-list avoids bulk updates but complicates queries; alphabetical removes user control |
+
+## Open Questions & Future Decisions
+
+### Deferred
+
+1. **Nullable Long params in `getEvents` SQL** — Room's handling of `Long?` in `IS NULL OR` queries needs verification during implementation. Fallback: two separate DAO methods (`getAll()`, `getAllInRange(start, end)`) dispatched in the repository.
+2. **`imagePaths` join table** — if per-image ordering, querying, or metadata is needed, a `event_images` join table may be preferable. Deferred until requirements emerge.
+3. **Pagination** — `getEvents` returns all rows. A `PagingSource` (Paging 3) may be needed at scale. Deferred until observed.
+4. **Backup / export** — out of scope for v1.
+
+## References
+
+- `docs/llds/data-model.md` — domain types, `EventValueConverter`, sort order, `ValueType` sealed class
+- `docs/high-level-design.md` — repository-as-seam decision
+- [Room documentation](https://developer.android.com/training/data-storage/room)
