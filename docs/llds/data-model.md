@@ -31,7 +31,7 @@ sealed class ValueType {
 | `Boolean` | Yes / No | `EventValue.BooleanValue` |
 | `Number` | Floating-point with optional unit | `EventValue.NumberValue` |
 | `Text` | Free-form string | `EventValue.TextValue` |
-| `Duration` | Duration in minutes (Int) | `EventValue.DurationValue` |
+| `Duration` | Duration in seconds (Int) | `EventValue.DurationValue` |
 | `Unknown(raw)` | Unrecognized future variant | display as error; `raw` preserved for round-trip |
 
 ## EventValue Sealed Class
@@ -61,8 +61,8 @@ sealed class EventValue {
     @Serializable
     data class TextValue(val text: String) : EventValue()
 
-    @Serializable
-    data class DurationValue(val minutes: Int) : EventValue()  // invariant: >= 0
+    @Serializable(with = DurationAsSecondsSerializer::class)
+    data class DurationValue(val duration: kotlin.time.Duration) : EventValue()  // invariant: >= Duration.ZERO
 
     @Serializable
     data class ErrorValue(
@@ -74,6 +74,8 @@ sealed class EventValue {
 
 `NONE`-type events carry `null` for their value — there is no `EventValue.None` variant. Null is the canonical representation in both the DB column and the domain model. `@Serializable` is required on each non-null variant so kotlinx.serialization can encode/decode the polymorphic sealed class via the class discriminator. `ErrorValue` is produced by the TypeConverter when a value can't be decoded cleanly. On encode, `ErrorValue` bypasses normal serialization — `raw` is written verbatim — so an older app version reading then writing a value from a newer version leaves the DB bytes identical. This is the forward-compatibility contract.
 
+`DurationValue` uses `kotlin.time.Duration` at the domain level. Because kotlinx.serialization encodes `Duration` as an ISO 8601 string by default, a `DurationAsSecondsSerializer` is used to store it as total seconds (Long) in the JSON — compact and unambiguous. The serializer lives in the `local-storage` segment alongside `EventValueConverter`.
+
 ### Invariants and repair strategy
 
 Invariants are enforced at two layers:
@@ -84,7 +86,7 @@ Invariants are enforced at two layers:
 | Condition | Result |
 |---|---|
 | `Scale.value` outside `1..10` | `ErrorValue(OUT_OF_RANGE, raw)` |
-| `DurationValue.minutes` < 0 | `ErrorValue(OUT_OF_RANGE, raw)` |
+| `DurationValue.duration` < `Duration.ZERO` | `ErrorValue(OUT_OF_RANGE, raw)` |
 | `NumberValue.value` | Any finite Double including negative — no constraint |
 | Unknown type discriminator | `ErrorValue(UNRECOGNIZED_TYPE, raw)` — preserves data from future app versions |
 | Unparsable JSON | `ErrorValue(UNPARSABLE, raw)` |
@@ -116,7 +118,7 @@ object EventValueConverter {
             when {
                 decoded is EventValue.Scale && decoded.value !in 1..10 ->
                     EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
-                decoded is EventValue.DurationValue && decoded.minutes < 0 ->
+                decoded is EventValue.DurationValue && decoded.duration < Duration.ZERO ->
                     EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
                 else -> decoded
             }
@@ -146,17 +148,16 @@ data class Category(
     val unit: String?,           // only meaningful when valueType == NUMBER
     val allowEmptyText: Boolean, // only meaningful when valueType == TEXT; read by event UI to gate submission
     val sortOrder: Int,          // ascending; lower = higher in list; new categories get currentMin - 1
-    val createdAt: Long,         // epoch millis
 )
 
 data class Event(
-    val id: String,           // UUID string
+    val id: String,                  // UUID string
     val categoryId: String,
-    val timestamp: Long,      // epoch millis — user-editable log time
-    val value: EventValue?,   // null for NONE-type categories; non-null for all others
+    val timestamp: Instant,          // user-editable log time (java.time.Instant)
+    val value: EventValue?,          // null for NONE-type categories; non-null for all others
     val notes: String?,
-    val imagePaths: List<String>,  // absolute paths within app-private storage; empty = no images
-    val createdAt: Long,           // epoch millis — wall-clock creation time
+    val imagePaths: List<String>,    // absolute paths within app-private storage; empty = no images
+    val createdAt: Instant,          // wall-clock creation time; never edited
 )
 ```
 
@@ -168,7 +169,7 @@ The quick-log flow captures at most one image; additional images can be attached
 
 ### timestamp vs createdAt
 
-`timestamp` is the time the user says the event occurred — it is editable and is what appears in the timeline. `createdAt` is the wall-clock time the record was created and is never edited. They diverge when the user logs a past event.
+`timestamp` is the time the user says the event occurred — it is editable and is what appears in the timeline. `createdAt` is the wall-clock `Instant` at which the record was first created and is never edited. They diverge when the user logs a past event. Both are stored in Room as epoch-millis Long values via an `InstantConverter` TypeConverter in the `local-storage` segment.
 
 ### Same-timestamp ordering
 
@@ -194,9 +195,9 @@ Changing a category's `valueType` after events have been logged is **not prevent
 |---|---|---|---|
 | Value storage format | JSON `String?` via kotlinx.serialization | Separate columns per type; separate tables per type; protobuf | Single-column JSON avoids schema migrations when new value types are added; kotlinx.serialization is compile-time safe and idiomatic Kotlin |
 | Sealed class vs. interface | `sealed class EventValue` | Open interface; `Any?` with ValueType cast | Sealed class gives exhaustive `when` expressions; compiler enforces handling all variants |
-| Timestamp representation | `Long` (epoch millis) | `java.time.Instant`; `kotlinx.datetime.Instant` | Avoids date library dependency in domain layer; trivial to convert in UI; Room stores Long natively |
+| Timestamp representation | `java.time.Instant` in domain; stored as epoch-millis Long in Room via `InstantConverter` | Plain `Long`; `kotlinx.datetime.Instant` | `Instant` is semantically correct and type-safe; no extra library needed (Java stdlib + desugaring); `Long` is error-prone without context about units |
 | Scale range | 1..10 (Int) | Float 0.0–1.0; configurable per category | Integer 1–10 is the universal convention for subjective scales; simpler UI (slider snaps to integers) |
-| Duration unit | Minutes (Int) | Seconds; `kotlin.time.Duration` | Minutes is the coarsest unit users think in for most tracking use cases; Int is simpler than Duration for storage |
+| Duration representation | `kotlin.time.Duration` in domain; serialized as total seconds (Long) via `DurationAsSecondsSerializer` | Plain `Int` seconds; `java.time.Duration` | `kotlin.time.Duration` is idiomatic Kotlin and gives UI convenient decomposition (`.toComponents`); serializing as Long seconds avoids ISO 8601 string overhead and keeps the JSON compact |
 | IDs | UUID strings | Auto-increment Long | UUIDs are stable across local/cloud sync boundary — no re-keying when a backend is added |
 | Image storage | File paths in `imagePaths: List<String>` | Blob in DB; separate images table | File paths keep the DB row small; blobs bloat SQLite and slow queries; separate table adds join overhead for a simple ordered list |
 | Image path type | Absolute path string | URI string; relative path | Absolute paths are unambiguous at read time; URI strings require resolution context; relative paths need a known root |

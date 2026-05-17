@@ -27,7 +27,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 |---|---|---|
 | Name | Text field | Always |
 | Emoji | Single-character text field (system emoji keyboard) | Always |
-| Color | Preset color palette picker | Always |
+| Color | Preset color palette picker; out-of-palette swatch if current color is not in palette | Always |
 | Value type | Segmented picker / dropdown | Always |
 | Unit | Text field | `valueType == Number` only |
 
@@ -41,7 +41,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 |---|---|
 | Name | Non-empty after trim |
 | Emoji | Non-empty; single grapheme cluster |
-| Color | Always valid (preset palette, always has a selection) |
+| Color | Always valid (current color always selected on open; user may switch to a preset) |
 | ValueType | Always valid (picker, always has a selection) |
 
 ## ViewModels
@@ -60,6 +60,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 - Exposes `saveResult: StateFlow<SaveResult>` (`Idle`, `Success`, `ValidationError`)
 - `eventCount: StateFlow<Int>` — live count from `repository.getEventCountForCategory()`; drives delete button visibility and ValueType change warning (both trigger when count > 0)
 - New categories are assigned `sortOrder = currentMin - 1` (placing them at the top); the repository provides the current minimum via `CategoryDao.getMinSortOrder()`
+- New categories are assigned a default color via `repository.getAndIncrementNextCategoryColorIndex()`, which returns `index % paletteSize` mapped to the preset palette; the counter is monotonically increasing and unaffected by deletions
 
 ### Event Count Query
 
@@ -90,6 +91,8 @@ Deletion can be initiated from either the list (long-press) or the edit screen (
 ## Color Selection
 
 Preset palette for v1. The palette is a fixed list of ARGB `Long` values defined in the UI layer. The domain model accepts any `Long` — the constraint is purely in the picker UI. Full color wheel deferred to a future version.
+
+**Out-of-palette colors:** if an existing category's color is not in the preset palette (e.g., set by a future app version with a custom picker), the editor displays the current color as a distinct "current color" swatch above the preset palette. It is pre-selected. The user may keep it (no change) or tap any preset to replace it. The out-of-palette swatch is only shown when editing an existing category whose color is not in the palette — it is never shown when creating a new category.
 
 ## Emoji Input
 

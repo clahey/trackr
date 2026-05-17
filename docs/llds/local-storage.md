@@ -27,6 +27,9 @@ interface TrackrRepository {
     suspend fun saveEvent(event: Event)            // upsert
     suspend fun deleteEvent(id: String)
 
+    // Preferences
+    suspend fun getAndIncrementNextCategoryColorIndex(): Int  // atomically returns current index then increments
+
     // Lifecycle
     suspend fun onStartup()
 }
@@ -50,7 +53,6 @@ Entities mirror domain models with Room annotations. They are package-private to
 | `unit` | `String?` | meaningful only when valueType = Number |
 | `allowEmptyText` | `Boolean` | meaningful only when valueType = Text |
 | `sortOrder` | `Int` | ascending; lower = higher in list; indexed |
-| `createdAt` | `Long` | epoch millis |
 
 ### EventEntity
 
@@ -58,17 +60,21 @@ Entities mirror domain models with Room annotations. They are package-private to
 |---|---|---|
 | `id` | `String` PK | UUID |
 | `categoryId` | `String` FK → categories(id) CASCADE DELETE | indexed |
-| `timestamp` | `Long` | epoch millis; user-editable; indexed |
+| `timestamp` | `Long` | epoch millis via `InstantConverter`; user-editable; indexed |
 | `value` | `String?` | `EventValue?` as JSON; null for None-type events |
 | `notes` | `String?` | |
 | `imagePaths` | `String` | `List<String>` as JSON array; `"[]"` when empty |
-| `createdAt` | `Long` | epoch millis; indexed |
+| `createdAt` | `Long` | epoch millis via `InstantConverter`; wall-clock creation time; indexed |
 
 ## TypeConverters
 
 ### EventValueConverter
 
 Contract: `EventValue?` ↔ `String?`. Null passes through. See `docs/llds/data-model.md § TypeConverter` for full encode/decode logic including `ErrorValue` repair and forward-compat round-trip.
+
+### InstantConverter
+
+Contract: `java.time.Instant` ↔ `Long` (epoch millis). Used for `Event.timestamp` and `Event.createdAt`. Encode: `instant.toEpochMilli()`. Decode: `Instant.ofEpochMilli(value)`.
 
 ### StringListConverter
 
@@ -139,9 +145,19 @@ A thin `@Singleton` wrapper around `context.filesDir/images`. Responsibilities:
 
 Image files are written by the UI before calling `saveEvent`. Deletion is always the repository's responsibility.
 
+## DataStore
+
+Jetpack DataStore Preferences stores simple app-wide state that doesn't belong in the Room schema. In v1, one key is stored:
+
+| Key | Type | Initial value | Notes |
+|---|---|---|---|
+| `next_category_color_index` | `Int` | `0` | Monotonically increasing; never reset on deletion |
+
+`LocalTrackrRepository.getAndIncrementNextCategoryColorIndex()` reads the current value, writes `value + 1`, and returns the original value — atomically within a DataStore transaction. The caller receives the index to apply; the store always holds the next one.
+
 ## Room Database
 
-Two entities (`CategoryEntity`, `EventEntity`), version 1, `exportSchema = true`. Three TypeConverters registered at the database level. Destructive migration disabled — data loss on schema change is never acceptable.
+Two entities (`CategoryEntity`, `EventEntity`), version 1, `exportSchema = true`. Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
 
 ## Migration Strategy
 
@@ -152,6 +168,8 @@ Version 1; no prior version. Future migrations added via `addMigrations()` on th
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Repository interface location | Defined in this segment | Separate `domain` module | No separate module at this scale; the interface is the seam, not the module boundary |
+| Next color index storage | DataStore Preferences | Room metadata table; SharedPreferences | DataStore is the idiomatic Jetpack replacement for SharedPreferences; a Room table would be over-engineered for a single integer |
+| Next color index strategy | Monotonically incrementing int; never reset on deletion | Compute from current category count | Count-based would repeat colors after deletions; a stored counter guarantees each new category gets the next unused palette slot |
 | DAO write style | `@Upsert` (Room 2.5+) | `@Insert(onConflict = REPLACE)`; separate insert/update | `@Upsert` is correct and idiomatic; REPLACE deletes-then-inserts which resets FKs |
 | Flow vs. suspend for reads | `Flow` | `suspend` returning snapshot | `Flow` gives reactive UI updates for free |
 | ValueType storage | Sealed class serialized to name string; `Unknown(raw)` round-trips verbatim | Enum ordinal; enum name with TEXT fallback | Sealed class enables lossless round-trip of unknown future variants; TEXT fallback silently loses the original value |

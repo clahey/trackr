@@ -25,7 +25,9 @@ Supports:
 
 Day headers show the date (e.g., "Today", "Yesterday", full date for older).
 
-A horizontally scrollable row of category chips sits below the app bar. An "All" chip appears first; tapping any category chip filters the timeline to that category only. Tapping the active chip again (or "All") clears the filter. When a filter is active, the FAB quick-log sheet opens directly to step 2 with that category pre-selected.
+A horizontally scrollable row of category chips sits below the app bar. An "All" chip appears first; tapping any inactive category chip sets it as the active filter (visually highlighted); tapping the active chip again (or "All") clears the filter. When a filter is active, the FAB quick-log sheet opens directly to step 2 with that category pre-selected.
+
+**Filter scroll behavior:** Day groups with no matching events are hidden when a filter is active. When a filter is applied, the timeline scrolls to keep the same calendar day approximately at the top (or the nearest earlier day that has matching events, if the current day has none). The pre-filter scroll position (top day) is remembered. When the filter is cleared, if the user has not manually scrolled since applying the filter, the timeline restores to the pre-filter position; if the user has scrolled in filtered mode, the position is not restored. Manual scrolling discards the remembered position.
 
 ### Quick-Log Sheet
 
@@ -60,11 +62,11 @@ Save navigates back to timeline. Delete shows a confirmation dialog, then delete
 | ValueType | Input widget | Notes |
 |---|---|---|
 | `None` | — | No input; field omitted |
-| `Scale` | Slider (1–10) or segmented row | Integer snap |
-| `Boolean` | Toggle / two-button picker | Yes / No |
-| `Number` | Numeric text field | Unit label shown inline; pre-filled from `Category.unit` |
+| `Scale` | Horizontal slider | Integer snap 1–10 |
+| `Boolean` | Two-button row | Labeled "Yes" / "No" in v1; custom labels deferred (see Open Questions) |
+| `Number` | Numeric text field + separate unit text field | Unit field pre-filled from `Category.unit`; user-editable; empty saves as null (unitless) |
 | `Text` | Multi-line text field | Empty string gated by `Category.allowEmptyText` |
-| `Duration` | Numeric minutes field or HH:MM picker | TBD in theme/UI LLD |
+| `Duration` | Three separate numeric fields (H / M / S) | Domain type is `kotlin.time.Duration`; fields decomposed via `.toComponents` |
 | `Unknown(raw)` | Read-only display of raw value | Cannot edit — type unknown to this version |
 | `ErrorValue` | Read-only display with error indicator | Shows `ErrorKind` and raw string; cannot edit |
 
@@ -76,6 +78,9 @@ Save navigates back to timeline. Delete shows a confirmation dialog, then delete
 
 - `activeFilter: StateFlow<Category?>` — the currently selected category chip; null = all categories
 - `dayGroups: StateFlow<List<DayGroup>>` — derived from `repository.getEventsByCategory()` when a filter is active, `repository.getEvents()` otherwise; grouped by calendar day of `timestamp` in local timezone
+- `preFilterTopDay: StateFlow<LocalDate?>` — the calendar day that was at the top of the timeline when the current filter was applied; null if no filter is active or if the user has manually scrolled since applying the filter. Set by `setFilter()`; cleared on manual scroll or filter clear after restore.
+- `setFilter(category: Category?)` — sets `activeFilter`, records the current top day in `preFilterTopDay`; null clears the filter
+- `onUserScrolled()` — called by the UI when the user manually scrolls; clears `preFilterTopDay`
 - `pendingDelete: StateFlow<Event?>` — the event swiped away but not yet committed; null when no undo is available
 - `swipeDelete(event: Event)` — immediately calls `repository.deleteEvent()`; stores the full `Event` in `pendingDelete` and injects an undo placeholder into the day group at the event's original position
 - `undoDelete()` — calls `repository.saveEvent(pendingDelete!!)` to restore; clears `pendingDelete`
@@ -103,7 +108,7 @@ sealed class DayEntry {
 - `categories: StateFlow<List<Category>>` — from `repository.getCategories()`
 - `selectedCategory: StateFlow<Category?>` — set when user picks in step 1
 - Form state: `timestamp`, `value`, `notes`, `imagePath` (single, nullable)
-- `timestamp` defaults to `System.currentTimeMillis()` at sheet open; user-editable
+- `timestamp` defaults to `Instant.now()` at sheet open; user-editable
 - `save()`: validates, generates a UUID for the new event, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, emits `SaveResult`
 - `reset()`: called when sheet is dismissed without saving; clears form state and deletes any captured-but-unsaved image file
 - **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1
@@ -144,7 +149,7 @@ Home (timeline)
 |---|---|---|---|
 | Quick-log flow | Two-step: category picker → value form | Single combined form; category pre-selected | Two-step keeps step 2 focused; pre-selection requires knowing the category in advance |
 | Timeline grouping | ViewModel groups by `LocalDate` of `timestamp` | Repository returns pre-grouped; group in UI | ViewModel is the right layer — grouping is presentation logic, not storage logic; keeps the repository general |
-| Default timestamp | Now (`System.currentTimeMillis()`) at sheet open | Now at save time | User-editable timestamp should show the current time as its default from the moment the sheet opens, not when they tap save |
+| Default timestamp | `Instant.now()` at sheet open | Now at save time | User-editable timestamp should show the current time as its default from the moment the sheet opens, not when they tap save |
 | `ErrorValue` / `Unknown` in edit | Read-only value field; other fields remain editable | Block editing entirely; allow raw edit | Preserving notes/timestamp/image editing is useful even when the value is unreadable; raw JSON edit is dangerous |
 | Unsaved image cleanup | ViewModel tracks newly captured paths; cleans up on cancel / `onCleared()` | Rely on startup orphan scan | Startup scan is a safety net, not the primary path; prompt cleanup avoids accumulating stale files during a session; process-kill gap covered by scan |
 | Category deleted during quick-log step 2 | `QuickLogViewModel` observes `categories`; drops `selectedCategory` and returns to step 1 if it disappears | Block deletion while sheet is open; crash | Reactive Flow already provides the signal; returning to step 1 is graceful and requires no special locking |
@@ -154,16 +159,20 @@ Home (timeline)
 | Undo mechanism | Hard delete + restore via `saveEvent` | Soft delete (pending flag in DB) | No schema change needed; restore is a normal save; soft delete complicates all queries with a filter |
 | Category filter UI | Horizontal chip row; single selection; "All" chip | Toolbar dropdown; drawer; no filter in v1 | Chip row keeps filters always visible and one tap away; single selection covers the common case without multi-select complexity |
 | Filter + FAB interaction | Active filter pre-selects category in quick-log step 2 | Ignore filter; always show picker | If the user filtered to a category, they likely want to log to it — skipping the picker saves a tap |
+| Scale widget | Horizontal slider with integer snap | Segmented row (10 buttons) | Slider conveys the continuous 1–10 range visually; segmented row adds tap-target complexity for 10 values |
+| Boolean widget | Two-button row (Yes / No) | Toggle switch | Toggle is ambiguous about which state is "on"; two-button row is explicit and symmetric |
+| Duration widget | Three separate H / M / S numeric fields | Single seconds field; HH:MM:SS text entry | Three fields allow independent editing of each component; single seconds field is unintuitive for durations > 60s |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
 
-1. **Duration input widget** — slider, HH:MM picker, or plain minutes field. Deferred to UI implementation.
-2. **Timeline date range filtering** — the repository supports `start`/`end` bounds; no UI for it in v1. Could be added as a filter/search later.
-3. **Multi-category filter** — v1 supports single-category filter only. Multi-select deferred.
-4. **Editing a `None`-type event's value** — currently no input shown. If a category later changes `valueType` away from None, historical None events show no value; edit screen should probably show the new input type for those. Edge case deferred.
-5. **Empty timeline state** — what the home screen shows when there are no events yet. Copy/illustration TBD.
+1. **Duration input improvements** — current H / M / S fields are functional but could be improved: stopwatch capture, natural-language input ("1h 30m"), or single-number + unit picker are candidates.
+2. **Boolean custom labels** — v1 uses "Yes" / "No" labels on the two-button row. Future: allow categories to specify custom label pairs (e.g., "Taken" / "Skipped" for medication, "Good" / "Bad" for mood).
+3. **Timeline date range filtering** — the repository supports `start`/`end` bounds; no UI for it in v1. Could be added as a filter/search later.
+4. **Multi-category filter** — v1 supports single-category filter only. Multi-select deferred.
+5. **Editing a `None`-type event's value** — currently no input shown. If a category later changes `valueType` away from None, historical None events show no value; edit screen should probably show the new input type for those. Edge case deferred.
+6. **Empty timeline state** — what the home screen shows when there are no events yet. Copy/illustration TBD.
 
 ## References
 
