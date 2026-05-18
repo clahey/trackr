@@ -45,12 +45,13 @@ graph TD
 
 **Major components:**
 
-- **UI Layer** — Jetpack Compose screens: Home (timeline), Add Event (bottom sheet), Categories (management), Event detail/edit
+- **UI Layer** — Jetpack Compose screens: Home (timeline), Add Event (bottom sheet), Categories (management), Event detail/edit. A bottom navigation bar with two tabs (Timeline, Categories) provides top-level navigation; hidden on detail screens.
 - **ViewModels** — state holders per screen; expose `StateFlow`; consume repository
 - **Repository interface** — `TrackrRepository` — sole seam for future backend swap
 - **LocalTrackrRepository** — Room-backed implementation
 - **Room Database** — two tables: `categories`, `events`
 - **Image storage** — image files written to app-private storage (`context.filesDir`); paths stored as a JSON list in the `events` table; never stored as blobs
+- **App Shell** — `TrackrApplication` (`@HiltAndroidApp`), `MainActivity` (`@AndroidEntryPoint`), Hilt modules, and the Compose `NavHost`. ViewModel arguments pass via `SavedStateHandle` (compatible with process-death restoration).
 
 ## Key Design Decisions
 
