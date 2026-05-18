@@ -1,0 +1,194 @@
+package com.trackr.app.ui.home
+
+import com.trackr.app.FakeImageStore
+import com.trackr.app.FakeTrackrRepository
+import com.trackr.app.domain.Category
+import com.trackr.app.domain.ErrorKind
+import com.trackr.app.domain.EventValue
+import com.trackr.app.domain.ValueType
+import com.trackr.app.ui.SaveResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import java.time.Instant
+import com.trackr.app.domain.Event
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class EventEditViewModelTest {
+
+    private val dispatcher = UnconfinedTestDispatcher()
+    private lateinit var repo: FakeTrackrRepository
+    private lateinit var imageStore: FakeImageStore
+    private lateinit var vm: EventEditViewModel
+
+    companion object {
+        val anchor: Instant = Instant.parse("2024-01-15T12:00:00Z")
+    }
+
+    private fun makeCategory(
+        id: String,
+        valueType: ValueType = ValueType.Scale,
+    ) = Category(
+        id = id, name = id, emoji = "📌", color = 0xFFE53935L,
+        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = 0,
+    )
+
+    private fun makeEvent(
+        id: String,
+        categoryId: String,
+        value: EventValue? = null,
+        notes: String? = null,
+        imagePaths: List<String> = emptyList(),
+        timestamp: Instant = anchor,
+    ) = Event(
+        id = id, categoryId = categoryId, timestamp = timestamp,
+        value = value, notes = notes, imagePaths = imagePaths,
+        createdAt = anchor,
+    )
+
+    @Before fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        repo = FakeTrackrRepository()
+        imageStore = FakeImageStore()
+    }
+
+    @After fun tearDown() { Dispatchers.resetMain() }
+
+    private fun makeVm(eventId: String) = EventEditViewModel(repo, imageStore, eventId)
+
+    // @spec EL-UI-040
+    @Test fun `form fields initialized from loaded event`() = runTest {
+        val event = makeEvent("e1", "c1", notes = "my note", timestamp = anchor)
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(event)
+        vm = makeVm("e1")
+        assertEquals(anchor, vm.timestamp.value)
+        assertEquals("my note", vm.notes.value)
+    }
+
+    // @spec EL-UI-040
+    @Test fun `imagePaths initialized from loaded event`() = runTest {
+        val event = makeEvent("e1", "c1", imagePaths = listOf("/img/a.jpg", "/img/b.jpg"))
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(event)
+        vm = makeVm("e1")
+        assertEquals(listOf("/img/a.jpg", "/img/b.jpg"), vm.imagePaths.value)
+    }
+
+    // @spec EL-UI-043
+    @Test fun `event with ErrorValue has isValueEditable false`() = runTest {
+        val event = makeEvent("e1", "c1", value = EventValue.ErrorValue(ErrorKind.UNPARSABLE, "bad"))
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(event)
+        vm = makeVm("e1")
+        assertFalse(vm.isValueEditable.value)
+    }
+
+    // @spec EL-UI-043
+    @Test fun `event with normal value has isValueEditable true`() = runTest {
+        val event = makeEvent("e1", "c1", value = EventValue.Scale(5))
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(event)
+        vm = makeVm("e1")
+        assertTrue(vm.isValueEditable.value)
+    }
+
+    // @spec EL-UI-043
+    @Test fun `category with Unknown valueType has isValueEditable false`() = runTest {
+        val event = makeEvent("e1", "c1")
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Unknown("future_type")))
+        repo.saveEvent(event)
+        vm = makeVm("e1")
+        assertFalse(vm.isValueEditable.value)
+    }
+
+    // @spec EL-UI-042
+    @Test fun `requestDelete sets pendingDelete true`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.requestDelete()
+        assertTrue(vm.pendingDelete.value)
+    }
+
+    // @spec EL-UI-042
+    @Test fun `cancelDelete sets pendingDelete false`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.requestDelete()
+        vm.cancelDelete()
+        assertFalse(vm.pendingDelete.value)
+    }
+
+    // @spec EL-NAV-006
+    @Test fun `confirmDelete deletes event from repository and signals completion`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.requestDelete()
+        vm.confirmDelete()
+        assertTrue(vm.deleteComplete.value)
+        assertNull(repo.getEventById("e1").first())
+    }
+
+    // @spec EL-NAV-005
+    @Test fun `save writes updated fields to repository`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "old note"))
+        vm = makeVm("e1")
+        vm.notes.value = "new note"
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.Success)
+        val saved = repo.getEventById("e1").first()
+        assertEquals("new note", saved?.notes)
+    }
+
+    // @spec EL-UI-044
+    @Test fun `addImage appends path to imagePaths`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.addImage("/img/new.jpg")
+        assertEquals(listOf("/img/new.jpg"), vm.imagePaths.value)
+    }
+
+    // @spec EL-UI-044
+    @Test fun `removeImage removes path from imagePaths`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", imagePaths = listOf("/img/a.jpg", "/img/b.jpg")))
+        vm = makeVm("e1")
+        vm.removeImage("/img/a.jpg")
+        assertEquals(listOf("/img/b.jpg"), vm.imagePaths.value)
+    }
+
+    // @spec EL-PROC-002
+    @Test fun `cancel deletes newly captured images not in original event`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", imagePaths = listOf("/img/original.jpg")))
+        vm = makeVm("e1")
+        vm.addImage("/img/new.jpg")
+        vm.cancel()
+        assertTrue(imageStore.wasDeleted("/img/new.jpg"))
+    }
+
+    // @spec EL-PROC-002
+    @Test fun `cancel does not delete images from the original event`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", imagePaths = listOf("/img/original.jpg")))
+        vm = makeVm("e1")
+        vm.cancel()
+        assertFalse(imageStore.wasDeleted("/img/original.jpg"))
+    }
+}
