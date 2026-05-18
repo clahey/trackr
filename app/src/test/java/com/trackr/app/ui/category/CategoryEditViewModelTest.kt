@@ -5,6 +5,7 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.ValueType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -119,9 +120,8 @@ class CategoryEditViewModelTest {
         vm.name.value = "Running"; vm.emoji.value = "🏃"; vm.save()
         vm = CategoryEditViewModel(repo)
         vm.name.value = "Sleep"; vm.emoji.value = "💤"; vm.save()
-        val colors = getAllSavedColors()
-        assertEquals(0xFFE53935L, colors[0]) // Red
-        assertEquals(0xFFFB8C00L, colors[1]) // Orange
+        assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color) // Red
+        assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)   // Orange
     }
 
     // @spec CAT-UI-030
@@ -144,23 +144,13 @@ class CategoryEditViewModelTest {
     }
 
     private suspend fun getSavedCategory(): Category =
-        (repo.getCategories() as kotlinx.coroutines.flow.Flow<List<Category>>).let {
-            var result: Category? = null
-            it.collect { list -> result = list.firstOrNull(); }
-            result!!
-        }
+        repo.getCategories().first().first()
 
-    private suspend fun getSavedCategoryByName(name: String): Category {
-        var result: Category? = null
-        repo.getCategories().collect { list -> result = list.find { it.name == name } }
-        return result!!
-    }
+    private suspend fun getSavedCategoryByName(name: String): Category =
+        repo.getCategories().first().first { it.name == name }
 
-    private suspend fun getAllSavedColors(): List<Long> {
-        var result: List<Long> = emptyList()
-        repo.getCategories().collect { result = it.map { c -> c.color } }
-        return result
-    }
+    private suspend fun getAllSavedColors(): List<Long> =
+        repo.getCategories().first().map { it.color }
 
     private fun makeCategory(
         id: String,

@@ -6,10 +6,10 @@ import org.junit.Test
 class CategoryColorsTest {
 
     // @spec THEME-PROC-001
-    @Test fun `dark red produces white foreground`() {
-        // 0xFFE53935 — Red, luminance well below 0.179
+    @Test fun `dark red produces black foreground`() {
+        // 0xFFE53935 — Red 600, relative luminance ~0.198 which is >= 0.179 threshold
         val fg = foregroundColorForBackground(0xFFE53935L)
-        assertEquals(0xFFFFFFFFL, fg)
+        assertEquals(0xFF000000L, fg)
     }
 
     // @spec THEME-PROC-001
@@ -73,13 +73,8 @@ class CategoryColorsTest {
     }
 
     // @spec THEME-UI-021
-    @Test fun `index 12 wraps back to Red`() {
-        assertEquals(0xFFE53935L, categoryColorForIndex(12))
-    }
-
-    // @spec THEME-UI-021
-    @Test fun `index 13 returns Orange`() {
-        assertEquals(0xFFFB8C00L, categoryColorForIndex(13))
+    @Test fun `index 11 returns Grey`() {
+        assertEquals(0xFF757575L, categoryColorForIndex(11))
     }
 }
 

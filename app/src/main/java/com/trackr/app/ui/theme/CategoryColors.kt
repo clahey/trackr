@@ -15,6 +15,14 @@ val categoryColorPalette: List<Long> = listOf(
     0xFF757575L, // Grey
 )
 
-fun categoryColorForIndex(index: Int): Long = categoryColorPalette[index % categoryColorPalette.size]
+fun categoryColorForIndex(index: Int): Long = categoryColorPalette[index]
 
-fun foregroundColorForBackground(argb: Long): Long = TODO()
+// @spec THEME-PROC-001, THEME-PROC-002
+fun foregroundColorForBackground(argb: Long): Long {
+    val r = ((argb shr 16) and 0xFF) / 255.0
+    val g = ((argb shr 8) and 0xFF) / 255.0
+    val b = (argb and 0xFF) / 255.0
+    fun linearize(c: Double) = if (c <= 0.04045) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4)
+    val luminance = 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+    return if (luminance < 0.179) 0xFFFFFFFFL else 0xFF000000L
+}

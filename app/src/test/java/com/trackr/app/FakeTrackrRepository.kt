@@ -43,7 +43,11 @@ class FakeTrackrRepository : TrackrRepository {
     }
     override suspend fun deleteEvent(id: String) { events.update { it.filter { e -> e.id != id } } }
 
-    override suspend fun getAndIncrementNextCategoryColorIndex(): Int = nextColorIndex++
+    override suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int {
+        val current = nextColorIndex
+        nextColorIndex = (nextColorIndex + 1) % paletteSize
+        return current
+    }
 
     override suspend fun onStartup() {}
 

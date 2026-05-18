@@ -45,7 +45,7 @@ LLD: `docs/llds/local-storage.md`
 ## DataStore
 
 - [ ] **LS-BE-080**: The system shall persist a `next_category_color_index` integer in DataStore Preferences, initialized to 0 and never reset.
-- [ ] **LS-BE-081**: `getAndIncrementNextCategoryColorIndex` shall atomically return the current index and increment the stored value by 1, so that concurrent calls never return the same index.
+- [ ] **LS-BE-081**: `getAndIncrementNextCategoryColorIndex(paletteSize: Int)` shall atomically return the current stored index and store `(current + 1) % paletteSize`, keeping the stored value in `[0, paletteSize)` so that concurrent calls never return the same index and the counter cycles at the caller-supplied palette size.
 
 ## ImageStore
 

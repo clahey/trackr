@@ -19,7 +19,7 @@ interface TrackrRepository {
     suspend fun saveEvent(event: Event)
     suspend fun deleteEvent(id: String)
 
-    suspend fun getAndIncrementNextCategoryColorIndex(): Int
+    suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int
 
     suspend fun onStartup()
 }

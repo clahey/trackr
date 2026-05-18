@@ -37,4 +37,4 @@ LLD: `docs/llds/theme.md`
   | Brown | `0xFF6D4C41` |
   | Grey | `0xFF757575` |
 
-- [ ] **THEME-UI-021**: When a new category is created, the system shall assign a default color of `palette[nextIndex % 12]` where `nextIndex` is a monotonically increasing counter (see LS-BE-080) that is never reset by deletions, ensuring consecutive categories always receive distinct colors.
+- [ ] **THEME-UI-021**: When a new category is created, the system shall assign a default color of `palette[nextIndex]` where `nextIndex` is obtained from `getAndIncrementNextCategoryColorIndex(palette.size)` (see LS-BE-081), which cycles within `[0, palette.size)` so that consecutive categories always receive distinct colors and adding palette entries in the future does not retroactively change which color is next.

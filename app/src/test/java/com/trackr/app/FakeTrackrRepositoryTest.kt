@@ -24,6 +24,13 @@ class FakeTrackrRepositoryTest {
         assertEquals(listOf("c1", "c2", "c3"), result.map { it.id })
     }
 
+    // @spec LS-BE-081
+    @Test fun `getAndIncrementNextCategoryColorIndex cycles within palette size`() = runTest {
+        val repo = FakeTrackrRepository()
+        val results = (0 until 5).map { repo.getAndIncrementNextCategoryColorIndex(3) }
+        assertEquals(listOf(0, 1, 2, 0, 1), results)
+    }
+
     // @spec LS-BE-010
     @Test fun `updating a category preserves sortOrder position not insertion order`() = runTest {
         val repo = FakeTrackrRepository()
