@@ -1,5 +1,6 @@
 package com.trackr.app.ui.category
 
+import androidx.lifecycle.SavedStateHandle
 import com.trackr.app.FakeTrackrRepository
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.ValueType
@@ -33,7 +34,7 @@ class CategoryEditViewModelTest {
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
         repo = FakeTrackrRepository()
-        vm = CategoryEditViewModel(repo)
+        vm = CategoryEditViewModel(repo, SavedStateHandle())
     }
 
     @After fun tearDown() { Dispatchers.resetMain() }
@@ -118,7 +119,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-043
     @Test fun `second new category gets next palette color`() = runTest {
         vm.name.value = "Running"; vm.emoji.value = "🏃"; vm.save()
-        vm = CategoryEditViewModel(repo)
+        vm = CategoryEditViewModel(repo, SavedStateHandle())
         vm.name.value = "Sleep"; vm.emoji.value = "💤"; vm.save()
         assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color) // Red
         assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)   // Orange
@@ -129,7 +130,7 @@ class CategoryEditViewModelTest {
         val existingCategory = makeCategory("c1", valueType = ValueType.Scale)
         repo.saveCategory(existingCategory)
         repo.saveEvent(makeEvent("e1", "c1"))
-        vm = CategoryEditViewModel(repo, categoryId = "c1")
+        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "c1")))
         vm.valueType.value = ValueType.Text
         assertTrue(vm.showValueTypeWarning.value)
     }
@@ -138,7 +139,7 @@ class CategoryEditViewModelTest {
     @Test fun `changing valueType on category with no events shows no warning`() = runTest {
         val existingCategory = makeCategory("c1", valueType = ValueType.Scale)
         repo.saveCategory(existingCategory)
-        vm = CategoryEditViewModel(repo, categoryId = "c1")
+        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "c1")))
         vm.valueType.value = ValueType.Text
         assertFalse(vm.showValueTypeWarning.value)
     }

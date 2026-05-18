@@ -112,7 +112,7 @@ private fun CategoryRow(
     }
 }
 
-private fun valueTypeLabel(type: ValueType): String = when (type) {
+internal fun valueTypeLabel(type: ValueType): String = when (type) {
     ValueType.None -> "None"
     ValueType.Scale -> "Scale (1–10)"
     ValueType.Boolean -> "Yes / No"
