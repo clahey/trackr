@@ -29,6 +29,8 @@ class CategoryEditViewModel @Inject constructor(
 
     private val categoryId: String? = savedStateHandle["categoryId"]
 
+    val isEditMode: Boolean get() = categoryId != null
+
     val name = MutableStateFlow("")
     val emoji = MutableStateFlow("")
     val color = MutableStateFlow(0xFFE53935L)

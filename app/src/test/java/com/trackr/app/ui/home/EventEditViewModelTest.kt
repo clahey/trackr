@@ -1,5 +1,6 @@
 package com.trackr.app.ui.home
 
+import androidx.lifecycle.SavedStateHandle
 import com.trackr.app.FakeImageStore
 import com.trackr.app.FakeTrackrRepository
 import com.trackr.app.domain.Category
@@ -65,7 +66,7 @@ class EventEditViewModelTest {
 
     @After fun tearDown() { Dispatchers.resetMain() }
 
-    private fun makeVm(eventId: String) = EventEditViewModel(repo, imageStore, eventId)
+    private fun makeVm(eventId: String) = EventEditViewModel(repo, imageStore, SavedStateHandle(mapOf("eventId" to eventId)))
 
     // @spec EL-UI-040
     @Test fun `form fields initialized from loaded event`() = runTest {

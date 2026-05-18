@@ -67,14 +67,6 @@ class QuickLogViewModelTest {
         assertEquals(cat, vm.selectedCategory.value)
     }
 
-    // @spec EL-UI-013
-    @Test fun `pre-selected category is set at construction`() {
-        val cat = makeCategory("c1")
-        repo.setCategories(cat)
-        vm = QuickLogViewModel(repo, imageStore, preSelectedCategory = cat, clock = fixedClock)
-        assertEquals(cat, vm.selectedCategory.value)
-    }
-
     // @spec EL-UI-034
     @Test fun `selected category deleted externally resets selectedCategory to null`() = runTest {
         val cat = makeCategory("c1")

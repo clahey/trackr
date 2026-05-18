@@ -16,7 +16,7 @@ import java.time.Instant
 // @spec LS-BE-010, LS-BE-011, LS-BE-012, LS-BE-013, LS-BE-020, LS-BE-021,
 // LS-BE-030, LS-BE-031, LS-BE-032, LS-BE-040, LS-BE-050, LS-BE-051,
 // LS-BE-052, LS-BE-053, LS-BE-054, LS-BE-071, LS-BE-080, LS-BE-081
-class LocalTrackrRepository(
+class LocalTrackrRepository @javax.inject.Inject constructor(
     private val categoryDao: CategoryDao,
     private val eventDao: EventDao,
     private val imageStore: ImageStore,

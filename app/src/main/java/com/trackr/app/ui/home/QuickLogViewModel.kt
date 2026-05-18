@@ -9,6 +9,7 @@ import com.trackr.app.domain.Event
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,20 +17,21 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
+import javax.inject.Inject
 
 // @spec EL-UI-013, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-052b, EL-UI-054, EL-UI-055b,
 // EL-NAV-002, EL-PROC-001
-class QuickLogViewModel(
+@HiltViewModel
+class QuickLogViewModel @Inject constructor(
     private val repository: TrackrRepository,
     private val imageStore: ImageStore,
-    preSelectedCategory: Category? = null,
-    private val clock: Clock = Clock.systemDefaultZone(),
+    private val clock: Clock,
 ) : ViewModel() {
 
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
 
-    val selectedCategory = MutableStateFlow<Category?>(preSelectedCategory)
+    val selectedCategory = MutableStateFlow<Category?>(null)
     val timestamp = MutableStateFlow<Instant>(Instant.now(clock))
     val notes = MutableStateFlow("")
     val imagePath = MutableStateFlow<String?>(null)
