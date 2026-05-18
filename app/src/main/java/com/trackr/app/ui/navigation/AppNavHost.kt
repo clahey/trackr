@@ -3,7 +3,7 @@ package com.trackr.app.ui.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -68,7 +68,7 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
                                 }
                             }
                         },
-                        icon = { Icon(Icons.Default.Label, contentDescription = "Categories") },
+                        icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Categories") },
                         label = { Text("Categories") },
                     )
                 }

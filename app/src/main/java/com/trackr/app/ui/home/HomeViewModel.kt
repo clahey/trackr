@@ -3,6 +3,7 @@ package com.trackr.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackr.app.data.TrackrRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,6 +26,7 @@ sealed class DayEntry {
 
 // @spec EL-UI-001, EL-UI-011, EL-UI-012, EL-UI-013b, EL-UI-017, EL-UI-018,
 // EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022, EL-UI-023, EL-UI-023b
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(private val repository: TrackrRepository) : ViewModel() {
     private val _activeFilter = MutableStateFlow<Category?>(null)
