@@ -16,12 +16,14 @@ LLD: `docs/llds/event-logging.md`
 - [ ] **EL-UI-011**: While a category filter chip is active, the timeline shall display only events belonging to that category.
 - [ ] **EL-UI-012**: When the user taps the currently active category chip or the "All" chip, the system shall clear the active filter and display all events.
 - [ ] **EL-UI-013**: While a category filter is active, opening the quick-log sheet shall skip step 1 and open directly to step 2 with the filtered category pre-selected.
+- [ ] **EL-UI-013b**: When the active filter category is deleted, the system shall clear the filter and display all events.
 - [ ] **EL-UI-014**: When the user taps an inactive category chip, the system shall set it as the active filter.
 - [ ] **EL-UI-015**: The active filter chip shall be visually distinguished from inactive chips.
 - [ ] **EL-UI-016**: When a category filter is applied, the timeline shall scroll to keep the same calendar day approximately at the top of the view; if that day has no matching events, the timeline shall scroll to the nearest earlier day that does.
-- [ ] **EL-UI-017**: When a category filter is applied, the system shall record the pre-filter scroll position (by top day).
-- [ ] **EL-UI-018**: When the user manually scrolls the timeline while a filter is active, the system shall discard the recorded pre-filter scroll position.
-- [ ] **EL-UI-019**: When the user clears an active category filter and the pre-filter scroll position has not been discarded, the timeline shall restore scroll to the recorded pre-filter position.
+- [ ] **EL-UI-017**: When the user activates a category filter from the unfiltered state (All), the system shall record the current top day as the pre-filter scroll position.
+- [ ] **EL-UI-018**: When the user switches from one active category filter to another, the system shall not update the recorded pre-filter scroll position, so that clearing the filter always returns to the position recorded when filtering first began.
+- [ ] **EL-UI-019**: When the user manually scrolls the timeline while a filter is active, the system shall discard the recorded pre-filter scroll position; the system-initiated anchor scroll (EL-UI-016) shall not discard it.
+- [ ] **EL-UI-019b**: When the user clears an active category filter and the pre-filter scroll position has not been discarded, the timeline shall restore scroll to the recorded pre-filter position.
 
 ## Swipe-to-Delete and Undo
 
@@ -29,11 +31,13 @@ LLD: `docs/llds/event-logging.md`
 - [ ] **EL-UI-021**: While an undo placeholder is visible, the system shall display a button in that position allowing the user to restore the deleted event.
 - [ ] **EL-UI-022**: When the user taps the undo button, the system shall restore the deleted event to its original position and remove the placeholder.
 - [ ] **EL-UI-023**: When the user performs any mutating action while an undo placeholder is visible — swiping another event, saving a new event, or opening an event for editing — the system shall discard the placeholder without restoring the event.
+- [ ] **EL-UI-023b**: When the category of a pending-delete event is deleted while the undo placeholder is visible, the system shall dismiss the placeholder without restoring the event.
+- [ ] **EL-UI-023c**: The undo placeholder row shall not be tappable for navigation; only the restore button within it responds to taps.
 
 ## Quick-Log Sheet
 
 - [ ] **EL-UI-030**: The quick-log sheet shall present a two-step flow: step 1 is a grid of all categories (emoji + name); tapping a category advances to step 2.
-- [ ] **EL-UI-031**: Step 2 of the quick-log sheet shall display a value input appropriate for the selected category's value type, an optional photo field, an optional notes field, a tappable timestamp field, and a save button.
+- [ ] **EL-UI-031**: Step 2 of the quick-log sheet shall display a value input appropriate for the selected category's value type, an optional single-photo field (at most one image), an optional notes field, a tappable timestamp field, and a save button.
 - [ ] **EL-UI-032**: The timestamp field in the quick-log sheet shall default to the time the sheet was opened, and shall be tappable to allow the user to edit the date and time.
 - [ ] **EL-UI-033**: For a None-type category, step 2 shall omit the value input field, making the flow completable in three taps (FAB → category → save).
 - [ ] **EL-UI-034**: When the category selected in the quick-log sheet is deleted externally while the sheet is open at step 2, the system shall reset to step 1.
@@ -54,6 +58,8 @@ LLD: `docs/llds/event-logging.md`
 - [ ] **EL-UI-053**: For Text-type categories, the value input shall be a multi-line text field.
 - [ ] **EL-UI-054**: While the selected Text-type category has `allowEmptyText` set to false, the system shall not allow saving with an empty text value.
 - [ ] **EL-UI-055**: For Duration-type categories, the value input shall be three separate numeric fields for hours, minutes, and seconds; the value shall be stored as a `kotlin.time.Duration`.
+- [ ] **EL-UI-055b**: The Duration input shall reject negative values in any field and shall reject values ≥ 60 in the minutes and seconds fields; the system shall not allow saving an invalid duration.
+- [ ] **EL-UI-052b**: The Number value field shall not allow saving when the value field is empty or not parseable as a number.
 - [ ] **EL-UI-056**: For Unknown or ErrorValue events, the value field shall display the error kind and raw value string in a read-only format.
 
 ## Image Handling

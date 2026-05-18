@@ -15,7 +15,7 @@ LLD: `docs/llds/theme.md`
 ## Category Color System
 
 - [ ] **THEME-UI-010**: Category colors shall be applied as container background colors wherever a category is represented — chips on the timeline filter row, event rows, category list rows, and the category edit screen preview.
-- [ ] **THEME-PROC-001**: When rendering a category color as a container background, the system shall compute the foreground color (text and icons) using WCAG relative luminance: white for backgrounds below the luminance threshold, black for backgrounds at or above it.
+- [ ] **THEME-PROC-001**: When rendering a category color as a container background, the system shall compute the foreground color (text and icons) using WCAG relative luminance: white for backgrounds with relative luminance below 0.179, black for backgrounds at or above 0.179.
 - [ ] **THEME-PROC-002**: The foreground color for category containers shall be either white or black only; Material 3's `contentColorFor()` shall not be used for category colors, as they are arbitrary user values outside the app's tonal palette.
 
 ## Preset Palette

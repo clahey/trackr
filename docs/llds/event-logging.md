@@ -27,7 +27,7 @@ Day headers show the date (e.g., "Today", "Yesterday", full date for older).
 
 A horizontally scrollable row of category chips sits below the app bar. An "All" chip appears first; tapping any inactive category chip sets it as the active filter (visually highlighted); tapping the active chip again (or "All") clears the filter. When a filter is active, the FAB quick-log sheet opens directly to step 2 with that category pre-selected.
 
-**Filter scroll behavior:** Day groups with no matching events are hidden when a filter is active. When a filter is applied, the timeline scrolls to keep the same calendar day approximately at the top (or the nearest earlier day that has matching events, if the current day has none). The pre-filter scroll position (top day) is remembered. When the filter is cleared, if the user has not manually scrolled since applying the filter, the timeline restores to the pre-filter position; if the user has scrolled in filtered mode, the position is not restored. Manual scrolling discards the remembered position.
+**Filter scroll behavior:** Day groups with no matching events are hidden when a filter is active. When a filter is applied (including switching between active filters), the timeline scrolls to keep the same calendar day approximately at the top (or the nearest earlier day that has matching events, if the current day has none). The pre-filter scroll position (top day) is recorded only on the transition from no filter to a filter — switching between active filters preserves the existing record so that clearing always returns to the original unfiltered position. When the filter is cleared, if the user has not manually scrolled since the filter was first applied, the timeline restores to the recorded pre-filter position. Manual scrolling (user-initiated only; not the system-initiated anchor scroll) discards the recorded position.
 
 ### Quick-Log Sheet
 
@@ -78,8 +78,8 @@ Save navigates back to timeline. Delete shows a confirmation dialog, then delete
 
 - `activeFilter: StateFlow<Category?>` — the currently selected category chip; null = all categories
 - `dayGroups: StateFlow<List<DayGroup>>` — derived from `repository.getEventsByCategory()` when a filter is active, `repository.getEvents()` otherwise; grouped by calendar day of `timestamp` in local timezone
-- `preFilterTopDay: StateFlow<LocalDate?>` — the calendar day that was at the top of the timeline when the current filter was applied; null if no filter is active or if the user has manually scrolled since applying the filter. Set by `setFilter()`; cleared on manual scroll or filter clear after restore.
-- `setFilter(category: Category?)` — sets `activeFilter`, records the current top day in `preFilterTopDay`; null clears the filter
+- `preFilterTopDay: StateFlow<LocalDate?>` — the calendar day that was at the top of the timeline when a filter was first applied (transition from no filter); null if no filter is active or if the user has manually scrolled since the filter was first applied. Not updated when switching between active filters.
+- `setFilter(category: Category?)` — sets `activeFilter`; records the current top day in `preFilterTopDay` only when transitioning from null to a non-null filter; switching between two non-null filters preserves the existing `preFilterTopDay`; null clears the filter
 - `onUserScrolled()` — called by the UI when the user manually scrolls; clears `preFilterTopDay`
 - `pendingDelete: StateFlow<Event?>` — the event swiped away but not yet committed; null when no undo is available
 - `swipeDelete(event: Event)` — immediately calls `repository.deleteEvent()`; stores the full `Event` in `pendingDelete` and injects an undo placeholder into the day group at the event's original position
