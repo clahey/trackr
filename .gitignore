@@ -1,0 +1,22 @@
+# Gradle
+.gradle/
+build/
+**/build/
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Keystore files (never commit)
+*.jks
+*.keystore
+
+# Google Services (contains API keys)
+google-services.json
+
+# OS
+.DS_Store
+Thumbs.db
