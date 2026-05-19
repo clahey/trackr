@@ -30,10 +30,18 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-021**: When the user attempts to save a category with an empty emoji field, the system shall display an inline error and not save.
 - [x] **CAT-UI-022**: When the user attempts to save a category whose emoji field contains more than one grapheme cluster, the system shall display an inline error and not save.
 
-## Category Edit — ValueType Change Warning
+## Category Edit — ValueType Change Warning and Migration
 
-- [x] **CAT-UI-030**: When the user changes the value type of a category that has one or more existing events, the system shall display a warning that historical events may display incorrectly.
-- [x] **CAT-UI-031**: The value type change warning shall inform without blocking — the user may proceed with or dismiss the change after seeing it.
+- [x] **CAT-UI-030**: While the selected value type differs from the category's original value type, the conversion is not reversible (per the conversion table in `docs/llds/category-management.md`), and the category has one or more existing events, the system shall display an inline warning below the value type picker.
+- [x] **CAT-UI-031**: The inline value type warning shall disappear automatically when the user reverts the value type picker back to its original value.
+- [x] **CAT-UI-036**: When the inline warning is shown for a fully-safe but irreversible conversion, the warning shall read: "Existing events will be converted. This change cannot be reversed by switching back."
+- [x] **CAT-UI-037**: When the inline warning is shown for a partially-safe conversion, the warning shall read: "Some existing events may not be convertible and will display incorrectly."
+- [x] **CAT-UI-038**: When the inline warning is shown for a non-safe conversion, the warning shall read: "Existing events cannot be converted and will display incorrectly."
+- [x] **CAT-UI-032**: When the user saves a category edit in which the value type differs from the original, the system shall migrate all existing event values for that category according to the conversion table in `docs/llds/category-management.md`.
+- [x] **CAT-UI-033**: For event values that cannot be converted to the new value type per the conversion table, the system shall leave those event values unchanged.
+- [x] **CAT-UI-034**: When converting Text to Number, the system shall parse both bare numeric strings (e.g. `"3.5"`) and strings of the form `"<number> <unit>"` (e.g. `"3.5 kg"`), preserving the unit; unconvertible strings shall be left unchanged.
+- [x] **CAT-UI-035**: When converting Text to Boolean, the system shall map `"Yes"` to `Boolean(true)` and `"No"` to `Boolean(false)`; all other strings shall be left unchanged.
+- [ ] **CAT-UI-039**: When converting Number to Scale, the system shall convert values that are exact integers (no fractional part) in the range [1, 10] to the corresponding Scale value; non-integer Number values and values outside [1, 10] shall be left unchanged. When implemented, Scale → Number becomes a reversible pair and the conversion table shall be updated accordingly.
 
 ## Category Edit — Save Behavior
 

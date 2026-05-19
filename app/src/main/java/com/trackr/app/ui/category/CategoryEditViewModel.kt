@@ -19,8 +19,11 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
+enum class ValueTypeWarningTier { IrreversibleSafe, Partial, Unsafe }
+
 // @spec CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
-// CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043, APP-NAV-004
+// CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
+// APP-NAV-004
 @HiltViewModel
 class CategoryEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -46,8 +49,8 @@ class CategoryEditViewModel @Inject constructor(
     private val _eventCount = MutableStateFlow(0)
     val eventCount: StateFlow<Int> = _eventCount.asStateFlow()
 
-    private val _showValueTypeWarning = MutableStateFlow(false)
-    val showValueTypeWarning: StateFlow<Boolean> = _showValueTypeWarning.asStateFlow()
+    private val _valueTypeWarning = MutableStateFlow<ValueTypeWarningTier?>(null)
+    val valueTypeWarning: StateFlow<ValueTypeWarningTier?> = _valueTypeWarning.asStateFlow()
 
     private val _originalValueType = MutableStateFlow<ValueType?>(null)
 
@@ -72,8 +75,9 @@ class CategoryEditViewModel @Inject constructor(
                     _originalValueType,
                     repository.getEventCountForCategory(categoryId),
                 ) { type, orig, count ->
-                    orig != null && type != orig && count > 0
-                }.collect { _showValueTypeWarning.value = it }
+                    if (orig == null || type == orig || count == 0) null
+                    else warningTierFor(orig, type)
+                }.collect { _valueTypeWarning.value = it }
             }
         }
     }
@@ -94,6 +98,7 @@ class CategoryEditViewModel @Inject constructor(
             return
         }
 
+        val originalType = _originalValueType.value
         val existing = categoryId?.let { repository.getCategoryById(it).first() }
         val sortOrder = existing?.sortOrder
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)
@@ -110,8 +115,32 @@ class CategoryEditViewModel @Inject constructor(
             allowEmptyText = true,
             sortOrder = sortOrder,
         )
-        repository.saveCategory(category)
+        if (categoryId != null && originalType != null && category.valueType != originalType) {
+            repository.saveCategoryAndMigrateEvents(category, originalType)
+        } else {
+            repository.saveCategory(category)
+        }
+
         _saveResult.value = SaveResult.Success
+    }
+
+    // @spec CAT-UI-030, CAT-UI-036, CAT-UI-037, CAT-UI-038
+    private fun warningTierFor(from: ValueType, to: ValueType): ValueTypeWarningTier? = when {
+        // Reversible pairs → no warning
+        (from == ValueType.None && to == ValueType.Text) ||
+        (from == ValueType.Scale && to == ValueType.Text) ||
+        (from == ValueType.Boolean && to == ValueType.Text) ||
+        (from == ValueType.Number && to == ValueType.Text) -> null
+        // Fully safe but irreversible
+        from == ValueType.None ||
+        (from == ValueType.Scale && to == ValueType.Number) ||
+        (from == ValueType.Duration && to == ValueType.Text) -> ValueTypeWarningTier.IrreversibleSafe
+        // Partially safe: migration attempted but some events may not convert
+        from == ValueType.Text && to in listOf(
+            ValueType.Boolean, ValueType.Number, ValueType.Scale, ValueType.None,
+        ) -> ValueTypeWarningTier.Partial
+        // All other pairs: no migration
+        else -> ValueTypeWarningTier.Unsafe
     }
 
     private fun String.graphemeClusterCount(): Int {

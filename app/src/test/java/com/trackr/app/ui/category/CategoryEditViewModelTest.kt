@@ -3,6 +3,8 @@ package com.trackr.app.ui.category
 import androidx.lifecycle.SavedStateHandle
 import com.trackr.app.FakeTrackrRepository
 import com.trackr.app.domain.Category
+import com.trackr.app.domain.Event
+import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,10 +17,14 @@ import com.trackr.app.ui.SaveResult
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CategoryEditViewModelTest {
@@ -38,6 +44,8 @@ class CategoryEditViewModelTest {
     }
 
     @After fun tearDown() { Dispatchers.resetMain() }
+
+    // ---------- Validation ----------
 
     // @spec CAT-UI-020
     @Test fun `save with empty name produces validation error`() = runTest {
@@ -77,14 +85,14 @@ class CategoryEditViewModelTest {
         assertEquals("emoji", (result as SaveResult.ValidationError).field)
     }
 
+    // ---------- New category save behavior ----------
+
     // @spec CAT-UI-040
     @Test fun `new category gets a UUID on save`() = runTest {
         vm.name.value = "Running"
         vm.emoji.value = "🏃"
         vm.save()
-        val saved = repo.getCategories()
         assertTrue(vm.saveResult.value is SaveResult.Success)
-        // UUID format check: 8-4-4-4-12 hex chars
         val savedCategory = getSavedCategory()
         assertTrue(savedCategory.id.matches(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
     }
@@ -111,9 +119,7 @@ class CategoryEditViewModelTest {
         vm.name.value = "Running"
         vm.emoji.value = "🏃"
         vm.save()
-        val color = getSavedCategory().color
-        // First call to getAndIncrement returns 0 → Red (0xFFE53935)
-        assertEquals(0xFFE53935L, color)
+        assertEquals(0xFFE53935L, getSavedCategory().color)
     }
 
     // @spec CAT-UI-043
@@ -121,28 +127,332 @@ class CategoryEditViewModelTest {
         vm.name.value = "Running"; vm.emoji.value = "🏃"; vm.save()
         vm = CategoryEditViewModel(repo, SavedStateHandle())
         vm.name.value = "Sleep"; vm.emoji.value = "💤"; vm.save()
-        assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color) // Red
-        assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)   // Orange
+        assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color)
+        assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)
+    }
+
+    // ---------- ValueType warning tiers ----------
+
+    // @spec CAT-UI-030
+    @Test fun `reversible conversion with events shows no warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        assertNull(vm.valueTypeWarning.value)
     }
 
     // @spec CAT-UI-030
-    @Test fun `changing valueType on category with events shows warning`() = runTest {
-        val existingCategory = makeCategory("c1", valueType = ValueType.Scale)
-        repo.saveCategory(existingCategory)
+    @Test fun `no warning when no events even for non-reversible conversion`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        assertNull(vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-036
+    @Test fun `none to number shows irreversible safe warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
-        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "c1")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        assertEquals(ValueTypeWarningTier.IrreversibleSafe, vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-036
+    @Test fun `duration to text shows irreversible safe warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Duration))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
         vm.valueType.value = ValueType.Text
-        assertTrue(vm.showValueTypeWarning.value)
+        assertEquals(ValueTypeWarningTier.IrreversibleSafe, vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-037
+    @Test fun `text to number shows partial warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        assertEquals(ValueTypeWarningTier.Partial, vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-037
+    @Test fun `text to boolean shows partial warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Boolean
+        assertEquals(ValueTypeWarningTier.Partial, vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-038
+    @Test fun `number to none shows unsafe warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.None
+        assertEquals(ValueTypeWarningTier.Unsafe, vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-038
+    @Test fun `boolean to duration shows unsafe warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Duration
+        assertEquals(ValueTypeWarningTier.Unsafe, vm.valueTypeWarning.value)
     }
 
     // @spec CAT-UI-031
-    @Test fun `changing valueType on category with no events shows no warning`() = runTest {
-        val existingCategory = makeCategory("c1", valueType = ValueType.Scale)
-        repo.saveCategory(existingCategory)
-        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "c1")))
-        vm.valueType.value = ValueType.Text
-        assertFalse(vm.showValueTypeWarning.value)
+    @Test fun `warning disappears when value type reverted to original`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.None
+        assertNotNull(vm.valueTypeWarning.value)
+        vm.valueType.value = ValueType.Number
+        assertNull(vm.valueTypeWarning.value)
     }
+
+    // ---------- Migration: fully safe conversions ----------
+
+    // @spec CAT-UI-032
+    @Test fun `none to number migrates null to default number`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        vm.save()
+        assertEquals(EventValue.NumberValue(0.0, null), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `none to scale migrates null to default scale`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Scale
+        vm.save()
+        assertEquals(EventValue.Scale(5), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `none to boolean migrates null to true`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Boolean
+        vm.save()
+        assertEquals(EventValue.BooleanValue(true), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `none to text migrates null to empty string`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue(""), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `none to duration migrates null to zero duration`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Duration
+        vm.save()
+        assertEquals(EventValue.DurationValue(Duration.ZERO), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `scale to number migrates correctly`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.Scale(7)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        vm.save()
+        assertEquals(EventValue.NumberValue(7.0, null), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `scale to text migrates correctly`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.Scale(7)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue("7"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `boolean true to text migrates to Yes`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.BooleanValue(true)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue("Yes"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `boolean false to text migrates to No`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.BooleanValue(false)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue("No"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `number to text includes unit`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.NumberValue(3.5, "kg")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue("3.5 kg"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `number to text without unit omits unit`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.NumberValue(3.5, null)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue("3.5"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `duration to text migrates correctly`() = runTest {
+        val dur = 90.seconds
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Duration))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.DurationValue(dur)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue(dur.toString()), eventValue("c1"))
+    }
+
+    // ---------- Migration: partially safe conversions ----------
+
+    // @spec CAT-UI-032, CAT-UI-035
+    @Test fun `text Yes to boolean migrates to true`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("Yes")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Boolean
+        vm.save()
+        assertEquals(EventValue.BooleanValue(true), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032, CAT-UI-035
+    @Test fun `text No to boolean migrates to false`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("No")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Boolean
+        vm.save()
+        assertEquals(EventValue.BooleanValue(false), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032, CAT-UI-034
+    @Test fun `text to number parses bare number`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("3.5")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        vm.save()
+        assertEquals(EventValue.NumberValue(3.5, null), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032, CAT-UI-034
+    @Test fun `text to number parses number with unit`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("3.5 kg")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        vm.save()
+        assertEquals(EventValue.NumberValue(3.5, "kg"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `text to scale migrates parseable int in range`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("7")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Scale
+        vm.save()
+        assertEquals(EventValue.Scale(7), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-032
+    @Test fun `empty text to none migrates to null`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.None
+        vm.save()
+        assertNull(eventValue("c1"))
+    }
+
+    // ---------- Migration: unconvertible values left unchanged ----------
+
+    // @spec CAT-UI-033, CAT-UI-035
+    @Test fun `non-yes-no text to boolean left unchanged`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("maybe")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Boolean
+        vm.save()
+        assertEquals(EventValue.TextValue("maybe"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-033, CAT-UI-034
+    @Test fun `non-parseable text to number left unchanged`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("hello")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        vm.save()
+        assertEquals(EventValue.TextValue("hello"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-033
+    @Test fun `text out of scale range left unchanged`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("11")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Scale
+        vm.save()
+        assertEquals(EventValue.TextValue("11"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-033
+    @Test fun `non-empty text to none left unchanged`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("hello")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.None
+        vm.save()
+        assertEquals(EventValue.TextValue("hello"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-033
+    @Test fun `non-safe conversion leaves event value unchanged`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.NumberValue(3.5, "kg")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.None
+        vm.save()
+        assertEquals(EventValue.NumberValue(3.5, "kg"), eventValue("c1"))
+    }
+
+    // ---------- Stale category guard ----------
 
     // @spec CAT-UI-017
     @Test fun `navigateBack emits true when category not found in edit mode`() = runTest {
@@ -163,23 +473,35 @@ class CategoryEditViewModelTest {
         assertFalse(vm.navigateBack.value)
     }
 
+    // ---------- Helpers ----------
+
+    private fun editVm(categoryId: String) =
+        CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to categoryId)))
+
+    private suspend fun eventValue(categoryId: String): EventValue? =
+        repo.getEventsByCategory(categoryId).first().first().value
+
     private suspend fun getSavedCategory(): Category =
         repo.getCategories().first().first()
 
     private suspend fun getSavedCategoryByName(name: String): Category =
         repo.getCategories().first().first { it.name == name }
 
-    private suspend fun getAllSavedColors(): List<Long> =
-        repo.getCategories().first().map { it.color }
-
     private fun makeCategory(
         id: String,
         sortOrder: Int = 0,
         valueType: ValueType = ValueType.None,
-    ) = Category(id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder)
+    ) = Category(
+        id = id, name = id, emoji = "📌", color = 0xFFE53935L,
+        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+    )
 
-    private fun makeEvent(id: String, categoryId: String) = com.trackr.app.domain.Event(
+    private fun makeEvent(
+        id: String,
+        categoryId: String,
+        value: EventValue? = null,
+    ) = Event(
         id = id, categoryId = categoryId, timestamp = anchor,
-        value = null, notes = null, imagePaths = emptyList(), createdAt = anchor)
+        value = value, notes = null, imagePaths = emptyList(), createdAt = anchor,
+    )
 }

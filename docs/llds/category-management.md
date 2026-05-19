@@ -33,7 +33,27 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 
 `allowEmptyText` is not exposed in the MVP editor; always written as `true` for new categories.
 
-**ValueType change warning:** when editing an existing category and the user changes `valueType`, show a warning that historical events may display incorrectly — but only if the category has at least one existing event. Do not block the change — inform and let the user decide.
+**ValueType change warning and migration:** when saving a category edit with a changed `valueType`, the system migrates all existing event values using the conversion table below. Conversions listed as **fully safe** are silent — no inline warning is shown while editing. All other conversions show an inline warning below the value type picker while the changed type is selected; the warning disappears if the user reverts the type. Event values that cannot be converted per the table are left unchanged.
+
+**Conversion table:**
+
+| From | To | Rule | Fully safe? | Reversible? |
+|---|---|---|---|---|
+| None | Number | `null` → `Number(0.0, null)` | Yes | No — Number→None is non-safe |
+| None | Scale | `null` → `Scale(5)` | Yes | No — Scale→None is non-safe |
+| None | Boolean | `null` → `Boolean(true)` | Yes | No — Boolean→None is non-safe |
+| None | Text | `null` → `Text("")` | Yes | Yes — Text("")→None via Text→None row |
+| None | Duration | `null` → `Duration(ZERO)` | Yes | No — Duration→None is non-safe |
+| Scale | Number | `Scale(n)` → `Number(n.toDouble(), null)` | Yes | No — Number→Scale is non-safe |
+| Scale | Text | `Scale(n)` → `Text(n.toString())` | Yes | Yes — Text("n")→Scale via Text→Scale row |
+| Boolean | Text | `Boolean(true)` → `Text("Yes")`, `Boolean(false)` → `Text("No")` | Yes | Yes — Text→Boolean row |
+| Number | Text | `Number(v, u)` → `Text("v u")` or `Text("v")` if u is null | Yes | Yes — Text→Number row (parses unit) |
+| Duration | Text | `Duration(d)` → `Text(d.toString())` | Yes | No — no reverse Duration parser |
+| Text | Boolean | `Text("Yes")` → `Boolean(true)`, `Text("No")` → `Boolean(false)`; else leave unchanged | No | — |
+| Text | Number | parse as `<double>` or `<double> <unit>` → `Number(d, u)`; else leave unchanged | No | — |
+| Text | Scale | if parseable as Int in [1..10] → `Scale(n)`; else leave unchanged | No | — |
+| Text | None | if `Text("")` → `null`; else leave unchanged | No | — |
+| all other pairs | — | leave unchanged | No | — |
 
 **Validation (all enforced before save):**
 
@@ -60,8 +80,20 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 - `save()`: validates all fields, constructs a `Category` with a new UUID (create) or existing id (edit), calls `repository.saveCategory()`
 - Exposes `saveResult: StateFlow<SaveResult>` (`Idle`, `Success`, `ValidationError`)
 - `eventCount: StateFlow<Int>` — live count from `repository.getEventCountForCategory()`; drives delete button visibility and ValueType change warning (both trigger when count > 0)
+- `valueTypeWarning: StateFlow<ValueTypeWarningTier?>` — null when no warning (conversion is reversible, `eventCount == 0`, or `valueType == originalValueType`); otherwise one of three tiers derived from the conversion table:
+  - `IrreversibleSafe`: conversion is fully safe but not reversible (e.g. None→Number, Duration→Text); message: *"Existing events will be converted. This change cannot be reversed by switching back."*
+  - `Partial`: conversion migrates what it can but some events may not convert (e.g. Text→Number, Text→Boolean); message: *"Some existing events may not be convertible and will display incorrectly."*
+  - `Unsafe`: no migration is performed — all other pairs (e.g. Number→None); message: *"Existing events cannot be converted and will display incorrectly."*
+- `originalValueType` is set at load time; null for new categories, so `valueTypeWarning` is always null in create mode
+- `save()`: when `valueType != originalValueType` (edit mode only), calls `repository.saveCategoryAndMigrateEvents(category, originalType)` to persist the category and migrate events atomically; otherwise calls `repository.saveCategory(category)`
 - New categories are assigned `sortOrder = currentMin - 1` (placing them at the top); the repository provides the current minimum via `CategoryDao.getMinSortOrder()`
 - New categories are assigned a default color via `repository.getAndIncrementNextCategoryColorIndex()`, which returns `index % paletteSize` mapped to the preset palette; the counter is monotonically increasing and unaffected by deletions
+
+### Value Type Migration
+
+The conversion function `convertEventValue(value, from, to)` lives in the domain layer (`domain/ValueTypeConversion.kt`) since it depends only on domain types. It is called by the repository implementation (inside a transaction) and is also importable by tests.
+
+`TrackrRepository.saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)` runs the category upsert and all event value updates inside a single Room transaction, ensuring the database is never left in a partially-migrated state.
 
 ### Event Count Query
 

@@ -21,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,7 +56,8 @@ import com.trackr.app.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.launch
 
 // @spec CAT-UI-017, CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
-// CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043, APP-NAV-004
+// CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
+// APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CategoryEditScreen(
@@ -70,7 +70,7 @@ fun CategoryEditScreen(
     val valueType by viewModel.valueType.collectAsState()
     val unit by viewModel.unit.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
-    val showValueTypeWarning by viewModel.showValueTypeWarning.collectAsState()
+    val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
     val navigateBack by viewModel.navigateBack.collectAsState()
     val isEditMode = viewModel.isEditMode
 
@@ -81,15 +81,6 @@ fun CategoryEditScreen(
     }
     LaunchedEffect(saveResult) {
         if (saveResult is SaveResult.Success) onNavigateBack(null)
-    }
-
-    if (showValueTypeWarning) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Change value type?") },
-            text = { Text("Existing events may display incorrectly after this change.") },
-            confirmButton = { TextButton(onClick = {}) { Text("OK") } },
-        )
     }
 
     Scaffold(
@@ -168,6 +159,21 @@ fun CategoryEditScreen(
                 selected = valueType,
                 onSelect = { viewModel.valueType.value = it },
             )
+
+            valueTypeWarning?.let { tier ->
+                Text(
+                    text = when (tier) {
+                        ValueTypeWarningTier.IrreversibleSafe ->
+                            "Existing events will be converted. This change cannot be reversed by switching back."
+                        ValueTypeWarningTier.Partial ->
+                            "Some existing events may not be convertible and will display incorrectly."
+                        ValueTypeWarningTier.Unsafe ->
+                            "Existing events cannot be converted and will display incorrectly."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             if (valueType == ValueType.Number) {
                 OutlinedTextField(

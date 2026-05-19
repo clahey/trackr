@@ -2,6 +2,7 @@ package com.trackr.app.data
 
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
+import com.trackr.app.domain.ValueType
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
@@ -9,6 +10,7 @@ interface TrackrRepository {
     fun getCategories(): Flow<List<Category>>
     fun getCategoryById(id: String): Flow<Category?>
     suspend fun saveCategory(category: Category)
+    suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)
     suspend fun deleteCategory(id: String)
     suspend fun reorderCategories(orderedIds: List<String>)
     fun getEventCountForCategory(categoryId: String): Flow<Int>

@@ -3,6 +3,8 @@ package com.trackr.app
 import com.trackr.app.data.TrackrRepository
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
+import com.trackr.app.domain.ValueType
+import com.trackr.app.domain.convertEventValue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -18,6 +20,18 @@ class FakeTrackrRepository : TrackrRepository {
     override fun getCategoryById(id: String): Flow<Category?> = categories.map { it.find { c -> c.id == id } }
     override suspend fun saveCategory(category: Category) {
         categories.update { list -> list.filter { it.id != category.id } + category }
+    }
+    override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
+        saveCategory(category)
+        events.update { list ->
+            list.map { event ->
+                if (event.categoryId != category.id) event
+                else {
+                    val newValue = convertEventValue(event.value, fromType, category.valueType)
+                    if (newValue != event.value) event.copy(value = newValue) else event
+                }
+            }
+        }
     }
     override suspend fun deleteCategory(id: String) {
         categories.update { it.filter { c -> c.id != id } }

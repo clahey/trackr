@@ -4,10 +4,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.room.withTransaction
 import com.trackr.app.data.ImageStore
 import com.trackr.app.data.TrackrRepository
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
+import com.trackr.app.domain.ValueType
+import com.trackr.app.domain.convertEventValue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -17,6 +20,7 @@ import java.time.Instant
 // LS-BE-030, LS-BE-031, LS-BE-032, LS-BE-040, LS-BE-050, LS-BE-051,
 // LS-BE-052, LS-BE-053, LS-BE-054, LS-BE-071, LS-BE-080, LS-BE-081
 class LocalTrackrRepository @javax.inject.Inject constructor(
+    private val db: TrackrDatabase,
     private val categoryDao: CategoryDao,
     private val eventDao: EventDao,
     private val imageStore: ImageStore,
@@ -33,6 +37,20 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     override suspend fun saveCategory(category: Category) {
         categoryDao.upsert(category.toEntity())
+    }
+
+    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035
+    override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
+        db.withTransaction {
+            categoryDao.upsert(category.toEntity())
+            eventDao.getByCategoryOnce(category.id).forEach { entity ->
+                val event = entity.toDomain()
+                val newValue = convertEventValue(event.value, fromType, category.valueType)
+                if (newValue != event.value) {
+                    eventDao.upsert(event.copy(value = newValue).toEntity())
+                }
+            }
+        }
     }
 
     // @spec LS-BE-031
