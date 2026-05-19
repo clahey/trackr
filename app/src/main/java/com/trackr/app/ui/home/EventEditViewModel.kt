@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackr.app.data.ImageStore
 import com.trackr.app.data.TrackrRepository
+import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
@@ -48,6 +49,9 @@ class EventEditViewModel @Inject constructor(
     private val _deleteComplete = MutableStateFlow(false)
     val deleteComplete: StateFlow<Boolean> = _deleteComplete.asStateFlow()
 
+    private val _category = MutableStateFlow<Category?>(null)
+    val category: StateFlow<Category?> = _category.asStateFlow()
+
     private var originalEvent: Event? = null
     private var originalImagePaths: Set<String> = emptySet()
 
@@ -65,12 +69,14 @@ class EventEditViewModel @Inject constructor(
             notes.value = event.notes ?: ""
             imagePaths.value = event.imagePaths
 
+            val loadedCategory = repository.getCategoryById(event.categoryId).first()
+            _category.value = loadedCategory
+
             val isError = event.value is EventValue.ErrorValue
             _isValueEditable.value = if (isError) {
                 false
             } else {
-                val category = repository.getCategoryById(event.categoryId).first()
-                category?.valueType !is ValueType.Unknown
+                loadedCategory?.valueType !is ValueType.Unknown
             }
         }
     }

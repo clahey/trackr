@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +61,7 @@ fun EventEditScreen(
     val notes by viewModel.notes.collectAsState()
     val imagePaths by viewModel.imagePaths.collectAsState()
     val isValueEditable by viewModel.isValueEditable.collectAsState()
+    val category by viewModel.category.collectAsState()
     val pendingDelete by viewModel.pendingDelete.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val deleteComplete by viewModel.deleteComplete.collectAsState()
@@ -119,6 +121,13 @@ fun EventEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // @spec EL-UI-046
+            category?.let { cat ->
+                Text(
+                    text = "${cat.emoji} ${cat.name}",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
             OutlinedTextField(
                 value = timestampFormatter.format(timestamp),
                 onValueChange = {},

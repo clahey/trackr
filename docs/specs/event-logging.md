@@ -7,7 +7,7 @@ LLD: `docs/llds/event-logging.md`
 ## Timeline Display
 
 - [x] **EL-UI-001**: The timeline screen shall display events grouped by the calendar day of their timestamp in the user's local timezone, with the most recent day first and the most recent event first within each day.
-- [ ] **EL-UI-002**: Each event row shall display the category emoji, category name, a value summary formatted for the event's value type, and the time of day from the event's timestamp.
+- [x] **EL-UI-002**: Each event row shall display the category emoji, category name, a value summary formatted for the event's value type, and the time of day from the event's timestamp. (Category fields are blank when the event is orphaned.)
 - [ ] **EL-UI-003**: Day group headers shall display "Today" for the current date, "Yesterday" for the prior date, and the full date for all older days.
 
 ## Category Filter
@@ -49,6 +49,7 @@ LLD: `docs/llds/event-logging.md`
 - [ ] **EL-UI-045**: When the event edit screen loads and the requested event is not found in the repository, the system shall navigate back to the timeline and display a snackbar on the timeline screen reading "Event not found."
 - [x] **EL-UI-042**: When the user taps the delete action on the event edit screen, the system shall show a confirmation dialog before deleting.
 - [x] **EL-UI-043**: While an event carries an Unknown or ErrorValue, the value field on the edit screen shall be read-only; the timestamp, notes, and image fields shall remain editable.
+- [x] **EL-UI-046**: The event edit screen shall display the category emoji and name as a read-only header above the editable fields; the header is omitted when the category cannot be resolved.
 - [ ] **EL-UI-044**: The event edit screen shall allow adding images via camera or gallery and removing individual images with no cap on total image count.
 
 ## Value Input

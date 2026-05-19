@@ -20,7 +20,7 @@ import java.time.ZoneId
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 
 sealed class DayEntry {
-    data class Entry(val event: Event) : DayEntry()
+    data class Entry(val event: Event, val category: Category?) : DayEntry()
     data class UndoPlaceholder(val event: Event) : DayEntry()
 }
 
@@ -51,8 +51,11 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
                     if (filter != null) repository.getEventsByCategory(filter.id)
                     else repository.getEvents()
                 }
-                .combine(_pendingDelete) { events, pending -> events to pending }
-                .collect { (events, pending) ->
+                .combine(repository.getCategories()) { events, categories -> events to categories }
+                .combine(_pendingDelete) { (events, categories), pending ->
+                    Triple(events, categories, pending)
+                }
+                .collect { (events, categories, pending) ->
                     currentEvents = events
                     if (pending != null) {
                         val newIds = events.map { it.id }.toSet() - deleteSnapshot
@@ -61,7 +64,7 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
                             return@collect
                         }
                     }
-                    _dayGroups.value = buildDayGroups(events, pending)
+                    _dayGroups.value = buildDayGroups(events, pending, categories)
                 }
         }
 
@@ -117,7 +120,8 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
         _pendingDelete.value = null
     }
 
-    private fun buildDayGroups(events: List<Event>, pending: Event?): List<DayGroup> {
+    private fun buildDayGroups(events: List<Event>, pending: Event?, categories: List<Category>): List<DayGroup> {
+        val categoryMap = categories.associateBy { it.id }
         val combined: List<Pair<Event, Boolean>> = buildList {
             events.forEach { add(it to false) }
             if (pending != null) add(pending to true)
@@ -136,7 +140,7 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
                     date = date,
                     events = items.map { (event, isPlaceholder) ->
                         if (isPlaceholder) DayEntry.UndoPlaceholder(event)
-                        else DayEntry.Entry(event)
+                        else DayEntry.Entry(event, categoryMap[event.categoryId])
                     }
                 )
             }

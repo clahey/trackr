@@ -76,7 +76,7 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
             }
         }
     ) { innerPadding ->
-        AppNavHost(navController = navController, modifier = Modifier.padding(innerPadding))
+        AppNavHost(navController = navController, modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()))
     }
 }
 

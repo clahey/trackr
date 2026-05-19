@@ -192,6 +192,7 @@ fun HomeScreen(
                         when (entry) {
                             is DayEntry.Entry -> SwipeableEventRow(
                                 event = entry.event,
+                                category = entry.category,
                                 onSwipeDelete = { homeVm.swipeDelete(entry.event) },
                                 onClick = { onNavigateToEventEdit(entry.event.id) },
                             )
@@ -241,6 +242,7 @@ fun HomeScreen(
 @Composable
 private fun SwipeableEventRow(
     event: Event,
+    category: com.trackr.app.domain.Category?,
     onSwipeDelete: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -267,12 +269,13 @@ private fun SwipeableEventRow(
             }
         },
     ) {
-        EventRow(event = event, onClick = onClick)
+        EventRow(event = event, category = category, onClick = onClick)
     }
 }
 
+// @spec EL-UI-002
 @Composable
-private fun EventRow(event: Event, onClick: () -> Unit) {
+private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -282,13 +285,17 @@ private fun EventRow(event: Event, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = event.timestamp.atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("HH:mm")),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = category?.emoji ?: "",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.width(28.dp),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = category?.name ?: "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 event.value?.let {
                     Text(formatValue(it), style = MaterialTheme.typography.bodyMedium)
                 }
@@ -300,6 +307,12 @@ private fun EventRow(event: Event, onClick: () -> Unit) {
                     )
                 }
             }
+            Text(
+                text = event.timestamp.atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm")),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

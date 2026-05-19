@@ -206,4 +206,20 @@ class EventEditViewModelTest {
         vm = makeVm("e1")
         assertFalse(vm.navigateBack.value)
     }
+
+    // @spec EL-UI-046
+    @Test fun `category exposes the loaded category`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        assertEquals(cat, vm.category.value)
+    }
+
+    // @spec EL-UI-046
+    @Test fun `category is null when event exists but its category does not`() = runTest {
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        assertNull(vm.category.value)
+    }
 }

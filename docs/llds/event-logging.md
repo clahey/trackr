@@ -49,6 +49,9 @@ For `ValueType.None` categories, step 2 has no value input — save is immediate
 
 Full edit view for an existing event. Toolbar contains a **Delete** action.
 
+Read-only header:
+- Category emoji and name — displayed above the editable fields; if the category cannot be resolved (orphaned event), the header is omitted.
+
 Editable fields:
 - Timestamp (date + time picker)
 - Value (see Value Input section)
@@ -115,7 +118,7 @@ sealed class DayEntry {
 
 ### EventEditViewModel
 
-- Loads event by ID via `repository.getEventById()`; also loads its category via `repository.getCategoryById()` for value type context
+- Loads event by ID via `repository.getEventById()`; also loads its category via `repository.getCategoryById()` for value type context and to populate `category: StateFlow<Category?>`
 - Full form state mirroring `Event` fields
 - `save()`: diffs image paths, calls `repository.saveEvent()`
 - `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()`

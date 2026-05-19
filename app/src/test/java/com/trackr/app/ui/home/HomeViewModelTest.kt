@@ -262,4 +262,26 @@ class HomeViewModelTest {
         assertTrue("Placeholder should be dismissed when category deleted", placeholders.isEmpty())
         assertNull(vm.pendingDelete.value)
     }
+
+    // @spec EL-UI-002
+    @Test fun `DayEntry Entry carries the matching category`() = runTest {
+        val cat = makeCategory("c1", name = "Steps")
+        repo.setCategories(cat)
+        repo.setEvents(makeEvent("e1", "c1"))
+        vm.dayGroups.test {
+            val groups = awaitItem()
+            val entry = groups.flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
+            assertEquals(cat, entry.category)
+        }
+    }
+
+    // @spec EL-UI-002
+    @Test fun `DayEntry Entry has null category for orphaned event`() = runTest {
+        repo.setEvents(makeEvent("e1", "c1"))
+        vm.dayGroups.test {
+            val groups = awaitItem()
+            val entry = groups.flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
+            assertNull(entry.category)
+        }
+    }
 }
