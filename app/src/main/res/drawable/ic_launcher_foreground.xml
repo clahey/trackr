@@ -7,7 +7,7 @@
 
     <!-- EKG wave: baseline → P wave bump → QRS spike → ST → T wave → baseline -->
     <path
-        android:pathData="M10,62 L30,62 C31,58 33,52 36,52 C39,52 41,58 42,62 L46,62 L48,68 L53,18 L58,68 L61,62 L68,62 C70,62 73,44 78,44 C83,44 86,62 90,62 L98,62"
+        android:pathData="M10,62 L30,62 C31,58 33,52 36,52 C39,52 41,58 42,62 L46,62 L48,68 L53,32 L58,68 L61,62 L68,62 C70,62 73,44 78,44 C83,44 86,62 90,62 L98,62"
         android:strokeColor="#FFFFFF"
         android:strokeWidth="4"
         android:strokeLineCap="round"
@@ -16,7 +16,7 @@
 
     <!-- Yellow dot at R-peak -->
     <path
-        android:pathData="M53,18 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0"
+        android:pathData="M53,32 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0"
         android:fillColor="#fcd214" />
 
 </vector>
