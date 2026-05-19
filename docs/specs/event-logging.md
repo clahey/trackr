@@ -74,6 +74,7 @@ LLD: `docs/llds/event-logging.md`
 
 - [ ] **EL-NAV-001**: When the user taps the FAB on the timeline screen, the system shall open the quick-log sheet.
 - [x] **EL-NAV-002**: When the user saves a new event in the quick-log sheet, the system shall dismiss the sheet and update the timeline.
+- [x] **EL-NAV-002b**: After the quick-log sheet is dismissed for any reason (save or user dismiss), the system shall reset all form state — including the save result — so that the sheet opens in step 1 with a clean state on the next open.
 - [ ] **EL-NAV-003**: When the user dismisses the quick-log sheet without saving, the system shall delete any unsaved captured image and return to the timeline.
 - [ ] **EL-NAV-004**: When the user taps an event row on the timeline, the system shall navigate to the event edit screen for that event.
 - [x] **EL-NAV-005**: When the user saves changes on the event edit screen, the system shall navigate back to the timeline.

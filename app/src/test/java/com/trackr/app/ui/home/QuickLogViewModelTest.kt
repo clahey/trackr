@@ -146,4 +146,15 @@ class QuickLogViewModelTest {
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.ValidationError)
     }
+
+    // @spec EL-NAV-002b
+    @Test fun `reset after successful save returns saveResult to Idle`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        vm.save()
+        assertEquals(SaveResult.Success, vm.saveResult.value)
+        vm.reset()
+        assertEquals(SaveResult.Idle, vm.saveResult.value)
+    }
 }

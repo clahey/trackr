@@ -110,7 +110,7 @@ sealed class DayEntry {
 - Form state: `timestamp`, `value`, `notes`, `imagePath` (single, nullable)
 - `timestamp` defaults to `Instant.now()` at sheet open; user-editable
 - `save()`: validates, generates a UUID for the new event, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, emits `SaveResult`
-- `reset()`: called when sheet is dismissed without saving; clears form state and deletes any captured-but-unsaved image file
+- `reset()`: called when sheet is dismissed (with or without saving); clears all form state including `saveResult` back to `Idle`, and deletes any captured-but-unsaved image file
 - **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1
 
 ### EventEditViewModel

@@ -99,5 +99,6 @@ class QuickLogViewModel @Inject constructor(
         notes.value = ""
         imagePath.value = null
         value.value = null
+        _saveResult.value = SaveResult.Idle
     }
 }
