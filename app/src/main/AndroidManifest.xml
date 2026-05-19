@@ -3,6 +3,8 @@
     <application
         android:name=".TrackrApplication"
         android:label="Trackr"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.Trackr">
         <activity
             android:name=".MainActivity"
