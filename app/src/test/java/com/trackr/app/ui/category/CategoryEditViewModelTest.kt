@@ -115,7 +115,12 @@ class CategoryEditViewModelTest {
     }
 
     // @spec CAT-UI-043
-    @Test fun `new category default color uses monotonic counter`() = runTest {
+    @Test fun `new category default color pre-populated from counter on init`() = runTest {
+        assertEquals(0xFFE53935L, vm.color.value)
+    }
+
+    // @spec CAT-UI-043
+    @Test fun `new category default color is saved`() = runTest {
         vm.name.value = "Running"
         vm.emoji.value = "🏃"
         vm.save()
@@ -129,6 +134,26 @@ class CategoryEditViewModelTest {
         vm.name.value = "Sleep"; vm.emoji.value = "💤"; vm.save()
         assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color)
         assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)
+    }
+
+    // @spec CAT-UI-043
+    @Test fun `new category saves picker-selected color when user overrides default`() = runTest {
+        vm.color.value = 0xFF1E88E5L // Blue
+        vm.name.value = "Running"
+        vm.emoji.value = "🏃"
+        vm.save()
+        assertEquals(0xFF1E88E5L, getSavedCategory().color)
+    }
+
+    // @spec CAT-UI-014
+    @Test fun `existing category saves picker-selected color`() = runTest {
+        repo.saveCategory(makeCategory("c1", color = 0xFFE53935L))
+        vm = editVm("c1")
+        vm.color.value = 0xFF43A047L // Green
+        vm.name.value = "c1"
+        vm.emoji.value = "📌"
+        vm.save()
+        assertEquals(0xFF43A047L, getSavedCategoryById("c1").color)
     }
 
     // ---------- ValueType warning tiers ----------
@@ -487,12 +512,16 @@ class CategoryEditViewModelTest {
     private suspend fun getSavedCategoryByName(name: String): Category =
         repo.getCategories().first().first { it.name == name }
 
+    private suspend fun getSavedCategoryById(id: String): Category =
+        repo.getCategoryById(id).first()!!
+
     private fun makeCategory(
         id: String,
         sortOrder: Int = 0,
         valueType: ValueType = ValueType.None,
+        color: Long = 0xFFE53935L,
     ) = Category(
-        id = id, name = id, emoji = "📌", color = 0xFFE53935L,
+        id = id, name = id, emoji = "📌", color = color,
         valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder,
     )
 

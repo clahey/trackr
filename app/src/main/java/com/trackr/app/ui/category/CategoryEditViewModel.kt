@@ -79,6 +79,13 @@ class CategoryEditViewModel @Inject constructor(
                     else warningTierFor(orig, type)
                 }.collect { _valueTypeWarning.value = it }
             }
+        } else {
+            // @spec CAT-UI-043
+            viewModelScope.launch {
+                color.value = categoryColorForIndex(
+                    repository.getAndIncrementNextCategoryColorIndex(categoryColorPalette.size)
+                )
+            }
         }
     }
 
@@ -99,17 +106,14 @@ class CategoryEditViewModel @Inject constructor(
         }
 
         val originalType = _originalValueType.value
-        val existing = categoryId?.let { repository.getCategoryById(it).first() }
-        val sortOrder = existing?.sortOrder
+        val sortOrder = categoryId?.let { repository.getCategoryById(it).first()?.sortOrder }
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)
-        val colorVal = existing?.color
-            ?: categoryColorForIndex(repository.getAndIncrementNextCategoryColorIndex(categoryColorPalette.size))
 
         val category = Category(
             id = categoryId ?: UUID.randomUUID().toString(),
             name = nameVal,
             emoji = emojiVal,
-            color = colorVal,
+            color = color.value,
             valueType = valueType.value,
             unit = unit.value.takeIf { it.isNotBlank() },
             allowEmptyText = true,

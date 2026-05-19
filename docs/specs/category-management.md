@@ -48,7 +48,7 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-040**: When saving a new category, the system shall assign it a new UUID as its identifier.
 - [x] **CAT-UI-041**: When saving a new category, the system shall assign it a `sortOrder` of `currentMin - 1`, placing it at the top of the list.
 - [x] **CAT-UI-042**: When saving a new category, the system shall set `allowEmptyText` to `true`.
-- [x] **CAT-UI-043**: When saving a new category, the system shall assign a default color by calling `getAndIncrementNextCategoryColorIndex(palette.size)` (LS-BE-081) and using `palette[index]` as a direct lookup; the counter cycles within `[0, palette.size)` and is unaffected by category deletions.
+- [x] **CAT-UI-043**: When the category edit screen loads in create mode, the system shall pre-select a default color by calling `getAndIncrementNextCategoryColorIndex(palette.size)` (LS-BE-081) and using `palette[index]` as the initial value of the color picker; the counter cycles within `[0, palette.size)` and is unaffected by category deletions. The user may override this by selecting any palette color before saving.
 
 ## Navigation
 

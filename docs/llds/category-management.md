@@ -87,7 +87,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 - `originalValueType` is set at load time; null for new categories, so `valueTypeWarning` is always null in create mode
 - `save()`: when `valueType != originalValueType` (edit mode only), calls `repository.saveCategoryAndMigrateEvents(category, originalType)` to persist the category and migrate events atomically; otherwise calls `repository.saveCategory(category)`
 - New categories are assigned `sortOrder = currentMin - 1` (placing them at the top); the repository provides the current minimum via `CategoryDao.getMinSortOrder()`
-- New categories are assigned a default color via `repository.getAndIncrementNextCategoryColorIndex()`, which returns `index % paletteSize` mapped to the preset palette; the counter is monotonically increasing and unaffected by deletions
+- New categories pre-populate `color` on init via `repository.getAndIncrementNextCategoryColorIndex()`, which returns `index % paletteSize` mapped to the preset palette; the counter is monotonically increasing and unaffected by deletions. The user may override the pre-selected color in the picker before saving. `save()` always uses `color.value` for both new and existing categories.
 
 ### Value Type Migration
 
