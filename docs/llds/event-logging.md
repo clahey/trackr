@@ -37,7 +37,7 @@ A bottom sheet opened from the timeline FAB. Two-step flow to minimize taps:
 Grid of all categories (emoji + name). Tapping one advances to step 2.
 
 **Step 2 — Value + details**
-- Value input (see Value Input section below)
+- Value input (see Value Input section below); for Number, Text, and Duration types the input field is automatically focused on entry so the keyboard rises without an extra tap
 - Optional: single photo (camera or gallery picker)
 - Optional: notes text field
 - Timestamp: defaults to now; tappable to edit (date + time picker)

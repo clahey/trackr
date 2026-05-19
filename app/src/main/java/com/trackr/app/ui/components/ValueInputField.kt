@@ -10,18 +10,25 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import kotlin.time.Duration.Companion.seconds
 
+// @spec EL-UI-058
 @Composable
 fun ValueInputField(
     value: EventValue?,
     onValueChange: (EventValue?) -> Unit,
     valueType: ValueType? = null,
+    autoFocus: Boolean = false,
 ) {
     when {
         value is EventValue.Scale || valueType == ValueType.Scale -> {
@@ -50,6 +57,8 @@ fun ValueInputField(
         }
         value is EventValue.NumberValue || valueType == ValueType.Number -> {
             val num = (value as? EventValue.NumberValue)
+            val focusRequester = remember { FocusRequester() }
+            if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
             OutlinedTextField(
                 value = num?.value?.toString() ?: "",
                 onValueChange = { s ->
@@ -59,20 +68,24 @@ fun ValueInputField(
                 },
                 label = { Text("Value") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).testTag("value_input_field"),
             )
         }
         value is EventValue.TextValue || valueType == ValueType.Text -> {
+            val focusRequester = remember { FocusRequester() }
+            if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
             OutlinedTextField(
                 value = (value as? EventValue.TextValue)?.text ?: "",
                 onValueChange = { onValueChange(EventValue.TextValue(it)) },
                 label = { Text("Value") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).testTag("value_input_field"),
                 minLines = 2,
             )
         }
         value is EventValue.DurationValue || valueType == ValueType.Duration -> {
             val dur = (value as? EventValue.DurationValue)?.duration ?: kotlin.time.Duration.ZERO
+            val hoursFocusRequester = remember { FocusRequester() }
+            if (autoFocus) LaunchedEffect(Unit) { hoursFocusRequester.requestFocus() }
             dur.toComponents { hours, minutes, seconds, _ ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -83,7 +96,7 @@ fun ValueInputField(
                         },
                         label = { Text("H") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).focusRequester(hoursFocusRequester).testTag("value_duration_h"),
                     )
                     OutlinedTextField(
                         value = minutes.toString(),
