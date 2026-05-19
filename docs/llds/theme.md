@@ -59,13 +59,17 @@ Default Material 3 shape scale throughout (rounded corners per M3 spec). No over
 
 Each `Category` carries a `color: Long` (ARGB). Category colors appear in:
 - Category chips on the timeline filter row
-- Event rows in the timeline (as a color accent or container)
+- Event rows in the timeline (circle avatar)
 - Category list rows
 - The category edit screen preview
 
 ### Usage in UI
 
-Category color is used as a **container background**. Text and icons on top use a computed foreground: white for dark backgrounds, black for light backgrounds, determined by the WCAG relative luminance of the color. Material 3's `contentColorFor()` is not used here since category colors are arbitrary user values outside the app's tonal palette.
+Category color usage differs by surface:
+
+**Container background** (chips, category list rows, edit screen color preview swatch): the category color fills the entire surface; text and icons on top use `foregroundColorForBackground(color)` — white for dark backgrounds, black for light, per WCAG relative luminance. Material 3's `contentColorFor()` is not used here since category colors are arbitrary user values outside the app's tonal palette.
+
+**Circle avatar** (timeline event rows): the category color fills a 48dp filled circle on the left of each row; the category emoji is centered inside the circle using `foregroundColorForBackground(color)`. The row card surface itself uses the M3 surface container color, not the category color.
 
 ### Preset Palette
 

@@ -8,6 +8,8 @@ LLD: `docs/llds/event-logging.md`
 
 - [x] **EL-UI-001**: The timeline screen shall display events grouped by the calendar day of their timestamp in the user's local timezone, with the most recent day first and the most recent event first within each day.
 - [x] **EL-UI-002**: Each event row shall display the category emoji, category name, a value summary formatted for the event's value type, and the time of day from the event's timestamp. (Category fields are blank when the event is orphaned.)
+- [x] **EL-UI-004**: Each event row shall be presented as an elevated card visually distinct from the screen background.
+- [x] **EL-UI-005**: Each event row shall display the category color as a filled circle avatar on the left; the category emoji shall be centered inside the circle using the WCAG foreground color computed by `foregroundColorForBackground(categoryColor)`.
 - [ ] **EL-UI-003**: Day group headers shall display "Today" for the current date, "Yesterday" for the prior date, and the full date for all older days.
 
 ## Category Filter

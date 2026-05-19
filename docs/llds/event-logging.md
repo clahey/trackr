@@ -12,10 +12,10 @@ The segment owns three screens (timeline, quick-log sheet, event edit) and their
 
 The primary screen. Displays all events grouped by calendar day of `timestamp` (user's local timezone), most recent day first, most recent event first within each day.
 
-Each event row shows:
-- Category emoji and name
-- Value summary (formatted per `ValueType`)
-- Time of day (from `timestamp`)
+Each event row is an elevated card (visually distinct from the screen background). Layout:
+- **Left**: 48dp filled circle using the category color; category emoji centered inside with WCAG foreground color (see `docs/llds/theme.md § Circle avatar`)
+- **Center**: category name (subtitle), value summary (formatted per `ValueType`), and notes (if any) stacked vertically
+- **Right**: time of day (from `timestamp`)
 
 Supports:
 - **Log new event** — FAB opens the Quick-Log Sheet

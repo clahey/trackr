@@ -14,7 +14,8 @@ LLD: `docs/llds/theme.md`
 
 ## Category Color System
 
-- [ ] **THEME-UI-010**: Category colors shall be applied as container background colors wherever a category is represented — chips on the timeline filter row, event rows, category list rows, and the category edit screen preview.
+- [ ] **THEME-UI-010**: Category colors shall be applied as container background colors on category chips (timeline filter row), category list rows, and the category edit screen color preview swatch.
+- [x] **THEME-UI-011**: On timeline event rows, the category color shall fill a 48dp circle avatar on the left of each row; the category emoji shall be centered inside using `foregroundColorForBackground(categoryColor)`; the row card surface shall use the M3 surface container color.
 - [x] **THEME-PROC-001**: When rendering a category color as a container background, the system shall compute the foreground color (text and icons) using WCAG relative luminance: white for backgrounds with relative luminance below 0.179, black for backgrounds at or above 0.179.
 - [x] **THEME-PROC-002**: The foreground color for category containers shall be either white or black only; Material 3's `contentColorFor()` shall not be used for category colors, as they are arbitrary user values outside the app's tonal palette.
 

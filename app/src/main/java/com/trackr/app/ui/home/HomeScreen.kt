@@ -67,6 +67,7 @@ import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
 import com.trackr.app.ui.components.ValueInputField
 import com.trackr.app.ui.components.formatValue
+import com.trackr.app.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -276,7 +277,7 @@ private fun SwipeableEventRow(
     }
 }
 
-// @spec EL-UI-002
+// @spec EL-UI-002, EL-UI-004, EL-UI-005, THEME-UI-011
 @Composable
 private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, onClick: () -> Unit) {
     ElevatedCard(
@@ -289,6 +290,7 @@ private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, on
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // @spec EL-UI-005, THEME-UI-011
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -301,6 +303,8 @@ private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, on
                 Text(
                     text = category?.emoji ?: "",
                     style = MaterialTheme.typography.titleLarge,
+                    color = category?.let { Color(foregroundColorForBackground(it.color)) }
+                        ?: MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
