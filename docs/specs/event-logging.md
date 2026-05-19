@@ -62,6 +62,7 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-055b**: The Duration input shall reject negative values in any field and shall reject values ≥ 60 in the minutes and seconds fields; the system shall not allow saving an invalid duration.
 - [x] **EL-UI-052b**: The Number value field shall not allow saving when the value field is empty or not parseable as a number.
 - [ ] **EL-UI-056**: For Unknown or ErrorValue events, the value field shall display the error kind and raw value string in a read-only format.
+- [ ] **EL-UI-057**: The event edit screen shall validate required value fields on save using the same per-ValueType rules as the quick-log screen (EL-UI-052b, EL-UI-054, EL-UI-055b); validation errors shall highlight the input field in error state; both the event edit screen and the quick-log sheet shall use the same visual error treatment for value validation failures.
 
 ## Image Handling
 
