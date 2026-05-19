@@ -17,6 +17,6 @@
     <!-- Yellow dot at R-peak -->
     <path
         android:pathData="M53,18 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0"
-        android:fillColor="#F9B24C" />
+        android:fillColor="#fcd214" />
 
 </vector>
