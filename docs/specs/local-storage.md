@@ -13,39 +13,39 @@ LLD: `docs/llds/local-storage.md`
 
 ## Category Persistence
 
-- [ ] **LS-BE-010**: The system shall store categories ordered by `sortOrder ASC`; `getCategories` shall return them in this order.
-- [ ] **LS-BE-011**: When `saveCategory` is called for a new category, the system shall assign it a `sortOrder` of `currentMin - 1`, placing it at the top of the list.
-- [ ] **LS-BE-012**: `reorderCategories` shall accept an ordered list of category IDs and reassign sequential `sortOrder` values (0, 1, 2…) matching that order in a single operation.
-- [ ] **LS-BE-013**: `getEventCountForCategory` shall return a `Flow<Int>` that reflects the live count of events for a given category.
+- [x] **LS-BE-010**: The system shall store categories ordered by `sortOrder ASC`; `getCategories` shall return them in this order.
+- [x] **LS-BE-011**: When `saveCategory` is called for a new category, the system shall assign it a `sortOrder` of `currentMin - 1`, placing it at the top of the list.
+- [x] **LS-BE-012**: `reorderCategories` shall accept an ordered list of category IDs and reassign sequential `sortOrder` values (0, 1, 2…) matching that order in a single operation.
+- [x] **LS-BE-013**: `getEventCountForCategory` shall return a `Flow<Int>` that reflects the live count of events for a given category.
 
 ## Event Persistence
 
-- [ ] **LS-BE-020**: `getEvents` shall return events ordered by `timestamp DESC`, then `createdAt DESC`, then `id ASC` as a tiebreaker.
-- [ ] **LS-BE-021**: `getEventsByCategory` shall return events in the same order as `getEvents`.
+- [x] **LS-BE-020**: `getEvents` shall return events ordered by `timestamp DESC`, then `createdAt DESC`, then `id ASC` as a tiebreaker.
+- [x] **LS-BE-021**: `getEventsByCategory` shall return events in the same order as `getEvents`.
 
 ## Deletion and File Lifecycle
 
-- [ ] **LS-BE-030**: When deleting an event, the system shall delete the database row before deleting any associated image files, so that a crash between the two steps leaves recoverable orphaned files rather than a valid DB row with missing files.
-- [ ] **LS-BE-031**: When deleting a category, the system shall collect image paths from all child events, delete the category row (which cascades to child event rows atomically via Room), then delete the collected image files.
-- [ ] **LS-BE-032**: When `saveEvent` is called with a modified image list, the system shall read the previous image paths, upsert the event, then delete any paths that were removed — ensuring that a failed upsert leaves storage intact.
+- [x] **LS-BE-030**: When deleting an event, the system shall delete the database row before deleting any associated image files, so that a crash between the two steps leaves recoverable orphaned files rather than a valid DB row with missing files.
+- [x] **LS-BE-031**: When deleting a category, the system shall collect image paths from all child events, delete the category row (which cascades to child event rows atomically via Room), then delete the collected image files.
+- [x] **LS-BE-032**: When `saveEvent` is called with a modified image list, the system shall read the previous image paths, upsert the event, then delete any paths that were removed — ensuring that a failed upsert leaves storage intact.
 
 ## Startup Orphan Recovery
 
-- [ ] **LS-BE-040**: `onStartup` shall scan the image storage directory and delete any file not referenced by a current event row in the database.
+- [x] **LS-BE-040**: `onStartup` shall scan the image storage directory and delete any file not referenced by a current event row in the database.
 - [ ] **LS-BE-041**: `onStartup` shall be called once per app process start before any user-visible UI is shown.
 
 ## TypeConverters
 
 - [ ] **LS-BE-050**: The `EventValueConverter` shall encode and decode `EventValue?` to and from a nullable JSON string, delegating full encode/decode logic (including `ErrorValue` verbatim passthrough and invariant repair) to the rules specified in `docs/specs/data-model.md § EventValue TypeConverter`.
-- [ ] **LS-BE-051**: The `InstantConverter` shall encode `java.time.Instant` as epoch milliseconds (Long) and decode a Long back to an `Instant`.
+- [x] **LS-BE-051**: The `InstantConverter` shall encode `java.time.Instant` as epoch milliseconds (Long) and decode a Long back to an `Instant`.
 - [ ] **LS-BE-052**: The `DurationAsSecondsSerializer` shall encode `kotlin.time.Duration` as total seconds (Long) and decode a Long back to a `Duration`.
-- [ ] **LS-BE-053**: The `StringListConverter` shall encode `List<String>` as a JSON array string; on decode failure it shall return `emptyList()` rather than propagating an exception.
+- [x] **LS-BE-053**: The `StringListConverter` shall encode `List<String>` as a JSON array string; on decode failure it shall return `emptyList()` rather than propagating an exception.
 - [ ] **LS-BE-054**: The `ValueTypeConverter` shall encode known `ValueType` variants as fixed lowercase name strings and encode `Unknown(raw)` as the raw string verbatim; unknown strings decoded from the database shall produce `ValueType.Unknown(raw)`.
 
 ## DataStore
 
-- [ ] **LS-BE-080**: The system shall persist a `next_category_color_index` integer in DataStore Preferences, initialized to 0 and never reset.
-- [ ] **LS-BE-081**: `getAndIncrementNextCategoryColorIndex(paletteSize: Int)` shall atomically return the current stored index and store `(current + 1) % paletteSize`, keeping the stored value in `[0, paletteSize)` so that concurrent calls never return the same index and the counter cycles at the caller-supplied palette size.
+- [x] **LS-BE-080**: The system shall persist a `next_category_color_index` integer in DataStore Preferences, initialized to 0 and never reset.
+- [x] **LS-BE-081**: `getAndIncrementNextCategoryColorIndex(paletteSize: Int)` shall atomically return the current stored index and store `(current + 1) % paletteSize`, keeping the stored value in `[0, paletteSize)` so that concurrent calls never return the same index and the counter cycles at the caller-supplied palette size.
 
 ## ImageStore
 

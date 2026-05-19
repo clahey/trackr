@@ -7,9 +7,9 @@ LLD: `docs/llds/data-model.md`
 ## ValueType
 
 - [ ] **DM-DATA-001**: The system shall represent category value types as a sealed class with variants: None, Scale, Boolean, Number, Text, Duration, and Unknown(raw).
-- [ ] **DM-DATA-002**: When decoding a ValueType string that does not match any known variant name, the system shall produce Unknown(raw), preserving the original string verbatim.
-- [ ] **DM-DATA-003**: When encoding an Unknown(raw) ValueType, the system shall write the raw string verbatim without modification.
-- [ ] **DM-DATA-004**: When encoding a known ValueType (None, Scale, Boolean, Number, Text, Duration), the system shall serialize it to a fixed lowercase name string.
+- [x] **DM-DATA-002**: When decoding a ValueType string that does not match any known variant name, the system shall produce Unknown(raw), preserving the original string verbatim.
+- [x] **DM-DATA-003**: When encoding an Unknown(raw) ValueType, the system shall write the raw string verbatim without modification.
+- [x] **DM-DATA-004**: When encoding a known ValueType (None, Scale, Boolean, Number, Text, Duration), the system shall serialize it to a fixed lowercase name string.
 
 ## EventValue
 
@@ -22,15 +22,15 @@ LLD: `docs/llds/data-model.md`
 
 ## EventValue TypeConverter
 
-- [ ] **DM-PROC-001**: When encoding a null EventValue, the system shall produce a null string.
-- [ ] **DM-PROC-002**: When encoding an ErrorValue, the system shall write its raw field verbatim, without re-serializing, so that bytes written by a newer app version are preserved unchanged by an older version.
-- [ ] **DM-PROC-003**: When encoding a non-null, non-ErrorValue EventValue, the system shall serialize it as JSON using a "type" class discriminator.
-- [ ] **DM-PROC-004**: When decoding a null string, the system shall produce a null EventValue.
-- [ ] **DM-PROC-005**: When decoding a JSON string whose "type" discriminator names an unrecognized EventValue variant, the system shall produce ErrorValue(UNRECOGNIZED_TYPE, raw).
-- [ ] **DM-PROC-006**: When decoding a string that cannot be parsed as JSON, the system shall produce ErrorValue(UNPARSABLE, raw).
-- [ ] **DM-PROC-007**: When decoding a Scale EventValue whose value is outside 1–10, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
-- [ ] **DM-PROC-008**: When decoding a DurationValue whose minutes field is negative, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
-- [ ] **DM-PROC-009**: The EventValue TypeConverter shall never propagate a serialization exception to the caller.
+- [x] **DM-PROC-001**: When encoding a null EventValue, the system shall produce a null string.
+- [x] **DM-PROC-002**: When encoding an ErrorValue, the system shall write its raw field verbatim, without re-serializing, so that bytes written by a newer app version are preserved unchanged by an older version.
+- [x] **DM-PROC-003**: When encoding a non-null, non-ErrorValue EventValue, the system shall serialize it as JSON using a "type" class discriminator.
+- [x] **DM-PROC-004**: When decoding a null string, the system shall produce a null EventValue.
+- [x] **DM-PROC-005**: When decoding a JSON string whose "type" discriminator names an unrecognized EventValue variant, the system shall produce ErrorValue(UNRECOGNIZED_TYPE, raw).
+- [x] **DM-PROC-006**: When decoding a string that cannot be parsed as JSON, the system shall produce ErrorValue(UNPARSABLE, raw).
+- [x] **DM-PROC-007**: When decoding a Scale EventValue whose value is outside 1–10, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
+- [x] **DM-PROC-008**: When decoding a DurationValue whose minutes field is negative, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
+- [x] **DM-PROC-009**: The EventValue TypeConverter shall never propagate a serialization exception to the caller.
 
 ## Category
 
