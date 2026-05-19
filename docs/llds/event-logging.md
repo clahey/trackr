@@ -119,6 +119,7 @@ sealed class DayEntry {
 - Full form state mirroring `Event` fields
 - `save()`: diffs image paths, calls `repository.saveEvent()`
 - `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()`
+- **Stale event guard:** if `getEventById` returns null on init, sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The timeline screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
 
 ## Image Handling
 

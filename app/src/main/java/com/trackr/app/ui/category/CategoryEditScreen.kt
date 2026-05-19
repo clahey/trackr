@@ -1,4 +1,4 @@
-package com.trackr.app.ui.category
+ package com.trackr.app.ui.category
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,12 +56,12 @@ import com.trackr.app.ui.theme.categoryColorPalette
 import com.trackr.app.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.launch
 
-// @spec CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
+// @spec CAT-UI-017, CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CategoryEditScreen(
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (errorMessage: String?) -> Unit,
     viewModel: CategoryEditViewModel = hiltViewModel(),
 ) {
     val name by viewModel.name.collectAsState()
@@ -71,12 +71,16 @@ fun CategoryEditScreen(
     val unit by viewModel.unit.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val showValueTypeWarning by viewModel.showValueTypeWarning.collectAsState()
+    val navigateBack by viewModel.navigateBack.collectAsState()
     val isEditMode = viewModel.isEditMode
 
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(navigateBack) {
+        if (navigateBack) onNavigateBack("Category not found.")
+    }
     LaunchedEffect(saveResult) {
-        if (saveResult is SaveResult.Success) onNavigateBack()
+        if (saveResult is SaveResult.Success) onNavigateBack(null)
     }
 
     if (showValueTypeWarning) {
@@ -93,7 +97,7 @@ fun CategoryEditScreen(
             TopAppBar(
                 title = { Text(if (isEditMode) "Edit Category" else "New Category") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = { onNavigateBack(null) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },

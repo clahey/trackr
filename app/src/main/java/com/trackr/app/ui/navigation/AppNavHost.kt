@@ -11,6 +11,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -89,10 +90,15 @@ fun AppNavHost(
         startDestination = Routes.TIMELINE,
         modifier = modifier,
     ) {
-        composable(Routes.TIMELINE) {
+        composable(Routes.TIMELINE) { entry ->
             HomeScreen(
                 onNavigateToEventEdit = { eventId ->
                     navController.navigate(Routes.eventEdit(eventId))
+                },
+                pendingSnackbarMessage = entry.savedStateHandle
+                    .getStateFlow<String?>("snackbar_message", null),
+                onSnackbarMessageConsumed = {
+                    entry.savedStateHandle.remove<String>("snackbar_message")
                 },
             )
         }
@@ -101,13 +107,25 @@ fun AppNavHost(
             arguments = listOf(navArgument("eventId") { type = NavType.StringType }),
         ) {
             EventEditScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack = { errorMessage ->
+                    if (errorMessage != null) {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("snackbar_message", errorMessage)
+                    }
+                    navController.popBackStack()
+                },
             )
         }
-        composable(Routes.CATEGORY_LIST) {
+        composable(Routes.CATEGORY_LIST) { entry ->
             CategoryListScreen(
                 onNavigateToCategoryEdit = { categoryId ->
                     navController.navigate(Routes.categoryEdit(categoryId))
+                },
+                pendingSnackbarMessage = entry.savedStateHandle
+                    .getStateFlow<String?>("snackbar_message", null),
+                onSnackbarMessageConsumed = {
+                    entry.savedStateHandle.remove<String>("snackbar_message")
                 },
             )
         }
@@ -120,7 +138,14 @@ fun AppNavHost(
             }),
         ) {
             CategoryEditScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack = { errorMessage ->
+                    if (errorMessage != null) {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("snackbar_message", errorMessage)
+                    }
+                    navController.popBackStack()
+                },
             )
         }
     }

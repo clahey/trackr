@@ -16,6 +16,7 @@ LLD: `docs/llds/category-management.md`
 ## Category Edit — Display
 
 - [ ] **CAT-UI-010**: The category edit screen shall display input fields for name, emoji, color, and value type.
+- [ ] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
 - [ ] **CAT-UI-011**: While value type is Number, the category edit screen shall display a unit input field; for all other value types the unit field shall be hidden.
 - [ ] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
 - [ ] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.

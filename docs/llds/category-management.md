@@ -55,6 +55,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 ### CategoryEditViewModel
 
 - Accepts an optional `categoryId`; loads existing category on init if provided
+- **Stale category guard:** if `getCategoryById` returns null on init (edit mode only), sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The category list screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
 - Exposes form field state as individual `StateFlow`s (or a single `FormState` data class)
 - `save()`: validates all fields, constructs a `Category` with a new UUID (create) or existing id (edit), calls `repository.saveCategory()`
 - Exposes `saveResult: StateFlow<SaveResult>` (`Idle`, `Success`, `ValidationError`)

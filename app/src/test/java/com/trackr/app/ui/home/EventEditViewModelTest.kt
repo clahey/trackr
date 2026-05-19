@@ -192,4 +192,18 @@ class EventEditViewModelTest {
         vm.cancel()
         assertFalse(imageStore.wasDeleted("/img/original.jpg"))
     }
+
+    // @spec EL-UI-045
+    @Test fun `navigateBack emits true when event not found`() = runTest {
+        vm = makeVm("nonexistent")
+        assertTrue(vm.navigateBack.value)
+    }
+
+    // @spec EL-UI-045
+    @Test fun `navigateBack stays false when event is found`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        assertFalse(vm.navigateBack.value)
+    }
 }

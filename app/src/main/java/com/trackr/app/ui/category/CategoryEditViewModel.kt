@@ -37,6 +37,9 @@ class CategoryEditViewModel @Inject constructor(
     val valueType = MutableStateFlow<ValueType>(ValueType.None)
     val unit = MutableStateFlow("")
 
+    private val _navigateBack = MutableStateFlow(false)
+    val navigateBack: StateFlow<Boolean> = _navigateBack.asStateFlow()
+
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
 
@@ -51,14 +54,17 @@ class CategoryEditViewModel @Inject constructor(
     init {
         if (categoryId != null) {
             viewModelScope.launch {
-                repository.getCategoryById(categoryId).first()?.let { cat ->
-                    name.value = cat.name
-                    emoji.value = cat.emoji
-                    color.value = cat.color
-                    valueType.value = cat.valueType
-                    unit.value = cat.unit ?: ""
-                    _originalValueType.value = cat.valueType
+                val cat = repository.getCategoryById(categoryId).first()
+                if (cat == null) {
+                    _navigateBack.value = true
+                    return@launch
                 }
+                name.value = cat.name
+                emoji.value = cat.emoji
+                color.value = cat.color
+                valueType.value = cat.valueType
+                unit.value = cat.unit ?: ""
+                _originalValueType.value = cat.valueType
             }
             viewModelScope.launch {
                 combine(

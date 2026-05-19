@@ -46,6 +46,7 @@ LLD: `docs/llds/event-logging.md`
 
 - [x] **EL-UI-040**: The event edit screen shall display editable fields for timestamp, value, notes, and images.
 - [ ] **EL-UI-041**: The event edit screen shall display a delete action in the toolbar.
+- [ ] **EL-UI-045**: When the event edit screen loads and the requested event is not found in the repository, the system shall navigate back to the timeline and display a snackbar on the timeline screen reading "Event not found."
 - [x] **EL-UI-042**: When the user taps the delete action on the event edit screen, the system shall show a confirmation dialog before deleting.
 - [x] **EL-UI-043**: While an event carries an Unknown or ErrorValue, the value field on the edit screen shall be read-only; the timestamp, notes, and image fields shall remain editable.
 - [ ] **EL-UI-044**: The event edit screen shall allow adding images via camera or gallery and removing individual images with no cap on total image count.
@@ -54,7 +55,7 @@ LLD: `docs/llds/event-logging.md`
 
 - [ ] **EL-UI-050**: For Scale-type categories, the value input shall be a horizontal slider with integer snap accepting values in the range 1–10.
 - [ ] **EL-UI-051**: For Boolean-type categories, the value input shall be a two-button row labeled "Yes" and "No".
-- [x] **EL-UI-052**: For Number-type categories, the value input shall consist of a numeric text field and a separate unit text field; the unit field shall be pre-filled from the category's unit and shall be user-editable; an empty unit field shall be saved as null (unitless).
+- [ ] **EL-UI-052**: For Number-type categories, the value input shall consist of a numeric text field and a separate unit text field; the unit field shall be pre-filled from the category's unit and shall be user-editable; an empty unit field shall be saved as null (unitless).
 - [ ] **EL-UI-053**: For Text-type categories, the value input shall be a multi-line text field.
 - [x] **EL-UI-054**: While the selected Text-type category has `allowEmptyText` set to false, the system shall not allow saving with an empty text value.
 - [ ] **EL-UI-055**: For Duration-type categories, the value input shall be three separate numeric fields for hours, minutes, and seconds; the value shall be stored as a `kotlin.time.Duration`.

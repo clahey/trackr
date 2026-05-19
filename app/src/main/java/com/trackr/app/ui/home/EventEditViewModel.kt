@@ -36,6 +36,9 @@ class EventEditViewModel @Inject constructor(
     private val _isValueEditable = MutableStateFlow(true)
     val isValueEditable: StateFlow<Boolean> = _isValueEditable.asStateFlow()
 
+    private val _navigateBack = MutableStateFlow(false)
+    val navigateBack: StateFlow<Boolean> = _navigateBack.asStateFlow()
+
     private val _pendingDelete = MutableStateFlow(false)
     val pendingDelete: StateFlow<Boolean> = _pendingDelete.asStateFlow()
 
@@ -51,21 +54,23 @@ class EventEditViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val event = repository.getEventById(eventId).first()
-            if (event != null) {
-                originalEvent = event
-                originalImagePaths = event.imagePaths.toSet()
-                timestamp.value = event.timestamp
-                value.value = event.value
-                notes.value = event.notes ?: ""
-                imagePaths.value = event.imagePaths
+            if (event == null) {
+                _navigateBack.value = true
+                return@launch
+            }
+            originalEvent = event
+            originalImagePaths = event.imagePaths.toSet()
+            timestamp.value = event.timestamp
+            value.value = event.value
+            notes.value = event.notes ?: ""
+            imagePaths.value = event.imagePaths
 
-                val isError = event.value is EventValue.ErrorValue
-                _isValueEditable.value = if (isError) {
-                    false
-                } else {
-                    val category = repository.getCategoryById(event.categoryId).first()
-                    category?.valueType !is ValueType.Unknown
-                }
+            val isError = event.value is EventValue.ErrorValue
+            _isValueEditable.value = if (isError) {
+                false
+            } else {
+                val category = repository.getCategoryById(event.categoryId).first()
+                category?.valueType !is ValueType.Unknown
             }
         }
     }

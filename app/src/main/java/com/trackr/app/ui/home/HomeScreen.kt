@@ -62,6 +62,10 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import com.trackr.app.ui.components.ValueInputField
+import com.trackr.app.ui.components.formatValue
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
@@ -69,11 +73,13 @@ import java.time.format.DateTimeFormatter
 
 // @spec EL-UI-001, EL-UI-011, EL-UI-012, EL-UI-013, EL-UI-013b, EL-UI-017, EL-UI-018,
 // EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022, EL-UI-023, EL-UI-023b,
-// EL-UI-030, EL-UI-032, EL-UI-034, EL-NAV-002, EL-PROC-001, APP-NAV-002
+// EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-045, EL-NAV-002, EL-PROC-001, APP-NAV-002
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToEventEdit: (String) -> Unit,
+    pendingSnackbarMessage: StateFlow<String?> = MutableStateFlow(null),
+    onSnackbarMessageConsumed: () -> Unit = {},
     homeVm: HomeViewModel = hiltViewModel(),
     quickLogVm: QuickLogViewModel = hiltViewModel(),
 ) {
@@ -90,6 +96,13 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var isProgrammaticScroll by remember { mutableStateOf(false) }
+
+    val snackbarMessage by pendingSnackbarMessage.collectAsState()
+    LaunchedEffect(snackbarMessage) {
+        val msg = snackbarMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        onSnackbarMessageConsumed()
+    }
 
     // Scroll to pre-filter day when filter applied
     LaunchedEffect(preFilterTopDay, dayGroups) {

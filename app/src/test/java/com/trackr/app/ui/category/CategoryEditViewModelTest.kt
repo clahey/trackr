@@ -144,6 +144,25 @@ class CategoryEditViewModelTest {
         assertFalse(vm.showValueTypeWarning.value)
     }
 
+    // @spec CAT-UI-017
+    @Test fun `navigateBack emits true when category not found in edit mode`() = runTest {
+        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "nonexistent")))
+        assertTrue(vm.navigateBack.value)
+    }
+
+    // @spec CAT-UI-017
+    @Test fun `navigateBack stays false when category is found`() = runTest {
+        repo.saveCategory(makeCategory("c1"))
+        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "c1")))
+        assertFalse(vm.navigateBack.value)
+    }
+
+    // @spec CAT-UI-017
+    @Test fun `navigateBack stays false in create mode`() = runTest {
+        vm = CategoryEditViewModel(repo, SavedStateHandle())
+        assertFalse(vm.navigateBack.value)
+    }
+
     private suspend fun getSavedCategory(): Category =
         repo.getCategories().first().first()
 
