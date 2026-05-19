@@ -48,7 +48,10 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 | Scale | Text | `Scale(n)` → `Text(n.toString())` | Yes | Yes — Text("n")→Scale via Text→Scale row |
 | Boolean | Text | `Boolean(true)` → `Text("Yes")`, `Boolean(false)` → `Text("No")` | Yes | Yes — Text→Boolean row |
 | Number | Text | `Number(v, u)` → `Text("v u")` or `Text("v")` if u is null | Yes | Yes — Text→Number row (parses unit) |
-| Duration | Text | `Duration(d)` → `Text(d.toString())` | Yes | No — no reverse Duration parser |
+| Duration | Text | `Duration(d)` → `Text(ValueInputFieldd.toString())` | Yes | No — no reverse Duration parser |
+| None | Exercise | `null` → `ExerciseValue(3, 15)` | Yes | No — Exercise→None is non-safe |
+| Exercise | Text | `ExerciseValue(s, r)` → `Text("$s × $r")` | Yes | Yes — Text→Exercise row |
+| Text | Exercise | parse `"$s × $r"` or `"$s x $r"` (both integers ≥ 1) → `ExerciseValue(s, r)`; else leave unchanged | No | — |
 | Text | Boolean | `Text("Yes")` → `Boolean(true)`, `Text("No")` → `Boolean(false)`; else leave unchanged | No | — |
 | Text | Number | parse as `<double>` or `<double> <unit>` → `Number(d, u)`; else leave unchanged | No | — |
 | Text | Scale | if parseable as Int in [1..10] → `Scale(n)`; else leave unchanged | No | — |

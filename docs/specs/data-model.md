@@ -6,19 +6,20 @@ LLD: `docs/llds/data-model.md`
 
 ## ValueType
 
-- [ ] **DM-DATA-001**: The system shall represent category value types as a sealed class with variants: None, Scale, Boolean, Number, Text, Duration, and Unknown(raw).
+- [ ] **DM-DATA-001**: The system shall represent category value types as a sealed class with variants: None, Scale, Boolean, Number, Text, Duration, Exercise, and Unknown(raw).
 - [x] **DM-DATA-002**: When decoding a ValueType string that does not match any known variant name, the system shall produce Unknown(raw), preserving the original string verbatim.
 - [x] **DM-DATA-003**: When encoding an Unknown(raw) ValueType, the system shall write the raw string verbatim without modification.
 - [x] **DM-DATA-004**: When encoding a known ValueType (None, Scale, Boolean, Number, Text, Duration), the system shall serialize it to a fixed lowercase name string.
 
 ## EventValue
 
-- [ ] **DM-DATA-010**: The system shall represent event values as a sealed class with variants: Scale, BooleanValue, NumberValue, TextValue, DurationValue, and ErrorValue.
+- [ ] **DM-DATA-010**: The system shall represent event values as a sealed class with variants: Scale, BooleanValue, NumberValue, TextValue, DurationValue, ExerciseValue, and ErrorValue.
 - [ ] **DM-DATA-011**: The system shall represent the absence of a value (for None-type categories) as null rather than as an EventValue variant.
 - [ ] **DM-DATA-012**: Scale values shall carry an integer in the inclusive range 1–10.
 - [ ] **DM-DATA-013**: DurationValue values shall carry a non-negative `kotlin.time.Duration`; the domain model shall reject (via ErrorValue at read time) any stored value representing a negative duration.
 - [ ] **DM-DATA-014**: NumberValue values shall carry a finite Double and an optional unit string (null means unitless).
 - [ ] **DM-DATA-015**: ErrorValue shall carry an ErrorKind (UNPARSABLE, UNRECOGNIZED_TYPE, or OUT_OF_RANGE) and the original raw string for diagnostics and future recovery.
+- [x] **DM-DATA-016**: ExerciseValue values shall carry two positive integer fields: sets (≥ 1) and reps (≥ 1).
 
 ## EventValue TypeConverter
 
@@ -30,6 +31,7 @@ LLD: `docs/llds/data-model.md`
 - [x] **DM-PROC-006**: When decoding a string that cannot be parsed as JSON, the system shall produce ErrorValue(UNPARSABLE, raw).
 - [x] **DM-PROC-007**: When decoding a Scale EventValue whose value is outside 1–10, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
 - [x] **DM-PROC-008**: When decoding a DurationValue whose minutes field is negative, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
+- [x] **DM-PROC-008b**: When decoding an ExerciseValue whose sets or reps is less than 1, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
 - [x] **DM-PROC-009**: The EventValue TypeConverter shall never propagate a serialization exception to the caller.
 
 ## Category
@@ -39,7 +41,7 @@ LLD: `docs/llds/data-model.md`
 - [ ] **DM-DATA-022**: Category.unit shall be meaningful only when valueType is Number; the domain model shall not reject a non-null unit value for other value types.
 - [ ] **DM-DATA-023**: Category.allowEmptyText shall be meaningful only when valueType is Text; the domain model shall not reject the field for other value types.
 - [ ] **DM-DATA-024**: Category.sortOrder shall be an integer where a lower value indicates a higher position in the displayed list.
-## Event
+## EventValueInputField
 
 - [ ] **DM-DATA-030**: The system shall identify each Event by a UUID string that remains stable across local storage and future cloud sync.
 - [ ] **DM-DATA-031**: Event.timestamp shall be a `java.time.Instant` representing when the event occurred (user-editable).

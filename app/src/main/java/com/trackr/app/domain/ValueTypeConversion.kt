@@ -1,16 +1,15 @@
 package com.trackr.app.domain
 
-import kotlin.time.Duration
-
-// @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035
+// @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, CAT-UI-044, CAT-UI-045, CAT-UI-046
 fun convertEventValue(value: EventValue?, from: ValueType, to: ValueType): EventValue? {
     if (from == to) return value
     if (from == ValueType.None && value == null) return when (to) {
-        ValueType.Number -> EventValue.NumberValue(0.0, null)
-        ValueType.Scale -> EventValue.Scale(5)
-        ValueType.Boolean -> EventValue.BooleanValue(true)
-        ValueType.Text -> EventValue.TextValue("")
-        ValueType.Duration -> EventValue.DurationValue(Duration.ZERO)
+        ValueType.Number -> EventValue.NumberValue()
+        ValueType.Scale -> EventValue.Scale()
+        ValueType.Boolean -> EventValue.BooleanValue()
+        ValueType.Text -> EventValue.TextValue()
+        ValueType.Duration -> EventValue.DurationValue()
+        ValueType.Exercise -> EventValue.ExerciseValue()
         else -> null
     }
     if (value == null) return null
@@ -28,6 +27,14 @@ fun convertEventValue(value: EventValue?, from: ValueType, to: ValueType): Event
             })
         value is EventValue.DurationValue && to == ValueType.Text ->
             EventValue.TextValue(value.duration.toString())
+        value is EventValue.ExerciseValue && to == ValueType.Text ->
+            EventValue.TextValue("${value.sets} × ${value.reps}")
+        value is EventValue.TextValue && to == ValueType.Exercise -> {
+            val parts = value.text.split(Regex("\\s*[×x]\\s*"), limit = 2)
+            val s = parts.getOrNull(0)?.trim()?.toIntOrNull()
+            val r = parts.getOrNull(1)?.trim()?.toIntOrNull()
+            if (s != null && r != null && s >= 1 && r >= 1) EventValue.ExerciseValue(s, r) else value
+        }
         value is EventValue.TextValue && to == ValueType.Boolean -> when (value.text) {
             "Yes" -> EventValue.BooleanValue(true)
             "No" -> EventValue.BooleanValue(false)

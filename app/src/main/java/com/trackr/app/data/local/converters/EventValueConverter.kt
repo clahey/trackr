@@ -6,7 +6,7 @@ import com.trackr.app.domain.EventValue
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
-// @spec DM-PROC-001, DM-PROC-002, DM-PROC-003, DM-PROC-004, DM-PROC-005, DM-PROC-006, DM-PROC-007, DM-PROC-008, DM-PROC-009
+// @spec DM-PROC-001, DM-PROC-002, DM-PROC-003, DM-PROC-004, DM-PROC-005, DM-PROC-006, DM-PROC-007, DM-PROC-008, DM-PROC-008b, DM-PROC-009
 object EventValueConverter {
     private val json = Json {
         classDiscriminator = "type"
@@ -39,6 +39,9 @@ object EventValueConverter {
                 else EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
             is EventValue.DurationValue ->
                 if (value.duration >= kotlin.time.Duration.ZERO) value
+                else EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
+            is EventValue.ExerciseValue ->
+                if (value.sets >= 1 && value.reps >= 1) value
                 else EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
             else -> value
         }

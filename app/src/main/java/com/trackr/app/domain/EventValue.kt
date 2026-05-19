@@ -17,26 +17,30 @@ enum class ErrorKind { UNPARSABLE, UNRECOGNIZED_TYPE, OUT_OF_RANGE }
 sealed class EventValue {
     @Serializable
     @SerialName("Scale")
-    data class Scale(val value: Int) : EventValue()
+    data class Scale(val value: Int = 5) : EventValue()              // invariant: 1..10
 
     @Serializable
     @SerialName("BooleanValue")
-    data class BooleanValue(val value: kotlin.Boolean) : EventValue()
+    data class BooleanValue(val value: kotlin.Boolean = true) : EventValue()
 
     @Serializable
     @SerialName("NumberValue")
-    data class NumberValue(val value: Double, val unit: String?) : EventValue()
+    data class NumberValue(val value: Double = 0.0, val unit: String? = null) : EventValue()
 
     @Serializable
     @SerialName("TextValue")
-    data class TextValue(val text: String) : EventValue()
+    data class TextValue(val text: String = "") : EventValue()
 
     @Serializable
     @SerialName("DurationValue")
     data class DurationValue(
         @Serializable(with = DurationAsSecondsSerializer::class)
-        val duration: Duration,
+        val duration: Duration = Duration.ZERO,
     ) : EventValue()
+
+    @Serializable
+    @SerialName("ExerciseValue")
+    data class ExerciseValue(val sets: Int = 3, val reps: Int = 15) : EventValue()  // invariant: sets >= 1, reps >= 1
 
     @Serializable
     @SerialName("ErrorValue")

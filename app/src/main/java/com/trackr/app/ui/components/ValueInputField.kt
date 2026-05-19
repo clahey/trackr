@@ -22,7 +22,7 @@ import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import kotlin.time.Duration.Companion.seconds
 
-// @spec EL-UI-058
+// @spec EL-UI-058, EL-UI-059, EL-UI-060
 @Composable
 fun ValueInputField(
     value: EventValue?,
@@ -32,7 +32,7 @@ fun ValueInputField(
 ) {
     when {
         value is EventValue.Scale || valueType == ValueType.Scale -> {
-            val scale = (value as? EventValue.Scale)?.value ?: 5
+            val scale = (value as? EventValue.Scale ?: EventValue.Scale()).value
             Column {
                 Text("Scale: $scale")
                 Slider(
@@ -82,8 +82,33 @@ fun ValueInputField(
                 minLines = 2,
             )
         }
+        value is EventValue.ExerciseValue || valueType == ValueType.Exercise -> {
+            val ex = value as? EventValue.ExerciseValue ?: EventValue.ExerciseValue()
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = ex.sets.toString(),
+                    onValueChange = { s ->
+                        val sets = s.toIntOrNull() ?: return@OutlinedTextField
+                        onValueChange(EventValue.ExerciseValue(sets, ex.reps))
+                    },
+                    label = { Text("Sets") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = ex.reps.toString(),
+                    onValueChange = { r ->
+                        val reps = r.toIntOrNull() ?: return@OutlinedTextField
+                        onValueChange(EventValue.ExerciseValue(ex.sets, reps))
+                    },
+                    label = { Text("Reps") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         value is EventValue.DurationValue || valueType == ValueType.Duration -> {
-            val dur = (value as? EventValue.DurationValue)?.duration ?: kotlin.time.Duration.ZERO
+            val dur = (value as? EventValue.DurationValue ?: EventValue.DurationValue()).duration
             val hoursFocusRequester = remember { FocusRequester() }
             if (autoFocus) LaunchedEffect(Unit) { hoursFocusRequester.requestFocus() }
             dur.toComponents { hours, minutes, seconds, _ ->
@@ -134,5 +159,6 @@ fun formatValue(value: EventValue): String = when (value) {
     }
     is EventValue.TextValue -> value.text
     is EventValue.DurationValue -> value.duration.toString()
+    is EventValue.ExerciseValue -> "${value.sets} × ${value.reps}"
     is EventValue.ErrorValue -> "[Error: ${value.raw}]"
 }

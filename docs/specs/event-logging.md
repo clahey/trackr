@@ -67,6 +67,8 @@ LLD: `docs/llds/event-logging.md`
 - [ ] **EL-UI-056**: For Unknown or ErrorValue events, the value field shall display the error kind and raw value string in a read-only format.
 - [ ] **EL-UI-057**: The event edit screen shall validate required value fields on save using the same per-ValueType rules as the quick-log screen (EL-UI-052b, EL-UI-054, EL-UI-055b); validation errors shall highlight the input field in error state; both the event edit screen and the quick-log sheet shall use the same visual error treatment for value validation failures.
 - [ ] **EL-UI-058**: When the quick-log sheet displays a Number, Text, or Duration value input in step 2, the system shall automatically focus the input field (the hours field for Duration) so the software keyboard is raised without an additional tap.
+- [x] **EL-UI-059**: For Exercise-type categories, the value input shall consist of two integer-only fields labeled "Sets" and "Reps" (integer keyboard, no decimal point); both fields shall default to 3 and 15 respectively when opening a new log; both fields shall require a value of 1 or greater before saving is permitted.
+- [x] **EL-UI-060**: Exercise values shall be displayed in the timeline and event edit screen as "$sets × $reps" using the Unicode multiplication sign (×, U+00D7).
 
 ## Image Handling
 

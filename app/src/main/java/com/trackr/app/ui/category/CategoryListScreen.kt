@@ -159,5 +159,6 @@ internal fun valueTypeLabel(type: ValueType): String = when (type) {
     ValueType.Number -> "Number"
     ValueType.Text -> "Text"
     ValueType.Duration -> "Duration"
+    ValueType.Exercise -> "Exercise (sets × reps)"
     is ValueType.Unknown -> "Unknown"
 }

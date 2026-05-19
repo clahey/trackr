@@ -206,6 +206,7 @@ private fun ValueTypeSelector(selected: ValueType, onSelect: (ValueType) -> Unit
         ValueType.Number,
         ValueType.Text,
         ValueType.Duration,
+        ValueType.Exercise,
     )
     var expanded by remember { mutableStateOf(false) }
 

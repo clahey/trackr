@@ -134,14 +134,15 @@ class CategoryEditViewModel @Inject constructor(
         (from == ValueType.None && to == ValueType.Text) ||
         (from == ValueType.Scale && to == ValueType.Text) ||
         (from == ValueType.Boolean && to == ValueType.Text) ||
-        (from == ValueType.Number && to == ValueType.Text) -> null
+        (from == ValueType.Number && to == ValueType.Text) ||
+        (from == ValueType.Exercise && to == ValueType.Text) -> null
         // Fully safe but irreversible
         from == ValueType.None ||
         (from == ValueType.Scale && to == ValueType.Number) ||
         (from == ValueType.Duration && to == ValueType.Text) -> ValueTypeWarningTier.IrreversibleSafe
         // Partially safe: migration attempted but some events may not convert
         from == ValueType.Text && to in listOf(
-            ValueType.Boolean, ValueType.Number, ValueType.Scale, ValueType.None,
+            ValueType.Boolean, ValueType.Number, ValueType.Scale, ValueType.None, ValueType.Exercise,
         ) -> ValueTypeWarningTier.Partial
         // All other pairs: no migration
         else -> ValueTypeWarningTier.Unsafe

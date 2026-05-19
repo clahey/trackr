@@ -4,7 +4,7 @@
 
 This component defines the domain types used throughout the app above the database layer. It is the vocabulary every other component speaks. The storage layer (Room entities) mirrors these types closely but is a separate concern — the domain model must not import Room annotations or Compose types.
 
-The central design challenge is supporting six distinct value shapes in a single `events` table without a polymorphic schema. The chosen approach: store values as JSON `String?` in Room and provide a typed `EventValue` sealed class at the domain boundary via kotlinx.serialization TypeConverters.
+The central design challenge is supporting seven distinct value shapes in a single `events` table without a polymorphic schema. The chosen approach: store values as JSON `String?` in Room and provide a typed `EventValue` sealed class at the domain boundary via kotlinx.serialization TypeConverters.
 
 ## ValueType
 
@@ -20,6 +20,7 @@ sealed class ValueType {
     data object Number : ValueType()
     data object Text : ValueType()
     data object Duration : ValueType()
+    data object Exercise : ValueType()
     data class Unknown(val raw: String) : ValueType()  // forward-compat: unknown future variant
 }
 ```
@@ -32,6 +33,7 @@ sealed class ValueType {
 | `Number` | Floating-point with optional unit | `EventValue.NumberValue` |
 | `Text` | Free-form string | `EventValue.TextValue` |
 | `Duration` | Duration in seconds (Int) | `EventValue.DurationValue` |
+| `Exercise` | Sets × reps (both integers ≥ 1) | `EventValue.ExerciseValue` |
 | `Unknown(raw)` | Unrecognized future variant | display as error; `raw` preserved for round-trip |
 
 ## EventValue Sealed Class
@@ -65,6 +67,12 @@ sealed class EventValue {
     data class DurationValue(val duration: kotlin.time.Duration) : EventValue()  // invariant: >= Duration.ZERO
 
     @Serializable
+    data class ExerciseValue(
+        val sets: Int,
+        val reps: Int,      // invariants: sets >= 1, reps >= 1
+    ) : EventValue()
+
+    @Serializable
     data class ErrorValue(
         val kind: ErrorKind,
         val raw: String,    // original JSON string, preserved for diagnostics and future recovery
@@ -87,6 +95,7 @@ Invariants are enforced at two layers:
 |---|---|
 | `Scale.value` outside `1..10` | `ErrorValue(OUT_OF_RANGE, raw)` |
 | `DurationValue.duration` < `Duration.ZERO` | `ErrorValue(OUT_OF_RANGE, raw)` |
+| `ExerciseValue.sets` < 1 or `ExerciseValue.reps` < 1 | `ErrorValue(OUT_OF_RANGE, raw)` |
 | `NumberValue.value` | Any finite Double including negative — no constraint |
 | Unknown type discriminator | `ErrorValue(UNRECOGNIZED_TYPE, raw)` — preserves data from future app versions |
 | Unparsable JSON | `ErrorValue(UNPARSABLE, raw)` |
@@ -119,6 +128,8 @@ object EventValueConverter {
                 decoded is EventValue.Scale && decoded.value !in 1..10 ->
                     EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
                 decoded is EventValue.DurationValue && decoded.duration < Duration.ZERO ->
+                    EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
+                decoded is EventValue.ExerciseValue && (decoded.sets < 1 || decoded.reps < 1) ->
                     EventValue.ErrorValue(ErrorKind.OUT_OF_RANGE, raw)
                 else -> decoded
             }

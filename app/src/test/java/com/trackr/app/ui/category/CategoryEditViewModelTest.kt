@@ -467,6 +467,102 @@ class CategoryEditViewModelTest {
         assertEquals(EventValue.TextValue("hello"), eventValue("c1"))
     }
 
+    // @spec CAT-UI-044
+    @Test fun `none to exercise migrates null to default ExerciseValue`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Exercise
+        vm.save()
+        assertEquals(EventValue.ExerciseValue(3, 15), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-045
+    @Test fun `exercise to text migrates to sets times reps format`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.ExerciseValue(4, 12)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        vm.save()
+        assertEquals(EventValue.TextValue("4 × 12"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-046
+    @Test fun `text to exercise parses unicode times format`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("5 × 8")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Exercise
+        vm.save()
+        assertEquals(EventValue.ExerciseValue(5, 8), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-046
+    @Test fun `text to exercise parses ascii x format`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("4 x 10")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Exercise
+        vm.save()
+        assertEquals(EventValue.ExerciseValue(4, 10), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-033, CAT-UI-046
+    @Test fun `non-parseable text to exercise left unchanged`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("bench press")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Exercise
+        vm.save()
+        assertEquals(EventValue.TextValue("bench press"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-033, CAT-UI-046
+    @Test fun `text to exercise with zero reps left unchanged`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("3 × 0")))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Exercise
+        vm.save()
+        assertEquals(EventValue.TextValue("3 × 0"), eventValue("c1"))
+    }
+
+    // @spec CAT-UI-030
+    @Test fun `exercise to text shows no warning (reversible)`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.ExerciseValue(3, 15)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Text
+        assertNull(vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-036
+    @Test fun `none to exercise shows irreversible safe warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Exercise
+        assertEquals(ValueTypeWarningTier.IrreversibleSafe, vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-037
+    @Test fun `text to exercise shows partial warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Exercise
+        assertEquals(ValueTypeWarningTier.Partial, vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-038
+    @Test fun `exercise to number shows unsafe warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.ExerciseValue(3, 15)))
+        vm = editVm("c1")
+        vm.valueType.value = ValueType.Number
+        assertEquals(ValueTypeWarningTier.Unsafe, vm.valueTypeWarning.value)
+    }
+
     // @spec CAT-UI-033
     @Test fun `non-safe conversion leaves event value unchanged`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))

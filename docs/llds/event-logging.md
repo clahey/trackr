@@ -70,6 +70,7 @@ Save navigates back to timeline. Delete shows a confirmation dialog, then delete
 | `Number` | Numeric text field + separate unit text field | Unit field pre-filled from `Category.unit`; user-editable; empty saves as null (unitless) |
 | `Text` | Multi-line text field | Empty string gated by `Category.allowEmptyText` |
 | `Duration` | Three separate numeric fields (H / M / S) | Domain type is `kotlin.time.Duration`; fields decomposed via `.toComponents` |
+| `Exercise` | Two integer-only fields (Sets / Reps) | Default 3 / 15; both ≥ 1 required to save; formatted as "$sets × $reps" in the timeline |
 | `Unknown(raw)` | Read-only display of raw value | Cannot edit — type unknown to this version |
 | `ErrorValue` | Read-only display with error indicator | Shows `ErrorKind` and raw string; cannot edit |
 
@@ -101,7 +102,7 @@ The DB delete fires immediately on swipe — undo is a restore (`saveEvent`) not
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 
 sealed class DayEntry {
-    data class Entry(val event: Event) : DayEntry()
+    data class Entry(val event: Event, val category: Category?) : DayEntry()
     data class UndoPlaceholder(val event: Event) : DayEntry()
 }
 ```

@@ -82,6 +82,28 @@ class EventValueConverterTest {
         assertEquals(ErrorKind.OUT_OF_RANGE, (result as EventValue.ErrorValue).kind)
     }
 
+    // @spec DM-PROC-008b
+    @Test fun `decode ExerciseValue with sets 0 returns OUT_OF_RANGE`() {
+        val raw = """{"type":"ExerciseValue","sets":0,"reps":10}"""
+        val result = EventValueConverter.decode(raw)
+        assertTrue(result is EventValue.ErrorValue)
+        assertEquals(ErrorKind.OUT_OF_RANGE, (result as EventValue.ErrorValue).kind)
+    }
+
+    // @spec DM-PROC-008b
+    @Test fun `decode ExerciseValue with reps 0 returns OUT_OF_RANGE`() {
+        val raw = """{"type":"ExerciseValue","sets":3,"reps":0}"""
+        val result = EventValueConverter.decode(raw)
+        assertTrue(result is EventValue.ErrorValue)
+        assertEquals(ErrorKind.OUT_OF_RANGE, (result as EventValue.ErrorValue).kind)
+    }
+
+    @Test fun `encode then decode round-trips ExerciseValue`() {
+        val original = EventValue.ExerciseValue(3, 15)
+        val result = EventValueConverter.decode(EventValueConverter.encode(original))
+        assertEquals(original, result)
+    }
+
     // @spec DM-PROC-009
     @Test fun `decode never throws exception for any input`() {
         val inputs = listOf(null, "", "{}", "null", "[]", """{"type":"X"}""", "true", "12345")

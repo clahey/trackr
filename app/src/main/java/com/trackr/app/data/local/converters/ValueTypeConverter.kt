@@ -13,6 +13,7 @@ object ValueTypeConverter {
         ValueType.Number -> "number"
         ValueType.Text -> "text"
         ValueType.Duration -> "duration"
+        ValueType.Exercise -> "exercise"
         is ValueType.Unknown -> value.raw
     }
 
@@ -24,6 +25,7 @@ object ValueTypeConverter {
         "number" -> ValueType.Number
         "text" -> ValueType.Text
         "duration" -> ValueType.Duration
+        "exercise" -> ValueType.Exercise
         else -> ValueType.Unknown(raw)
     }
 }

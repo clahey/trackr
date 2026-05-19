@@ -42,6 +42,10 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-034**: When converting Text to Number, the system shall parse both bare numeric strings (e.g. `"3.5"`) and strings of the form `"<number> <unit>"` (e.g. `"3.5 kg"`), preserving the unit; unconvertible strings shall be left unchanged.
 - [x] **CAT-UI-035**: When converting Text to Boolean, the system shall map `"Yes"` to `Boolean(true)` and `"No"` to `Boolean(false)`; all other strings shall be left unchanged.
 - [ ] **CAT-UI-039**: When converting Number to Scale, the system shall convert values that are exact integers (no fractional part) in the range [1, 10] to the corresponding Scale value; non-integer Number values and values outside [1, 10] shall be left unchanged. When implemented, Scale → Number becomes a reversible pair and the conversion table shall be updated accordingly.
+- [x] **CAT-UI-044**: When converting a None-type event to Exercise, the system shall produce ExerciseValue(sets=3, reps=15).
+- [x] **CAT-UI-045**: When converting an Exercise-type event to Text, the system shall produce Text("$sets × $reps") using the Unicode multiplication sign.
+- [x] **CAT-UI-046**: When converting a Text-type event to Exercise, the system shall attempt to parse the text as "$s × $r" or "$s x $r" where both s and r are integers ≥ 1; if parseable, it shall produce ExerciseValue(s, r); otherwise it shall leave the event value unchanged.
+- [x] **CAT-UI-047**: The value type picker on the category edit screen shall include Exercise as a selectable option.
 
 ## Category Edit — Save Behavior
 

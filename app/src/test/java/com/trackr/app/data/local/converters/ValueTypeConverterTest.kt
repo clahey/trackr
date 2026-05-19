@@ -15,6 +15,7 @@ class ValueTypeConverterTest {
         assertEquals("number", ValueTypeConverter.encode(ValueType.Number))
         assertEquals("text", ValueTypeConverter.encode(ValueType.Text))
         assertEquals("duration", ValueTypeConverter.encode(ValueType.Duration))
+        assertEquals("exercise", ValueTypeConverter.encode(ValueType.Exercise))
     }
 
     // @spec DM-DATA-003
@@ -38,6 +39,7 @@ class ValueTypeConverterTest {
         assertEquals(ValueType.Number, ValueTypeConverter.decode("number"))
         assertEquals(ValueType.Text, ValueTypeConverter.decode("text"))
         assertEquals(ValueType.Duration, ValueTypeConverter.decode("duration"))
+        assertEquals(ValueType.Exercise, ValueTypeConverter.decode("exercise"))
     }
 
     @Test fun `Unknown round-trips verbatim`() {

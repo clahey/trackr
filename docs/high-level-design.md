@@ -18,7 +18,7 @@ Individuals tracking personal health and lifestyle data who want:
 ## Goals
 
 - Log any event in under three taps
-- Support at least six value types: none (occurrence), scale 1–10, boolean, numeric with unit, free text, duration
+- Support at least seven value types: none (occurrence), scale 1–10, boolean, numeric with unit, free text, duration, exercise (sets × reps)
 - User-defined categories with emoji, color, and value type
 - Attach photos to an event (camera or gallery); quick-log captures one image, full edit allows multiple
 - Timeline view of events grouped by day

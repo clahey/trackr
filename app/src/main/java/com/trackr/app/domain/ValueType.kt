@@ -7,5 +7,6 @@ sealed class ValueType {
     data object Number : ValueType()
     data object Text : ValueType()
     data object Duration : ValueType()
+    data object Exercise : ValueType()
     data class Unknown(val raw: String) : ValueType()
 }
