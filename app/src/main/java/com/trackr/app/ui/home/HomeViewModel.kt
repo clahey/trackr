@@ -6,6 +6,7 @@ import com.trackr.app.data.TrackrRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
+import com.trackr.app.domain.matchesValueType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
@@ -20,7 +21,10 @@ import java.time.ZoneId
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 
 sealed class DayEntry {
-    data class Entry(val event: Event, val category: Category?) : DayEntry()
+    // @spec EL-UI-061
+    data class Entry(val event: Event, val category: Category?) : DayEntry() {
+        val hasMismatch: Boolean = category != null && !matchesValueType(event.value, category.valueType)
+    }
     data class UndoPlaceholder(val event: Event) : DayEntry()
 }
 

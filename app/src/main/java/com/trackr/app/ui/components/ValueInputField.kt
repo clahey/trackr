@@ -162,3 +162,17 @@ fun formatValue(value: EventValue): String = when (value) {
     is EventValue.ExerciseValue -> "${value.sets} × ${value.reps}"
     is EventValue.ErrorValue -> "[Error: ${value.raw}]"
 }
+
+// @spec EL-UI-063, EL-UI-064
+fun describeValue(value: EventValue): String = when (value) {
+    is EventValue.Scale -> "${value.value}/10"
+    is EventValue.BooleanValue -> if (value.value) "Yes" else "No"
+    is EventValue.NumberValue -> buildString {
+        append(value.value)
+        value.unit?.let { append(" $it") }
+    }
+    is EventValue.TextValue -> value.text
+    is EventValue.DurationValue -> value.duration.toString()
+    is EventValue.ExerciseValue -> "${value.sets} sets × ${value.reps} reps"
+    is EventValue.ErrorValue -> value.raw
+}

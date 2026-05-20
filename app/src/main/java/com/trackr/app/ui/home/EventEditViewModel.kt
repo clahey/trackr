@@ -6,15 +6,21 @@ import androidx.lifecycle.viewModelScope
 import com.trackr.app.data.ImageStore
 import com.trackr.app.data.TrackrRepository
 import com.trackr.app.domain.Category
+import com.trackr.app.domain.ConversionOutcome
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
+import com.trackr.app.domain.convertOrDefault
+import com.trackr.app.domain.matchesValueType
 import com.trackr.app.ui.SaveResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
@@ -51,6 +57,12 @@ class EventEditViewModel @Inject constructor(
 
     private val _category = MutableStateFlow<Category?>(null)
     val category: StateFlow<Category?> = _category.asStateFlow()
+
+    // @spec EL-UI-062, EL-UI-063, EL-UI-064, EL-UI-065, EL-UI-067
+    val conversionOutcome: StateFlow<ConversionOutcome?> = combine(value, _category) { v, cat ->
+        if (cat == null || v == null || matchesValueType(v, cat.valueType)) null
+        else convertOrDefault(v, cat.valueType)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private var originalEvent: Event? = null
     private var originalImagePaths: Set<String> = emptySet()
@@ -100,6 +112,17 @@ class EventEditViewModel @Inject constructor(
             )
         )
         _saveResult.value = SaveResult.Success
+    }
+
+    // @spec EL-UI-066
+    fun applyConversion() {
+        when (val outcome = conversionOutcome.value) {
+            is ConversionOutcome.Converted -> value.value = outcome.value
+            is ConversionOutcome.UsedDefault -> value.value = outcome.value
+            ConversionOutcome.Discard -> value.value = null
+            null -> Unit
+        }
+        _isValueEditable.value = true
     }
 
     fun addImage(path: String) {

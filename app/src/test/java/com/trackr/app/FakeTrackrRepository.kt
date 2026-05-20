@@ -27,7 +27,7 @@ class FakeTrackrRepository : TrackrRepository {
             list.map { event ->
                 if (event.categoryId != category.id) event
                 else {
-                    val newValue = convertEventValue(event.value, fromType, category.valueType)
+                    val newValue = convertEventValue(event.value, category.valueType)
                     if (newValue != event.value) event.copy(value = newValue) else event
                 }
             }

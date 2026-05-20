@@ -4,6 +4,8 @@ import app.cash.turbine.test
 import com.trackr.app.FakeTrackrRepository
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
+import com.trackr.app.domain.ErrorKind
+import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -282,6 +285,77 @@ class HomeViewModelTest {
             val groups = awaitItem()
             val entry = groups.flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
             assertNull(entry.category)
+        }
+    }
+
+    // @spec EL-UI-061
+    @Test fun `DayEntry Entry hasMismatch is true when event value does not match category type`() = runTest {
+        val cat = Category(
+            id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
+            valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
+        )
+        repo.setCategories(cat)
+        val event = Event(
+            id = "e1", categoryId = "c1", timestamp = anchor,
+            value = EventValue.TextValue("hello"),
+            notes = null, imagePaths = emptyList(), createdAt = anchor,
+        )
+        repo.setEvents(event)
+        vm.dayGroups.test {
+            val entry = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
+            assertTrue(entry.hasMismatch)
+        }
+    }
+
+    // @spec EL-UI-061
+    @Test fun `DayEntry Entry hasMismatch is false when value matches category type`() = runTest {
+        val cat = Category(
+            id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
+            valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
+        )
+        repo.setCategories(cat)
+        val event = Event(
+            id = "e1", categoryId = "c1", timestamp = anchor,
+            value = EventValue.Scale(7),
+            notes = null, imagePaths = emptyList(), createdAt = anchor,
+        )
+        repo.setEvents(event)
+        vm.dayGroups.test {
+            val entry = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
+            assertFalse(entry.hasMismatch)
+        }
+    }
+
+    // @spec EL-UI-061
+    @Test fun `DayEntry Entry hasMismatch is false when ErrorValue inferredType matches Unknown category`() = runTest {
+        val cat = Category(
+            id = "c1", name = "Future Cat", emoji = "📌", color = 0xFFE53935L,
+            valueType = ValueType.Unknown("future_type"), unit = null, allowEmptyText = true, sortOrder = 0,
+        )
+        repo.setCategories(cat)
+        val event = Event(
+            id = "e1", categoryId = "c1", timestamp = anchor,
+            value = EventValue.ErrorValue(ErrorKind.UNRECOGNIZED_TYPE, """{"type":"future_type"}""", inferredType = "future_type"),
+            notes = null, imagePaths = emptyList(), createdAt = anchor,
+        )
+        repo.setEvents(event)
+        vm.dayGroups.test {
+            val entry = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
+            assertFalse(entry.hasMismatch)
+        }
+    }
+
+    // @spec EL-UI-061
+    @Test fun `DayEntry Entry hasMismatch is false for orphaned event with no category`() = runTest {
+        val event = Event(
+            id = "e1", categoryId = "nonexistent", timestamp = anchor,
+            value = EventValue.Scale(7),
+            notes = null, imagePaths = emptyList(), createdAt = anchor,
+        )
+        repo.setEvents(event)
+        vm.dayGroups.test {
+            val entry = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
+            assertFalse(entry.hasMismatch)
         }
     }
 }

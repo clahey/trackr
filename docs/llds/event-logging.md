@@ -76,6 +76,40 @@ Save navigates back to timeline. Delete shows a confirmation dialog, then delete
 
 `Unknown` and `ErrorValue` are read-only in both Quick-Log (these categories/events won't normally appear in the picker or edit flow) and Event Edit. An event carrying `ErrorValue` can still have its notes, timestamp, and images edited.
 
+### ValueType change
+
+When a category's `valueType` is changed, `TrackrRepository.saveCategoryAndMigrateEvents` migrates historical events in a single transaction using `convertEventValue`. The conversion is best-effort: values that have a defined conversion path (e.g., `Scale` → `Number`, parseable `Text` → `Scale`) are converted; values with no path are left unchanged in the database, creating a mismatch between the event's stored value type and the category's current type.
+
+Mismatches can also arise when the app reads data from a newer app version — an `Unknown` category type or an `ErrorValue`. The event-logging UI is responsible for detecting and surfacing these cases.
+
+### Value type mismatch
+
+A **value action banner** is shown on the edit screen whenever `conversionOutcome` is non-null — i.e., the stored value cannot be meaningfully used as-is for the category's current type. This covers three cases:
+
+1. **Type mismatch** — the stored `EventValue` is a concrete type that does not match the category's `valueType` (e.g., `TextValue("hello")` on an Exercise category). Happens when migration leaves some events unconverted.
+2. **`ErrorValue`** — the stored value could not be decoded at all. Read-only per EL-UI-043; the banner offers a "replace with default" action.
+3. **`Unknown` category type** — the category's type is unrecognized by this app version; no input is possible.
+
+**Detection:** `matchesValueType(value: EventValue?, type: ValueType): Boolean` — domain-layer helper. Returns `true` only when the value's runtime type is the expected variant for `type`, or when an `ErrorValue` with `inferredType` matches an `Unknown` category's raw string (coherent future-type pair — both from the same unrecognized type). Returns `false` for: `ErrorValue` without a matching `Unknown` type, `Unknown` category type without a matching `ErrorValue`, `None` type with non-null value, or a concrete value of the wrong type. `null` on `None` type returns `true`.
+
+**Conversion-or-default:** `convertOrDefault(value: EventValue, targetType: ValueType): ConversionOutcome` — domain layer. Returns a sealed class with three cases:
+- `ConversionOutcome.Converted(value: EventValue)` — `convertEventValue` produced a value of the right type (genuine conversion from the stored data).
+- `ConversionOutcome.UsedDefault(value: EventValue)` — conversion failed, no path exists, or the value is `ErrorValue`; `defaultForType(targetType)` is used instead.
+- `ConversionOutcome.Discard` — target type is `None` or `Unknown`; the right action is to clear the event value.
+
+**Timeline display:** events with `!matchesValueType(event.value, category.valueType)` display the raw stored value via the existing `formatValue` followed by a warning icon. No DB write on view.
+
+**Edit screen — value action banner:** shown below the value input whenever `conversionOutcome` is non-null. Contains:
+- A short description: *"Stored value doesn't match the category type."*
+- An action button whose label depends on `conversionOutcome`, using `describeValue(v: EventValue): String` for the value descriptions (a UI-layer function that produces verbose human-readable text — e.g., `"2 sets × 5 reps"` for `ExerciseValue(2, 5)`, `"7/10"` for `Scale(7)`, `"Yes"` for `BooleanValue(true)`, `"3.5 kg"` for `NumberValue(3.5, "kg")`):
+  - `Converted(v)`: **"Convert to [describeValue(v)]"**
+  - `UsedDefault(v)`: **"Replace with default: [describeValue(v)]"**
+  - `Discard`: **"Discard value"**
+  - In all cases, tapping clears the banner and sets `value`: for `Converted(v)` or `UsedDefault(v)`, to `v`; for `Discard`, to null (only reachable when category type is None or Unknown).
+- The banner is informational — the Save button remains enabled while the banner is visible. If the user saves without resolving the banner, the mismatched value is persisted unchanged.
+
+**Edit screen — value input while banner is shown:** the value input fields render using the category's type with whatever fallback defaults `ValueInputField` uses for a mismatched value (the same `?: Default()` fallback already present). The value is not in a valid editable state until the action button is tapped or the user manually edits a field (which itself updates `value` and can clear the banner automatically if the new value matches).
+
 ## ViewModels
 
 ### HomeViewModel
@@ -124,6 +158,8 @@ sealed class DayEntry {
 - `save()`: diffs image paths, calls `repository.saveEvent()`
 - `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()`
 - **Stale event guard:** if `getEventById` returns null on init, sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The timeline screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
+- `conversionOutcome: StateFlow<ConversionOutcome?>` — pre-computed result of `convertOrDefault`; null when no mismatch; drives banner visibility and the action button label (Converted → "Convert to X", UsedDefault → "Replace with default: X", Discard → "Discard value")
+- `applyConversion()`: sets `value` to the outcome's value for Converted/UsedDefault, or null for Discard (only reachable when category type is None or Unknown); `isValueEditable` is set to true; banner clears reactively via `conversionOutcome` becoming null
 
 ## Image Handling
 

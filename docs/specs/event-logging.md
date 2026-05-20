@@ -70,6 +70,16 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-059**: For Exercise-type categories, the value input shall consist of two integer-only fields labeled "Sets" and "Reps" (integer keyboard, no decimal point); both fields shall default to 3 and 15 respectively when opening a new log; both fields shall require a value of 1 or greater before saving is permitted.
 - [x] **EL-UI-060**: Exercise values shall be displayed in the timeline and event edit screen as "$sets × $reps" using the Unicode multiplication sign (×, U+00D7).
 
+## Value Type Mismatch UI
+
+- [x] **EL-UI-061**: When an event row in the timeline has a non-null value that does not satisfy `matchesValueType(value, category.valueType)`, the system shall display the raw stored value (formatted by `formatValue`) followed by a warning indicator; the value shall not be corrected in the database by viewing the timeline.
+- [x] **EL-UI-062**: When the event edit screen loads and `matchesValueType(event.value, category.valueType)` is false and `event.value` is non-null, the system shall display a value action banner below the value input reading "Stored value doesn't match the category type."
+- [x] **EL-UI-063**: When the `conversionOutcome` for the loaded event is `Converted(v)`, the banner action button shall be labeled "Convert to [description]" where description is a human-readable rendering of `v`.
+- [x] **EL-UI-064**: When the `conversionOutcome` is `UsedDefault(v)`, the banner action button shall be labeled "Replace with default: [description]" where description is a human-readable rendering of `v`.
+- [x] **EL-UI-065**: When the `conversionOutcome` is `Discard` (category type is None or Unknown), the banner action button shall be labeled "Discard value".
+- [x] **EL-UI-066**: When the user taps the banner action button, the system shall dismiss the banner and set the event's value form field: for `Converted(v)` or `UsedDefault(v)`, to `v`; for `Discard`, to null (only reachable when category type is None or Unknown).
+- [x] **EL-UI-067**: When the user manually edits a value input field such that the resulting value satisfies `matchesValueType`, the system shall dismiss the banner automatically without requiring the user to tap the action button.
+
 ## Image Handling
 
 - [x] **EL-PROC-001**: When the user dismisses the quick-log sheet without saving after capturing an image, the system shall delete the captured image file.

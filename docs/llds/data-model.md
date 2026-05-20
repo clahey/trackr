@@ -75,12 +75,15 @@ sealed class EventValue {
     @Serializable
     data class ErrorValue(
         val kind: ErrorKind,
-        val raw: String,    // original JSON string, preserved for diagnostics and future recovery
+        val raw: String,                // original JSON string, preserved for diagnostics and future recovery
+        val inferredType: String? = null, // "type" discriminator extracted from raw JSON when kind == UNRECOGNIZED_TYPE; null otherwise
     ) : EventValue()
 }
 ```
 
 `NONE`-type events carry `null` for their value — there is no `EventValue.None` variant. Null is the canonical representation in both the DB column and the domain model. `@Serializable` is required on each non-null variant so kotlinx.serialization can encode/decode the polymorphic sealed class via the class discriminator. `ErrorValue` is produced by the TypeConverter when a value can't be decoded cleanly. On encode, `ErrorValue` bypasses normal serialization — `raw` is written verbatim — so an older app version reading then writing a value from a newer version leaves the DB bytes identical. This is the forward-compatibility contract.
+
+`inferredType` on `ErrorValue` is a decode-time annotation, not a stored field. When the converter produces `ErrorValue(UNRECOGNIZED_TYPE, raw)`, it also extracts the `"type"` discriminator from the raw JSON and stores it in `inferredType`. This allows `matchesValueType` to recognise that an `ErrorValue` whose `inferredType` matches an `Unknown` category's `raw` string represents a coherent future-type pair — both the value and the category come from the same unrecognized type — and to return `true` rather than flagging a spurious mismatch. `inferredType` has a default of `null`; it is never serialized to disk (encoding always uses `raw` verbatim).
 
 `DurationValue` uses `kotlin.time.Duration` at the domain level. Because kotlinx.serialization encodes `Duration` as an ISO 8601 string by default, a `DurationAsSecondsSerializer` is used to store it as total seconds (Long) in the JSON — compact and unambiguous. The serializer lives in the `local-storage` segment alongside `EventValueConverter`.
 
@@ -97,7 +100,7 @@ Invariants are enforced at two layers:
 | `DurationValue.duration` < `Duration.ZERO` | `ErrorValue(OUT_OF_RANGE, raw)` |
 | `ExerciseValue.sets` < 1 or `ExerciseValue.reps` < 1 | `ErrorValue(OUT_OF_RANGE, raw)` |
 | `NumberValue.value` | Any finite Double including negative — no constraint |
-| Unknown type discriminator | `ErrorValue(UNRECOGNIZED_TYPE, raw)` — preserves data from future app versions |
+| Unknown type discriminator | `ErrorValue(UNRECOGNIZED_TYPE, raw, inferredType = <"type" field>)` — preserves data from future app versions; `inferredType` enables mismatch detection against `Unknown` category types |
 | Unparsable JSON | `ErrorValue(UNPARSABLE, raw)` |
 | `null` (NONE-type event) | `null` — passed through; no decoding attempted |
 
@@ -135,9 +138,14 @@ object EventValueConverter {
             }
         } catch (e: SerializationException) {
             // Distinguish unrecognized type discriminator from unparsable JSON
-            val kind = if (raw.contains("\"type\"")) ErrorKind.UNRECOGNIZED_TYPE
-                       else ErrorKind.UNPARSABLE
-            EventValue.ErrorValue(kind, raw)
+            if (raw.contains("\"type\"")) {
+                val inferredType = try {
+                    json.decodeFromString<JsonObject>(raw)["type"]?.jsonPrimitive?.content
+                } catch (_: Exception) { null }
+                EventValue.ErrorValue(ErrorKind.UNRECOGNIZED_TYPE, raw, inferredType = inferredType)
+            } else {
+                EventValue.ErrorValue(ErrorKind.UNPARSABLE, raw)
+            }
         }
     }
 }
@@ -196,9 +204,24 @@ When two events share the same `timestamp`, the canonical sort order is `created
 
 When `valueType != NUMBER`, `Category.unit` is ignored. It is not an error for it to be non-null.
 
+### Value type mismatch helpers
+
+Three domain-layer functions and a supporting type support the mismatch detection and conversion UI (see `event-logging.md § Value type mismatch`):
+
+- `matchesValueType(value: EventValue?, type: ValueType): Boolean` — true when the value's runtime type is the expected variant for `type`. `ErrorValue` → true only when `type is Unknown` and `value.inferredType == type.raw` (coherent future-type pair); false otherwise. `Unknown` category type → false unless matched by an `ErrorValue` as above. `null` → true only for `None`. `None` type with non-null value → false.
+- `convertOrDefault(value: EventValue, targetType: ValueType): ConversionOutcome` — returns `Discard` if the target is `None`/`Unknown`; otherwise calls `convertEventValue(value, targetType)` and returns `Converted(v)` if the result satisfies `matchesValueType`, or `UsedDefault(defaultForType(targetType))` if not. `ErrorValue` always yields `UsedDefault` because `convertEventValue` returns it unchanged and `matchesValueType(ErrorValue, X)` is always false.
+- `ConversionOutcome` — sealed class: `Converted(value: EventValue)`, `UsedDefault(value: EventValue)`, `Discard`.
+- `defaultForType(type: ValueType): EventValue?` — returns the zero-arg constructor default for each known type (null for `None` and `Unknown`).
+
+All four live in `domain/ValueTypeConversion.kt` alongside `convertEventValue`.
+
 ### ValueType change on a Category
 
-Changing a category's `valueType` after events have been logged is **not prevented at the domain layer**. The result is a category whose historical events carry `EventValue` instances that no longer match the current `valueType`. The UI must handle this gracefully — rendering mismatched events as a raw fallback rather than crashing. Whether to allow the edit is a UI/UX decision, not a domain constraint.
+Changing a category's `valueType` is permitted and handled at the repository layer — the domain model does not prevent it. When a type change is saved, `TrackrRepository.saveCategoryAndMigrateEvents(category, fromType)` runs an atomic transaction: it upserts the category and migrates all historical events by calling `convertEventValue(event.value, category.valueType)` on each one.
+
+`convertEventValue` performs best-effort conversion — e.g., `Scale(7)` → `NumberValue(7.0, null)` when changing Scale → Number, or `TextValue("7")` → `Scale(7)` when changing Text → Scale. When no conversion path exists (e.g., `DurationValue` → `Scale`), the original value is returned unchanged, leaving the event with a mismatched value in the database.
+
+Mismatches can also arise when reading data written by a newer app version (an `Unknown` category type or an `ErrorValue`). The mismatch helpers (`matchesValueType`, `convertOrDefault`, `defaultForType`) support detection and recovery. The event-logging segment owns the UI for surfacing and resolving mismatches.
 
 ## Decisions & Alternatives
 

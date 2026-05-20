@@ -27,7 +27,7 @@ LLD: `docs/llds/data-model.md`
 - [x] **DM-PROC-002**: When encoding an ErrorValue, the system shall write its raw field verbatim, without re-serializing, so that bytes written by a newer app version are preserved unchanged by an older version.
 - [x] **DM-PROC-003**: When encoding a non-null, non-ErrorValue EventValue, the system shall serialize it as JSON using a "type" class discriminator.
 - [x] **DM-PROC-004**: When decoding a null string, the system shall produce a null EventValue.
-- [x] **DM-PROC-005**: When decoding a JSON string whose "type" discriminator names an unrecognized EventValue variant, the system shall produce ErrorValue(UNRECOGNIZED_TYPE, raw).
+- [x] **DM-PROC-005**: When decoding a JSON string whose "type" discriminator names an unrecognized EventValue variant, the system shall produce ErrorValue(UNRECOGNIZED_TYPE, raw, inferredType) where inferredType is the value of the "type" field extracted from the JSON, or null if extraction fails.
 - [x] **DM-PROC-006**: When decoding a string that cannot be parsed as JSON, the system shall produce ErrorValue(UNPARSABLE, raw).
 - [x] **DM-PROC-007**: When decoding a Scale EventValue whose value is outside 1–10, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
 - [x] **DM-PROC-008**: When decoding a DurationValue whose minutes field is negative, the system shall produce ErrorValue(OUT_OF_RANGE, raw).
@@ -41,13 +41,20 @@ LLD: `docs/llds/data-model.md`
 - [ ] **DM-DATA-022**: Category.unit shall be meaningful only when valueType is Number; the domain model shall not reject a non-null unit value for other value types.
 - [ ] **DM-DATA-023**: Category.allowEmptyText shall be meaningful only when valueType is Text; the domain model shall not reject the field for other value types.
 - [ ] **DM-DATA-024**: Category.sortOrder shall be an integer where a lower value indicates a higher position in the displayed list.
-## EventValueInputField
+## Event
 
 - [ ] **DM-DATA-030**: The system shall identify each Event by a UUID string that remains stable across local storage and future cloud sync.
 - [ ] **DM-DATA-031**: Event.timestamp shall be a `java.time.Instant` representing when the event occurred (user-editable).
 - [ ] **DM-DATA-032**: Event.createdAt shall be a `java.time.Instant` recording the wall-clock moment the record was first created; it shall not be modified on subsequent edits.
 - [ ] **DM-DATA-033**: Event.value shall be null for events whose category has valueType None.
 - [ ] **DM-DATA-034**: Event.imagePaths shall be a list of absolute file-system paths to images in app-private storage; an empty list means no images are attached.
+
+## Value Type Mismatch Helpers
+
+- [x] **DM-PROC-013**: `matchesValueType(value: EventValue?, type: ValueType)` shall return `true` only when: the value's runtime type is the expected variant for `type`; or `value` is null and `type` is `None`; or `value` is an `ErrorValue` whose `inferredType` is non-null and equals `type.raw` when `type` is `Unknown`. It shall return `false` in all other cases, including: an `ErrorValue` whose `inferredType` does not match, or is null; a non-null value when `type` is `None`; a concrete value of the wrong type.
+- [x] **DM-PROC-014**: `convertOrDefault` shall return `ConversionOutcome.Discard` when the target type is `None` or `Unknown`.
+- [x] **DM-PROC-015**: `convertOrDefault` shall return `ConversionOutcome.Converted(v)` when `convertEventValue` produces a value whose runtime type matches the target type.
+- [x] **DM-PROC-016**: `convertOrDefault` shall return `ConversionOutcome.UsedDefault(v)` when the input is an `ErrorValue` (regardless of target type, provided target is not `None`/`Unknown`) or when `convertEventValue` does not produce a value of the target type; `v` shall be `defaultForType(targetType)`.
 
 ## Ordering and Invariants
 

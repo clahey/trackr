@@ -5,6 +5,8 @@ import com.trackr.app.domain.ErrorKind
 import com.trackr.app.domain.EventValue
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 // @spec DM-PROC-001, DM-PROC-002, DM-PROC-003, DM-PROC-004, DM-PROC-005, DM-PROC-006, DM-PROC-007, DM-PROC-008, DM-PROC-008b, DM-PROC-009
 object EventValueConverter {
@@ -27,8 +29,13 @@ object EventValueConverter {
             json.decodeFromString<EventValue>(raw)
         } catch (e: SerializationException) {
             return try {
-                Json.parseToJsonElement(raw)
-                EventValue.ErrorValue(ErrorKind.UNRECOGNIZED_TYPE, raw)
+                val element = Json.parseToJsonElement(raw)
+                val inferredType = (element as? JsonObject)
+                    ?.get("type")
+                    ?.let { it as? JsonPrimitive }
+                    ?.takeIf { it.isString }
+                    ?.content
+                EventValue.ErrorValue(ErrorKind.UNRECOGNIZED_TYPE, raw, inferredType = inferredType)
             } catch (e2: SerializationException) {
                 EventValue.ErrorValue(ErrorKind.UNPARSABLE, raw)
             }

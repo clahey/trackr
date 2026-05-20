@@ -16,6 +16,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,10 +37,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackr.app.domain.ConversionOutcome
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
 import com.trackr.app.ui.components.ValueInputField
+import com.trackr.app.ui.components.describeValue
 import com.trackr.app.ui.components.formatValue
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -49,7 +53,7 @@ import kotlin.time.Duration.Companion.seconds
 private val timestampFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
 
-// @spec EL-UI-040, EL-UI-042, EL-UI-043, EL-UI-044, EL-UI-045, EL-NAV-005, EL-NAV-006, EL-PROC-002, APP-NAV-003
+// @spec EL-UI-040, EL-UI-042, EL-UI-043, EL-UI-044, EL-UI-045, EL-UI-062, EL-UI-063, EL-UI-064, EL-UI-065, EL-UI-066, EL-NAV-005, EL-NAV-006, EL-PROC-002, APP-NAV-003
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventEditScreen(
@@ -62,6 +66,7 @@ fun EventEditScreen(
     val imagePaths by viewModel.imagePaths.collectAsState()
     val isValueEditable by viewModel.isValueEditable.collectAsState()
     val category by viewModel.category.collectAsState()
+    val conversionOutcome by viewModel.conversionOutcome.collectAsState()
     val pendingDelete by viewModel.pendingDelete.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val deleteComplete by viewModel.deleteComplete.collectAsState()
@@ -143,6 +148,35 @@ fun EventEditScreen(
                 )
             } else {
                 Text("Value: ${value?.let { formatValue(it) } ?: "—"} (read-only)")
+            }
+
+            // @spec EL-UI-062, EL-UI-063, EL-UI-064, EL-UI-065, EL-UI-066
+            if (conversionOutcome != null) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Stored value doesn't match the category type.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                        val buttonLabel = when (val outcome = conversionOutcome) {
+                            is ConversionOutcome.Converted -> "Convert to ${describeValue(outcome.value)}"
+                            is ConversionOutcome.UsedDefault -> "Replace with default: ${describeValue(outcome.value)}"
+                            ConversionOutcome.Discard -> "Discard value"
+                            null -> null
+                        }
+                        if (buttonLabel != null) {
+                            TextButton(onClick = { viewModel.applyConversion() }) {
+                                Text(buttonLabel)
+                            }
+                        }
+                    }
+                }
             }
 
             OutlinedTextField(

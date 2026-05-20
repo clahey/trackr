@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -197,6 +198,7 @@ fun HomeScreen(
                             is DayEntry.Entry -> SwipeableEventRow(
                                 event = entry.event,
                                 category = entry.category,
+                                hasMismatch = entry.hasMismatch,
                                 onSwipeDelete = { homeVm.swipeDelete(entry.event) },
                                 onClick = { onNavigateToEventEdit(entry.event.id) },
                             )
@@ -247,6 +249,7 @@ fun HomeScreen(
 private fun SwipeableEventRow(
     event: Event,
     category: com.trackr.app.domain.Category?,
+    hasMismatch: Boolean,
     onSwipeDelete: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -273,13 +276,13 @@ private fun SwipeableEventRow(
             }
         },
     ) {
-        EventRow(event = event, category = category, onClick = onClick)
+        EventRow(event = event, category = category, hasMismatch = hasMismatch, onClick = onClick)
     }
 }
 
-// @spec EL-UI-002, EL-UI-004, EL-UI-005, THEME-UI-011
+// @spec EL-UI-002, EL-UI-004, EL-UI-005, EL-UI-061, THEME-UI-011
 @Composable
-private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, onClick: () -> Unit) {
+private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, hasMismatch: Boolean, onClick: () -> Unit) {
     ElevatedCard(
         onClick = onClick,
         modifier = Modifier
@@ -315,7 +318,18 @@ private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, on
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 event.value?.let {
-                    Text(formatValue(it), style = MaterialTheme.typography.bodyMedium)
+                    // @spec EL-UI-061
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(formatValue(it), style = MaterialTheme.typography.bodyMedium)
+                        if (hasMismatch) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = "Value type mismatch",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp).padding(start = 4.dp),
+                            )
+                        }
+                    }
                 }
                 event.notes?.let {
                     Text(

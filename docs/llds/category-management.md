@@ -94,7 +94,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 
 ### Value Type Migration
 
-The conversion function `convertEventValue(value, from, to)` lives in the domain layer (`domain/ValueTypeConversion.kt`) since it depends only on domain types. It is called by the repository implementation (inside a transaction) and is also importable by tests.
+The conversion function `convertEventValue(value, to)` lives in the domain layer (`domain/ValueTypeConversion.kt`) since it depends only on domain types. It is called by the repository implementation (inside a transaction) and is also importable by tests.
 
 `TrackrRepository.saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)` runs the category upsert and all event value updates inside a single Room transaction, ensuring the database is never left in a partially-migrated state.
 

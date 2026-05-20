@@ -45,7 +45,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
             categoryDao.upsert(category.toEntity())
             eventDao.getByCategoryOnce(category.id).forEach { entity ->
                 val event = entity.toDomain()
-                val newValue = convertEventValue(event.value, fromType, category.valueType)
+                val newValue = convertEventValue(event.value, category.valueType)
                 if (newValue != event.value) {
                     eventDao.upsert(event.copy(value = newValue).toEntity())
                 }

@@ -42,12 +42,24 @@ class EventValueConverterTest {
     }
 
     // @spec DM-PROC-005
-    @Test fun `decode JSON with unknown type discriminator returns UNRECOGNIZED_TYPE`() {
+    @Test fun `decode JSON with unknown type discriminator returns UNRECOGNIZED_TYPE with inferredType`() {
         val raw = """{"type":"UnknownFutureType","value":1}"""
         val result = EventValueConverter.decode(raw)
         assertTrue(result is EventValue.ErrorValue)
-        assertEquals(ErrorKind.UNRECOGNIZED_TYPE, (result as EventValue.ErrorValue).kind)
-        assertEquals(raw, result.raw)
+        val error = result as EventValue.ErrorValue
+        assertEquals(ErrorKind.UNRECOGNIZED_TYPE, error.kind)
+        assertEquals(raw, error.raw)
+        assertEquals("UnknownFutureType", error.inferredType)
+    }
+
+    // @spec DM-PROC-005
+    @Test fun `decode JSON with type field that cannot be extracted as string leaves inferredType null`() {
+        val raw = """{"type":42,"value":1}"""
+        val result = EventValueConverter.decode(raw)
+        assertTrue(result is EventValue.ErrorValue)
+        val error = result as EventValue.ErrorValue
+        assertEquals(ErrorKind.UNRECOGNIZED_TYPE, error.kind)
+        assertNull(error.inferredType)
     }
 
     // @spec DM-PROC-006

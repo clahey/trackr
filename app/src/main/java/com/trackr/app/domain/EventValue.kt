@@ -44,7 +44,11 @@ sealed class EventValue {
 
     @Serializable
     @SerialName("ErrorValue")
-    data class ErrorValue(val kind: ErrorKind, val raw: String) : EventValue()
+    data class ErrorValue(
+        val kind: ErrorKind,
+        val raw: String,
+        val inferredType: String? = null,
+    ) : EventValue()
 }
 
 object DurationAsSecondsSerializer : KSerializer<Duration> {
