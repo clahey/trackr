@@ -101,7 +101,24 @@ fun CategoryListScreen(
             onDismissRequest = { viewModel.cancelDelete() },
             title = { Text("Delete category?") },
             text = {
-                Text("This will permanently delete ${confirmation.ownEventCount} event(s) logged under this category.")
+                // @spec CAT-UI-005
+                val text = if (confirmation.isMetaCategory) {
+                    buildString {
+                        if (confirmation.ownEventCount > 0) {
+                            val n = confirmation.ownEventCount
+                            append("$n ${if (n == 1) "event" else "events"} from this category will be permanently deleted.")
+                        }
+                        if (confirmation.subCategoryCount > 0) {
+                            if (isNotEmpty()) append(" ")
+                            val n = confirmation.subCategoryCount
+                            append("$n ${if (n == 1) "subcategory" else "subcategories"} will be promoted to top-level categories.")
+                        }
+                    }
+                } else {
+                    val n = confirmation.ownEventCount
+                    "This will permanently delete $n ${if (n == 1) "event" else "events"} logged under this category."
+                }
+                Text(text)
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmDelete() }) { Text("Delete") }
@@ -123,12 +140,14 @@ private fun CategoryRow(
     onMenuDismiss: () -> Unit,
     onDeleteClick: () -> Unit,
 ) {
+    // @spec CAT-UI-001
+    val startPadding = if (category is Category.SubCategory) 40.dp else 16.dp
     Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(start = startPadding, end = 16.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text = category.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)

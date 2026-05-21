@@ -18,6 +18,7 @@ data class DeleteConfirmation(
     val categoryId: String,
     val ownEventCount: Int,
     val subCategoryCount: Int = 0,
+    val isMetaCategory: Boolean = false,
 )
 
 // @spec CAT-UI-001, CAT-UI-003, CAT-UI-004, CAT-UI-005, CAT-UI-006
@@ -40,14 +41,40 @@ class CategoryListViewModel @Inject constructor(
             if (ownCount == 0 && subCount == 0) {
                 repository.deleteCategory(id)
             } else {
-                _pendingDeleteConfirmation.value = DeleteConfirmation(id, ownEventCount = ownCount, subCategoryCount = subCount)
+                val isMeta = repository.getCategoryById(id).first() is Category.MetaCategory
+                _pendingDeleteConfirmation.value = DeleteConfirmation(
+                    id,
+                    ownEventCount = ownCount,
+                    subCategoryCount = subCount,
+                    isMetaCategory = isMeta,
+                )
             }
         }
     }
 
+    // @spec CAT-UI-006
     fun confirmDelete() {
         val pending = _pendingDeleteConfirmation.value ?: return
         viewModelScope.launch {
+            if (pending.isMetaCategory) {
+                repository.getCategories().first()
+                    .filterIsInstance<Category.SubCategory>()
+                    .filter { it.parent.id == pending.categoryId }
+                    .forEach { sub ->
+                        repository.saveCategory(
+                            Category.MetaCategory(
+                                id = sub.id,
+                                name = sub.name,
+                                emoji = sub.resolvedEmoji,
+                                color = sub.resolvedColor,
+                                valueType = sub.resolvedValueType,
+                                unit = sub.unit,
+                                allowEmptyText = sub.allowEmptyText,
+                                sortOrder = sub.sortOrder,
+                            )
+                        )
+                    }
+            }
             repository.deleteCategory(pending.categoryId)
             _pendingDeleteConfirmation.value = null
         }
