@@ -60,8 +60,8 @@ class EventEditViewModel @Inject constructor(
 
     // @spec EL-UI-062, EL-UI-063, EL-UI-064, EL-UI-065, EL-UI-067
     val conversionOutcome: StateFlow<ConversionOutcome?> = combine(value, _category) { v, cat ->
-        if (cat == null || v == null || matchesValueType(v, cat.valueType)) null
-        else convertOrDefault(v, cat.valueType)
+        if (cat == null || v == null || matchesValueType(v, cat.resolvedValueType)) null
+        else convertOrDefault(v, cat.resolvedValueType)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private var originalEvent: Event? = null
@@ -88,7 +88,7 @@ class EventEditViewModel @Inject constructor(
             _isValueEditable.value = if (isError) {
                 false
             } else {
-                loadedCategory?.valueType !is ValueType.Unknown
+                loadedCategory?.resolvedValueType !is ValueType.Unknown
             }
         }
     }

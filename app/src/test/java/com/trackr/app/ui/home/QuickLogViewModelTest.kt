@@ -40,7 +40,7 @@ class QuickLogViewModelTest {
         id: String,
         valueType: ValueType = ValueType.None,
         allowEmptyText: Boolean = true,
-    ) = Category(
+    ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
         valueType = valueType, unit = null, allowEmptyText = allowEmptyText, sortOrder = 0,
     )

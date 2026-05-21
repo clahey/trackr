@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -41,7 +42,7 @@ class EventEditViewModelTest {
     private fun makeCategory(
         id: String,
         valueType: ValueType = ValueType.Scale,
-    ) = Category(
+    ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
         valueType = valueType, unit = null, allowEmptyText = true, sortOrder = 0,
     )

@@ -25,7 +25,28 @@ Supports:
 
 Day headers show the date (e.g., "Today", "Yesterday", full date for older).
 
-A horizontally scrollable row of category chips sits below the app bar. An "All" chip appears first; tapping any inactive category chip sets it as the active filter (visually highlighted); tapping the active chip again (or "All") clears the filter. When a filter is active, the FAB quick-log sheet opens directly to step 2 with that category pre-selected.
+A horizontally scrollable row of category chips sits below the app bar. **Only `MetaCategory` (top-level) chips appear in this row**, plus an "All" chip first.
+
+**Chip color:** each chip uses the category's `resolvedColor` — colored border when unselected; filled background with the category color when active.
+
+**Two-level filter UX:**
+- Tapping an inactive MetaCategory chip → activates that chip (filled background); filter covers that category **plus all its SubCategories'** events; that chip's SubCategory chips appear inline to the right of it in the same scrollable row, visually grouped (e.g., a subtle separator before them)
+- Tapping a SubCategory chip → narrows filter to `ActiveFilter.Sub`; the MetaCategory chip returns to unselected style (border) but the subcategory chips remain visible; the tapped subcategory chip is shown as active (filled)
+- Tapping the MetaCategory chip when a SubCategory of that meta is active → promotes filter to `ActiveFilter.TopLevel(meta)` (shows meta + all children); the MetaCategory chip becomes active (filled); all subcategory chips remain visible
+- Tapping the active MetaCategory chip again (when `ActiveFilter.TopLevel`), or tapping "All" → clears to `All`; subcategory chips disappear
+- Tapping a different MetaCategory chip while a SubCategory filter is active → switches to the new MetaCategory's filter (pre-filter scroll position is not updated per EL-UI-018)
+- MetaCategories with no SubCategories: no subcategory chips appear when their chip is tapped
+
+**Active filter state** is a sealed class in `HomeViewModel`:
+```kotlin
+sealed class ActiveFilter {
+    data object All : ActiveFilter()
+    data class TopLevel(val category: Category.MetaCategory) : ActiveFilter()
+    data class Sub(val parent: Category.MetaCategory, val sub: Category.SubCategory) : ActiveFilter()
+}
+```
+
+When `ActiveFilter.TopLevel` is active, the FAB quick-log sheet opens in an expanded subcategory picker for that MetaCategory (if it has subcategories) rather than advancing directly to step 2. When `ActiveFilter.Sub` is active, the quick-log opens directly to step 2 for the selected subcategory.
 
 **Filter scroll behavior:** Day groups with no matching events are hidden when a filter is active. When a filter is applied (including switching between active filters), the timeline scrolls to keep the same calendar day approximately at the top (or the nearest earlier day that has matching events, if the current day has none). The pre-filter scroll position (top day) is recorded only on the transition from no filter to a filter — switching between active filters preserves the existing record so that clearing always returns to the original unfiltered position. When the filter is cleared, if the user has not manually scrolled since the filter was first applied, the timeline restores to the recorded pre-filter position. Manual scrolling (user-initiated only; not the system-initiated anchor scroll) discards the recorded position.
 
@@ -34,7 +55,9 @@ A horizontally scrollable row of category chips sits below the app bar. An "All"
 A bottom sheet opened from the timeline FAB. Two-step flow to minimize taps:
 
 **Step 1 — Category picker**
-Grid of all categories (emoji + name). Tapping one advances to step 2.
+Grid of MetaCategory items (resolved emoji + name; resolved color as background tint or badge). Tapping a MetaCategory with no SubCategories advances directly to step 2. Tapping a MetaCategory with SubCategories **expands inline**: subcategory cells appear below or adjacent to the tapped cell; the MetaCategory itself is included as the first option (labeled "Log to [Name] directly" or similar) so users can still log directly to the parent. Tapping any expanded option advances to step 2 for that category.
+
+When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has SubCategories, the quick-log opens directly at the already-expanded state for that MetaCategory, skipping the initial tap. When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has no SubCategories, step 2 opens directly (existing behaviour). When `ActiveFilter.Sub` is active, step 2 opens directly for the subcategory.
 
 **Step 2 — Value + details**
 - Value input (see Value Input section below); for Number, Text, and Duration types the input field is automatically focused on entry so the keyboard rises without an extra tap
@@ -114,15 +137,17 @@ A **value action banner** is shown on the edit screen whenever `conversionOutcom
 
 ### HomeViewModel
 
-- `activeFilter: StateFlow<Category?>` — the currently selected category chip; null = all categories
-- `dayGroups: StateFlow<List<DayGroup>>` — derived from `repository.getEventsByCategory()` when a filter is active, `repository.getEvents()` otherwise; grouped by calendar day of `timestamp` in local timezone
+- `activeFilter: StateFlow<ActiveFilter>` — current filter state (`All`, `TopLevel`, or `Sub`); see sealed class above
+- `dayGroups: StateFlow<List<DayGroup>>` — derived from `repository.getEventsByCategory()` (single category) or `repository.getEventsByCategories()` (set of IDs: meta + all its subs) when a filter is active, `repository.getEvents()` otherwise; grouped by calendar day of `timestamp` in local timezone
 - `preFilterTopDay: StateFlow<LocalDate?>` — the calendar day that was at the top of the timeline when a filter was first applied (transition from no filter); null if no filter is active or if the user has manually scrolled since the filter was first applied. Not updated when switching between active filters.
-- `setFilter(category: Category?)` — sets `activeFilter`; records the current top day in `preFilterTopDay` only when transitioning from null to a non-null filter; switching between two non-null filters preserves the existing `preFilterTopDay`; null clears the filter
+- `setFilter(filter: ActiveFilter)` — sets `activeFilter`; records the current top day in `preFilterTopDay` only when transitioning from `All` to a non-`All` filter; switching between two non-`All` filters preserves the existing `preFilterTopDay`; `All` clears the filter
 - `onUserScrolled()` — called by the UI when the user manually scrolls; clears `preFilterTopDay`
 - `pendingDelete: StateFlow<Event?>` — the event swiped away but not yet committed; null when no undo is available
 - `swipeDelete(event: Event)` — immediately calls `repository.deleteEvent()`; stores the full `Event` in `pendingDelete` and injects an undo placeholder into the day group at the event's original position
 - `undoDelete()` — calls `repository.saveEvent(pendingDelete!!)` to restore; clears `pendingDelete`
 - `clearPendingDelete()` — called internally before any other mutating action (new log, another delete, open event); discards `pendingDelete` without restoring
+
+**Active filter guard:** `HomeViewModel` observes the category list. If the active filter references a deleted category, the filter clears to `All` regardless of whether the deleted category is a MetaCategory or SubCategory.
 
 **Undo window closes when any of these occur:**
 - Another event is swiped to delete
@@ -149,7 +174,7 @@ sealed class DayEntry {
 - `timestamp` defaults to `Instant.now()` at sheet open; user-editable
 - `save()`: validates, generates a UUID for the new event, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, emits `SaveResult`
 - `reset()`: called when sheet is dismissed (with or without saving); clears all form state including `saveResult` back to `Idle`, and deletes any captured-but-unsaved image file
-- **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1
+- **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1. If a MetaCategory is deleted while the user has expanded it in step 1, the expansion collapses.
 
 ### EventEditViewModel
 

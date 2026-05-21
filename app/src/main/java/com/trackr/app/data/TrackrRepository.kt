@@ -13,7 +13,8 @@ interface TrackrRepository {
     suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)
     suspend fun deleteCategory(id: String)
     suspend fun reorderCategories(orderedIds: List<String>)
-    fun getEventCountForCategory(categoryId: String): Flow<Int>
+    fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
+    fun getSubCategoryCount(categoryId: String): Flow<Int>
 
     fun getEvents(start: Instant? = null, end: Instant? = null): Flow<List<Event>>
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>

@@ -129,7 +129,7 @@ fun EventEditScreen(
             // @spec EL-UI-046
             category?.let { cat ->
                 Text(
-                    text = "${cat.emoji} ${cat.name}",
+                    text = "${cat.resolvedEmoji} ${cat.name}",
                     style = MaterialTheme.typography.titleMedium,
                 )
             }

@@ -173,7 +173,7 @@ fun HomeScreen(
                             onClick = {
                                 homeVm.setFilter(if (activeFilter?.id == cat.id) null else cat)
                             },
-                            label = { Text("${cat.emoji} ${cat.name}") },
+                            label = { Text("${cat.resolvedEmoji} ${cat.name}") },
                         )
                     }
                 }
@@ -299,14 +299,14 @@ private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, ha
                 modifier = Modifier
                     .size(48.dp)
                     .background(
-                        color = category?.let { Color(it.color) } ?: MaterialTheme.colorScheme.primaryContainer,
+                        color = category?.let { Color(it.resolvedColor) } ?: MaterialTheme.colorScheme.primaryContainer,
                         shape = CircleShape,
                     ),
             ) {
                 Text(
-                    text = category?.emoji ?: "",
+                    text = category?.resolvedEmoji ?: "",
                     style = MaterialTheme.typography.titleLarge,
-                    color = category?.let { Color(foregroundColorForBackground(it.color)) }
+                    color = category?.let { Color(foregroundColorForBackground(it.resolvedColor)) }
                         ?: MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
@@ -421,7 +421,7 @@ private fun QuickLogSheet(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(cat.emoji, style = MaterialTheme.typography.headlineSmall)
+                            Text(cat.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)
                             Text(cat.name, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                         }
                     }
@@ -437,18 +437,18 @@ private fun QuickLogSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${cat.emoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
+                Text("${cat.resolvedEmoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { viewModel.selectedCategory.value = null }) {
                     Text("Change")
                 }
             }
 
-            if (cat.valueType != ValueType.None) {
+            if (cat.resolvedValueType != ValueType.None) {
                 ValueInputField(
                     value = value,
                     onValueChange = { viewModel.value.value = it },
-                    valueType = cat.valueType,
+                    valueType = cat.resolvedValueType,
                     autoFocus = true,
                 )
                 if (saveResult is SaveResult.ValidationError) {

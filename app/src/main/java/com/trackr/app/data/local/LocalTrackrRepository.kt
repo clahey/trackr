@@ -30,27 +30,42 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     private val nextColorKey = intPreferencesKey("next_category_color_index")
 
     override fun getCategories(): Flow<List<Category>> =
-        categoryDao.getAll().map { it.map { e -> e.toDomain() } }
+        categoryDao.getAll().map { it.toDomainList() }
 
     override fun getCategoryById(id: String): Flow<Category?> =
-        categoryDao.getById(id).map { it?.toDomain() }
+        getCategories().map { it.find { c -> c.id == id } }
 
     override suspend fun saveCategory(category: Category) {
         categoryDao.upsert(category.toEntity())
     }
 
-    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035
+    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
+        val targetType = category.resolvedValueType
         db.withTransaction {
             categoryDao.upsert(category.toEntity())
-            eventDao.getByCategoryOnce(category.id).forEach { entity ->
-                val event = entity.toDomain()
-                val newValue = convertEventValue(event.value, category.valueType)
-                if (newValue != event.value) {
-                    eventDao.upsert(event.copy(value = newValue).toEntity())
+            val affectedCategoryIds = buildAffectedCategoryIds(category)
+            affectedCategoryIds.forEach { catId ->
+                eventDao.getByCategoryOnce(catId).forEach { entity ->
+                    val event = entity.toDomain()
+                    val newValue = convertEventValue(event.value, targetType)
+                    if (newValue != event.value) {
+                        eventDao.upsert(event.copy(value = newValue).toEntity())
+                    }
                 }
             }
         }
+    }
+
+    // Returns the category itself plus any SubCategories that inherit its valueType (null valueType).
+    private suspend fun buildAffectedCategoryIds(category: Category): List<String> {
+        if (category !is Category.MetaCategory) return listOf(category.id)
+        val all = categoryDao.getAllOnce().toDomainList()
+        val inheritingChildIds = all
+            .filterIsInstance<Category.SubCategory>()
+            .filter { it.parent.id == category.id && it.valueType == null }
+            .map { it.id }
+        return listOf(category.id) + inheritingChildIds
     }
 
     // @spec LS-BE-031
@@ -64,8 +79,14 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         categoryDao.updateSortOrders(orderedIds)
     }
 
-    override fun getEventCountForCategory(categoryId: String): Flow<Int> =
-        eventDao.countByCategory(categoryId)
+    override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> =
+        if (includeSubCategoriesWithNullType)
+            eventDao.countByCategoryIncludingInheriting(categoryId)
+        else
+            eventDao.countByCategory(categoryId)
+
+    override fun getSubCategoryCount(categoryId: String): Flow<Int> =
+        categoryDao.countByParentId(categoryId)
 
     override fun getEvents(start: Instant?, end: Instant?): Flow<List<Event>> {
         val startMs = start?.toEpochMilli()

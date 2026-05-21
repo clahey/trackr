@@ -23,7 +23,7 @@ data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 sealed class DayEntry {
     // @spec EL-UI-061
     data class Entry(val event: Event, val category: Category?) : DayEntry() {
-        val hasMismatch: Boolean = category != null && !matchesValueType(event.value, category.valueType)
+        val hasMismatch: Boolean = category != null && !matchesValueType(event.value, category.resolvedValueType)
     }
     data class UndoPlaceholder(val event: Event) : DayEntry()
 }

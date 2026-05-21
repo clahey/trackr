@@ -39,6 +39,15 @@ interface EventDao {
     @Query("SELECT COUNT(*) FROM events WHERE categoryId = :categoryId")
     fun countByCategory(categoryId: String): Flow<Int>
 
+    @Query("""
+        SELECT COUNT(*) FROM events
+        WHERE categoryId = :categoryId
+           OR categoryId IN (
+               SELECT id FROM categories WHERE parentId = :categoryId AND valueType IS NULL
+           )
+    """)
+    fun countByCategoryIncludingInheriting(categoryId: String): Flow<Int>
+
     @Upsert
     suspend fun upsert(entity: EventEntity)
 

@@ -14,7 +14,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class DeleteConfirmation(val categoryId: String, val eventCount: Int)
+data class DeleteConfirmation(
+    val categoryId: String,
+    val ownEventCount: Int,
+    val subCategoryCount: Int = 0,
+)
 
 // @spec CAT-UI-001, CAT-UI-003, CAT-UI-004, CAT-UI-005, CAT-UI-006
 @HiltViewModel
@@ -28,13 +32,15 @@ class CategoryListViewModel @Inject constructor(
     private val _pendingDeleteConfirmation = MutableStateFlow<DeleteConfirmation?>(null)
     val pendingDeleteConfirmation: StateFlow<DeleteConfirmation?> = _pendingDeleteConfirmation.asStateFlow()
 
+    // @spec CAT-UI-004, CAT-UI-005
     fun deleteCategory(id: String) {
         viewModelScope.launch {
-            val count = repository.getEventCountForCategory(id).first()
-            if (count == 0) {
+            val ownCount = repository.getEventCountForCategory(id).first()
+            val subCount = repository.getSubCategoryCount(id).first()
+            if (ownCount == 0 && subCount == 0) {
                 repository.deleteCategory(id)
             } else {
-                _pendingDeleteConfirmation.value = DeleteConfirmation(id, count)
+                _pendingDeleteConfirmation.value = DeleteConfirmation(id, ownEventCount = ownCount, subCategoryCount = subCount)
             }
         }
     }

@@ -101,7 +101,7 @@ fun CategoryListScreen(
             onDismissRequest = { viewModel.cancelDelete() },
             title = { Text("Delete category?") },
             text = {
-                Text("This will permanently delete ${confirmation.eventCount} event(s) logged under this category.")
+                Text("This will permanently delete ${confirmation.ownEventCount} event(s) logged under this category.")
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmDelete() }) { Text("Delete") }
@@ -131,12 +131,12 @@ private fun CategoryRow(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = category.emoji, style = MaterialTheme.typography.headlineSmall)
+            Text(text = category.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = category.name, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = valueTypeLabel(category.valueType),
+                    text = valueTypeLabel(category.resolvedValueType),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -602,21 +602,21 @@ class CategoryEditViewModelTest {
     private suspend fun eventValue(categoryId: String): EventValue? =
         repo.getEventsByCategory(categoryId).first().first().value
 
-    private suspend fun getSavedCategory(): Category =
-        repo.getCategories().first().first()
+    private suspend fun getSavedCategory(): Category.MetaCategory =
+        repo.getCategories().first().first() as Category.MetaCategory
 
-    private suspend fun getSavedCategoryByName(name: String): Category =
-        repo.getCategories().first().first { it.name == name }
+    private suspend fun getSavedCategoryByName(name: String): Category.MetaCategory =
+        repo.getCategories().first().first { it.name == name } as Category.MetaCategory
 
-    private suspend fun getSavedCategoryById(id: String): Category =
-        repo.getCategoryById(id).first()!!
+    private suspend fun getSavedCategoryById(id: String): Category.MetaCategory =
+        repo.getCategoryById(id).first()!! as Category.MetaCategory
 
     private fun makeCategory(
         id: String,
         sortOrder: Int = 0,
         valueType: ValueType = ValueType.None,
         color: Long = 0xFFE53935L,
-    ) = Category(
+    ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = color,
         valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder,
     )

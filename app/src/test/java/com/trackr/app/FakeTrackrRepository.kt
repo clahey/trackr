@@ -7,6 +7,7 @@ import com.trackr.app.domain.ValueType
 import com.trackr.app.domain.convertEventValue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import java.time.Instant
@@ -21,28 +22,66 @@ class FakeTrackrRepository : TrackrRepository {
     override suspend fun saveCategory(category: Category) {
         categories.update { list -> list.filter { it.id != category.id } + category }
     }
+
+    // @spec DM-PROC-021
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
         saveCategory(category)
+        val targetType = category.resolvedValueType
+        val affectedIds = buildAffectedIds(category)
         events.update { list ->
             list.map { event ->
-                if (event.categoryId != category.id) event
+                if (event.categoryId !in affectedIds) event
                 else {
-                    val newValue = convertEventValue(event.value, category.valueType)
+                    val newValue = convertEventValue(event.value, targetType)
                     if (newValue != event.value) event.copy(value = newValue) else event
                 }
             }
         }
     }
+
+    private fun buildAffectedIds(category: Category): Set<String> {
+        if (category !is Category.MetaCategory) return setOf(category.id)
+        val inheritingChildIds = categories.value
+            .filterIsInstance<Category.SubCategory>()
+            .filter { it.parent.id == category.id && it.valueType == null }
+            .map { it.id }
+        return setOf(category.id) + inheritingChildIds
+    }
+
     override suspend fun deleteCategory(id: String) {
         categories.update { it.filter { c -> c.id != id } }
         events.update { it.filter { e -> e.categoryId != id } }
     }
+
     override suspend fun reorderCategories(orderedIds: List<String>) {
         val map = categories.value.associateBy { it.id }
-        categories.value = orderedIds.mapIndexed { i, id -> map[id]!!.copy(sortOrder = i) }
+        categories.value = orderedIds.mapIndexed { i, id ->
+            when (val cat = map[id]!!) {
+                is Category.MetaCategory -> cat.copy(sortOrder = i)
+                is Category.SubCategory -> cat.copy(sortOrder = i)
+            }
+        }
     }
-    override fun getEventCountForCategory(categoryId: String): Flow<Int> =
-        events.map { it.count { e -> e.categoryId == categoryId } }
+
+    override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> {
+        return if (!includeSubCategoriesWithNullType) {
+            events.map { it.count { e -> e.categoryId == categoryId } }
+        } else {
+            combine(categories, events) { cats, evts ->
+                val inheritingChildIds = cats
+                    .filterIsInstance<Category.SubCategory>()
+                    .filter { it.parent.id == categoryId && it.valueType == null }
+                    .map { it.id }
+                    .toSet()
+                evts.count { e -> e.categoryId == categoryId || e.categoryId in inheritingChildIds }
+            }
+        }
+    }
+
+    override fun getSubCategoryCount(categoryId: String): Flow<Int> =
+        categories.map { cats ->
+            cats.count { c -> c is Category.SubCategory && c.parent.id == categoryId }
+        }
 
     override fun getEvents(start: Instant?, end: Instant?): Flow<List<Event>> = events.map { list ->
         list.filter { (start == null || !it.timestamp.isBefore(start)) && (end == null || it.timestamp.isBefore(end)) }
@@ -67,4 +106,8 @@ class FakeTrackrRepository : TrackrRepository {
 
     fun setEvents(vararg e: Event) { events.value = e.toList() }
     fun setCategories(vararg c: Category) { categories.value = c.toList() }
+
+    // Test helpers for CategoryEditViewModelHierarchyTest (Phase 6 Step 3)
+    fun resetColorCounter(value: Int) { nextColorIndex = value }
+    fun peekColorCounter(): Int = nextColorIndex
 }

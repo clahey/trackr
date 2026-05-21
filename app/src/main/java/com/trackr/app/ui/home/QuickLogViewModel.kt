@@ -58,7 +58,7 @@ class QuickLogViewModel @Inject constructor(
 
     suspend fun save() {
         val category = selectedCategory.value ?: return
-        when (category.valueType) {
+        when (category.resolvedValueType) {
             ValueType.Number -> if (value.value == null) {
                 _saveResult.value = SaveResult.ValidationError("value")
                 return

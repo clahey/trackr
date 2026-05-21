@@ -20,6 +20,9 @@ Individuals tracking personal health and lifestyle data who want:
 - Log any event in under three taps
 - Support at least seven value types: none (occurrence), scale 1–10, boolean, numeric with unit, free text, duration, exercise (sets × reps)
 - User-defined categories with emoji, color, and value type
+- Two-level category hierarchy (parent → subcategory); subcategories inherit color, emoji, and value type from their parent but can override any field individually
+- Category edit screen displays a live preview of how a timeline row will look with the current name, emoji, color, and value type
+- Category color used throughout the UI wherever categories are identified: timeline row avatars, filter chips, category list rows, quick-log category grid, and category edit screen
 - Attach photos to an event (camera or gallery); quick-log captures one image, full edit allows multiple
 - Timeline view of events grouped by day
 - Data stays fully on-device; no network required
@@ -49,7 +52,7 @@ graph TD
 - **ViewModels** — state holders per screen; expose `StateFlow`; consume repository
 - **Repository interface** — `TrackrRepository` — sole seam for future backend swap
 - **LocalTrackrRepository** — Room-backed implementation
-- **Room Database** — two tables: `categories`, `events`
+- **Room Database** — two tables: `categories`, `events`. `Category` supports a two-level hierarchy via `parentId: String?` (null = top-level). Subcategories store null for any field they inherit from their parent (color, emoji, valueType); top-level categories always carry explicit values. The UI layer resolves effective values by falling back to the parent when a field is null.
 - **Image storage** — image files written to app-private storage (`context.filesDir`); paths stored as a JSON list in the `events` table; never stored as blobs
 - **App Shell** — `TrackrApplication` (`@HiltAndroidApp`), `MainActivity` (`@AndroidEntryPoint`), Hilt modules, and the Compose `NavHost`. ViewModel arguments pass via `SavedStateHandle` (compatible with process-death restoration).
 
@@ -68,6 +71,14 @@ graph TD
 *Alternatives considered:* fixed palette only (ignores user's system preference); fully custom theme (unjustified work at this scale).
 
 **Hilt for DI.** Standard Android DI; keeps ViewModels testable and repository injection straightforward.
+
+**Two-level category hierarchy.** Categories support one level of nesting (parent → subcategory). A category with children cannot be re-parented; a category with a parent cannot receive children. This covers the grouping and subtype use case without recursive query complexity or deep-tree UI problems.
+
+*Alternatives considered:* full tree (arbitrary depth) — adds recursive Room queries and unwieldy navigation UI; flat groups (separate entity, not loggable) — prevents logging at the group level, which allows the UX to be flexible to user needs.
+
+**Subcategory inheritance via nullable fields.** Subcategories store `null` for color, emoji, and valueType to mean "inherit from parent." Top-level categories always carry explicit values. Effective values are resolved by the UI layer, not the repository, so all stored events reference the raw category without denormalization.
+
+*Alternatives considered:* denormalize at write time (copy parent values) — breaks when the parent is later edited; separate override-flag columns — extra schema complexity without observability benefit over nullable fields.
 
 ## Success Metrics
 

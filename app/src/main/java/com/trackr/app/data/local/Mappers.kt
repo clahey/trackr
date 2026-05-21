@@ -6,18 +6,59 @@ import com.trackr.app.data.local.converters.StringListConverter
 import com.trackr.app.data.local.converters.ValueTypeConverter
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
+import com.trackr.app.domain.ValueType
 
-fun CategoryEntity.toDomain(): Category = Category(
-    id = id, name = name, emoji = emoji, color = color,
-    valueType = ValueTypeConverter.decode(valueType),
-    unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
-)
+fun List<CategoryEntity>.toDomainList(): List<Category> {
+    val metaMap = mutableMapOf<String, Category.MetaCategory>()
+    forEach { entity ->
+        if (entity.parentId == null) {
+            metaMap[entity.id] = Category.MetaCategory(
+                id = entity.id,
+                name = entity.name,
+                emoji = entity.emoji ?: "",
+                color = entity.color ?: 0xFFE53935L,
+                valueType = entity.valueType?.let { ValueTypeConverter.decode(it) } ?: ValueType.None,
+                unit = entity.unit,
+                allowEmptyText = entity.allowEmptyText,
+                sortOrder = entity.sortOrder,
+            )
+        }
+    }
+    return map { entity ->
+        if (entity.parentId == null) {
+            metaMap[entity.id]!!
+        } else {
+            val parent = metaMap[entity.parentId]
+                ?: return@map null
+            Category.SubCategory(
+                id = entity.id,
+                name = entity.name,
+                emoji = entity.emoji,
+                color = entity.color,
+                valueType = entity.valueType?.let { ValueTypeConverter.decode(it) },
+                unit = entity.unit,
+                allowEmptyText = entity.allowEmptyText,
+                sortOrder = entity.sortOrder,
+                parent = parent,
+            )
+        }
+    }.filterNotNull()
+}
 
-fun Category.toEntity(): CategoryEntity = CategoryEntity(
-    id = id, name = name, emoji = emoji, color = color,
-    valueType = ValueTypeConverter.encode(valueType),
-    unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
-)
+fun Category.toEntity(): CategoryEntity = when (this) {
+    is Category.MetaCategory -> CategoryEntity(
+        id = id, name = name, emoji = emoji, color = color,
+        valueType = ValueTypeConverter.encode(valueType),
+        unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
+        parentId = null,
+    )
+    is Category.SubCategory -> CategoryEntity(
+        id = id, name = name, emoji = emoji, color = color,
+        valueType = valueType?.let { ValueTypeConverter.encode(it) },
+        unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
+        parentId = parent.id,
+    )
+}
 
 fun EventEntity.toDomain(): Event = Event(
     id = id, categoryId = categoryId,

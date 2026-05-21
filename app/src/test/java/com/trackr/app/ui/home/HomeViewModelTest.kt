@@ -34,7 +34,7 @@ class HomeViewModelTest {
         val anchor: Instant = Instant.parse("2024-01-15T12:00:00Z")
     }
 
-    private fun makeCategory(id: String, name: String = id) = Category(
+    private fun makeCategory(id: String, name: String = id) = Category.MetaCategory(
         id = id, name = name, emoji = "📌", color = 0xFFE53935L,
         valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = 0,
     )
@@ -290,7 +290,7 @@ class HomeViewModelTest {
 
     // @spec EL-UI-061
     @Test fun `DayEntry Entry hasMismatch is true when event value does not match category type`() = runTest {
-        val cat = Category(
+        val cat = Category.MetaCategory(
             id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
             valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
         )
@@ -309,7 +309,7 @@ class HomeViewModelTest {
 
     // @spec EL-UI-061
     @Test fun `DayEntry Entry hasMismatch is false when value matches category type`() = runTest {
-        val cat = Category(
+        val cat = Category.MetaCategory(
             id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
             valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
         )
@@ -328,7 +328,7 @@ class HomeViewModelTest {
 
     // @spec EL-UI-061
     @Test fun `DayEntry Entry hasMismatch is false when ErrorValue inferredType matches Unknown category`() = runTest {
-        val cat = Category(
+        val cat = Category.MetaCategory(
             id = "c1", name = "Future Cat", emoji = "📌", color = 0xFFE53935L,
             valueType = ValueType.Unknown("future_type"), unit = null, allowEmptyText = true, sortOrder = 0,
         )

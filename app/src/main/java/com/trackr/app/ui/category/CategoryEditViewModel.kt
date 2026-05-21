@@ -63,11 +63,11 @@ class CategoryEditViewModel @Inject constructor(
                     return@launch
                 }
                 name.value = cat.name
-                emoji.value = cat.emoji
-                color.value = cat.color
-                valueType.value = cat.valueType
+                emoji.value = cat.resolvedEmoji
+                color.value = cat.resolvedColor
+                valueType.value = cat.resolvedValueType
                 unit.value = cat.unit ?: ""
-                _originalValueType.value = cat.valueType
+                _originalValueType.value = cat.resolvedValueType
             }
             viewModelScope.launch {
                 combine(
@@ -109,7 +109,7 @@ class CategoryEditViewModel @Inject constructor(
         val sortOrder = categoryId?.let { repository.getCategoryById(it).first()?.sortOrder }
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)
 
-        val category = Category(
+        val category = Category.MetaCategory(
             id = categoryId ?: UUID.randomUUID().toString(),
             name = nameVal,
             emoji = emojiVal,
@@ -119,7 +119,7 @@ class CategoryEditViewModel @Inject constructor(
             allowEmptyText = true,
             sortOrder = sortOrder,
         )
-        if (categoryId != null && originalType != null && category.valueType != originalType) {
+        if (categoryId != null && originalType != null && category.resolvedValueType != originalType) {
             repository.saveCategoryAndMigrateEvents(category, originalType)
         } else {
             repository.saveCategory(category)

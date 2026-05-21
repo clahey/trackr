@@ -56,6 +56,18 @@ LLD: `docs/llds/data-model.md`
 - [x] **DM-PROC-015**: `convertOrDefault` shall return `ConversionOutcome.Converted(v)` when `convertEventValue` produces a value whose runtime type matches the target type.
 - [x] **DM-PROC-016**: `convertOrDefault` shall return `ConversionOutcome.UsedDefault(v)` when the input is an `ErrorValue` (regardless of target type, provided target is not `None`/`Unknown`) or when `convertEventValue` does not produce a value of the target type; `v` shall be `defaultForType(targetType)`.
 
+## Category Hierarchy
+
+- [ ] **DM-DATA-025**: The system shall represent Category as a sealed class with two variants: MetaCategory (top-level, no parent) and SubCategory (child of exactly one MetaCategory).
+- [ ] **DM-DATA-026**: A MetaCategory shall carry non-null emoji, color, and valueType fields; it shall have no parentId or parent reference.
+- [ ] **DM-DATA-027**: A SubCategory shall carry nullable emoji, color, and valueType fields where null indicates inheritance from the parent; it shall carry a non-null MetaCategory parent reference populated at the repository layer.
+- [ ] **DM-DATA-028**: The system shall enforce a two-level constraint: a category with SubCategory children shall not be nested under another category; a SubCategory shall not be given children. Violations shall be rejected at the repository layer.
+- [ ] **DM-PROC-017**: When loading Category records, the system shall assemble MetaCategory and SubCategory domain objects using a single LEFT JOIN of the categories table on parentId, making the assembly atomic with respect to concurrent reads.
+- [ ] **DM-PROC-018**: The `Category` sealed class shall declare abstract members `resolvedEmoji: String`, `resolvedColor: Long`, and `resolvedValueType: ValueType`; `MetaCategory` shall implement each by returning its own field directly; `SubCategory` shall implement each by returning its override field when non-null, or the parent's value otherwise.
+- [ ] **DM-PROC-019**: When un-nesting a SubCategory (removing it from its group), the system shall resolve any null (inherited) fields to the parent's current values at the time of the operation before persisting the record as a MetaCategory.
+- [ ] **DM-PROC-020**: When reparenting a category into a group, the system shall preserve all current explicit field values as overrides regardless of whether they match the new parent's values.
+- [ ] **DM-PROC-021**: When migrating events due to a MetaCategory valueType change, the system shall include events belonging to SubCategories whose valueType is null (inheriting); SubCategories with an explicit valueType override shall be excluded from the migration.
+
 ## Ordering and Invariants
 
 - [ ] **DM-PROC-010**: When two events share the same timestamp, the system shall order them by createdAt ascending, then by id string ascending as a tiebreaker.

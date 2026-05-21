@@ -11,7 +11,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class FakeTrackrRepositoryTest {
 
-    private fun makeCategory(id: String, sortOrder: Int) = Category(
+    private fun makeCategory(id: String, sortOrder: Int) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
         valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = sortOrder,
     )

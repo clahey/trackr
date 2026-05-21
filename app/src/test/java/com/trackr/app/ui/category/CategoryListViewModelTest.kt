@@ -63,7 +63,7 @@ class CategoryListViewModelTest {
         val confirmation = vm.pendingDeleteConfirmation.value
         assertNotNull(confirmation)
         assertEquals("c1", confirmation!!.categoryId)
-        assertEquals(2, confirmation.eventCount)
+        assertEquals(2, confirmation.ownEventCount)
     }
 
     // @spec CAT-UI-006
@@ -86,7 +86,7 @@ class CategoryListViewModelTest {
         assertFalse(vm.categories.first().isEmpty())
     }
 
-    private fun makeCategory(id: String, sortOrder: Int = 0) = Category(
+    private fun makeCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
         valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = sortOrder,
     )
