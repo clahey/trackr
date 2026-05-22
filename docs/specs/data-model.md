@@ -65,7 +65,7 @@ LLD: `docs/llds/data-model.md`
 - [ ] **DM-PROC-017**: When loading Category records, the system shall assemble MetaCategory and SubCategory domain objects using a single LEFT JOIN of the categories table on parentId, making the assembly atomic with respect to concurrent reads.
 - [ ] **DM-PROC-018**: The `Category` sealed class shall declare abstract members `resolvedEmoji: String`, `resolvedColor: Long`, and `resolvedValueType: ValueType`; `MetaCategory` shall implement each by returning its own field directly; `SubCategory` shall implement each by returning its override field when non-null, or the parent's value otherwise.
 - [ ] **DM-PROC-019**: When un-nesting a SubCategory (removing it from its group), the system shall resolve any null (inherited) fields to the parent's current values at the time of the operation before persisting the record as a MetaCategory.
-- [ ] **DM-PROC-020**: When reparenting a category into a group, the system shall preserve all current explicit field values as overrides regardless of whether they match the new parent's values.
+- [x] **DM-PROC-020**: When reparenting a category into a group, the system shall preserve all current explicit field values as overrides regardless of whether they match the new parent's values.
 - [ ] **DM-PROC-021**: When migrating events due to a MetaCategory valueType change, the system shall include events belonging to SubCategories whose valueType is null (inheriting); SubCategories with an explicit valueType override shall be excluded from the migration.
 
 ## Ordering and Invariants
