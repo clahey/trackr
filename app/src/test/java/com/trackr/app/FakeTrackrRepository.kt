@@ -19,13 +19,24 @@ class FakeTrackrRepository : TrackrRepository {
 
     override fun getCategories(): Flow<List<Category>> = categories.map { it.sortedBy { c -> c.sortOrder } }
     override fun getCategoryById(id: String): Flow<Category?> = categories.map { it.find { c -> c.id == id } }
+    // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
-        categories.update { list -> list.filter { it.id != category.id } + category }
+        categories.update { list ->
+            if (category is Category.SubCategory) {
+                val childCount = list.count { c ->
+                    c is Category.SubCategory && c.parent.id == category.id
+                }
+                require(childCount == 0) {
+                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
+                }
+            }
+            list.filter { it.id != category.id } + category
+        }
     }
 
-    // @spec DM-PROC-021
+    // @spec DM-PROC-021, DM-DATA-028
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
-        saveCategory(category)
+        saveCategory(category)  // constraint check is inside saveCategory
         val targetType = category.resolvedValueType
         val affectedIds = buildAffectedIds(category)
         events.update { list ->

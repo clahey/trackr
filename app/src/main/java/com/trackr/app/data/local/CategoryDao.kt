@@ -38,4 +38,7 @@ abstract class CategoryDao {
 
     @Query("SELECT COUNT(*) FROM categories WHERE parentId = :parentId")
     abstract fun countByParentId(parentId: String): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM categories WHERE parentId = :parentId")
+    abstract suspend fun countByParentIdOnce(parentId: String): Int
 }

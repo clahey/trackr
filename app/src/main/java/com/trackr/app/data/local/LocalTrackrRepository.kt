@@ -35,14 +35,29 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getCategoryById(id: String): Flow<Category?> =
         getCategories().map { it.find { c -> c.id == id } }
 
+    // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
-        categoryDao.upsert(category.toEntity())
+        db.withTransaction {
+            if (category is Category.SubCategory) {
+                val childCount = categoryDao.countByParentIdOnce(category.id)
+                require(childCount == 0) {
+                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
+                }
+            }
+            categoryDao.upsert(category.toEntity())
+        }
     }
 
-    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021
+    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021, DM-DATA-028
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
         val targetType = category.resolvedValueType
         db.withTransaction {
+            if (category is Category.SubCategory) {
+                val childCount = categoryDao.countByParentIdOnce(category.id)
+                require(childCount == 0) {
+                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
+                }
+            }
             categoryDao.upsert(category.toEntity())
             val affectedCategoryIds = buildAffectedCategoryIds(category)
             affectedCategoryIds.forEach { catId ->

@@ -6,15 +6,12 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FakeTrackrRepositoryTest {
-
-    private fun makeCategory(id: String, sortOrder: Int) = Category.MetaCategory(
-        id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = sortOrder,
-    )
 
     // @spec LS-BE-010
     @Test fun `getCategories returns categories sorted by sortOrder ascending`() = runTest {
@@ -39,4 +36,59 @@ class FakeTrackrRepositoryTest {
         val result = repo.getCategories().first()
         assertEquals(listOf("c1", "c2", "c3"), result.map { it.id })
     }
+
+    // @spec DM-DATA-028
+    @Test fun `saveCategory throws when nesting a MetaCategory that already has SubCategory children`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent")
+        val newParent = makeCategory("newParent")
+        val child = makeSubCategory("child", parent = parent)
+        repo.setCategories(parent, newParent, child)
+        try {
+            repo.saveCategory(makeSubCategory("parent", parent = newParent))
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+    }
+
+    // @spec DM-DATA-028
+    @Test fun `saveCategory succeeds when nesting a category that has no children`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent")
+        val target = makeCategory("target")
+        repo.setCategories(parent, target)
+        repo.saveCategory(makeSubCategory("target", parent = parent))
+        val result = repo.getCategories().first()
+        assertEquals(1, result.filterIsInstance<Category.SubCategory>().size)
+    }
+
+    // @spec DM-DATA-028
+    @Test fun `saveCategoryAndMigrateEvents throws when nesting a category that has children`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent")
+        val newParent = makeCategory("newParent")
+        val child = makeSubCategory("child", parent = parent)
+        repo.setCategories(parent, newParent, child)
+        try {
+            repo.saveCategoryAndMigrateEvents(
+                makeSubCategory("parent", parent = newParent),
+                fromType = ValueType.None,
+            )
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+    }
+
+    private fun makeCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(
+        id = id, name = id, emoji = "📌", color = 0xFFE53935L,
+        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+    )
+
+    private fun makeSubCategory(id: String, parent: Category.MetaCategory, sortOrder: Int = 0) =
+        Category.SubCategory(
+            id = id, name = id, emoji = null, color = null, valueType = null,
+            unit = null, allowEmptyText = true, sortOrder = sortOrder, parent = parent,
+        )
 }
