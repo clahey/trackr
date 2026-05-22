@@ -23,6 +23,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,7 +46,8 @@ import com.trackr.app.domain.ValueType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-// @spec CAT-UI-001, CAT-UI-003, CAT-UI-004, CAT-UI-005, CAT-UI-006, CAT-UI-017
+// @spec CAT-UI-001, CAT-UI-003, CAT-UI-004, CAT-UI-005, CAT-UI-006,
+// CAT-UI-051, CAT-UI-052, CAT-UI-017
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CategoryListScreen(
@@ -56,6 +58,7 @@ fun CategoryListScreen(
 ) {
     val categories by viewModel.categories.collectAsState()
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
+    val pendingGroupPicker by viewModel.pendingGroupPicker.collectAsState()
     var menuCategoryId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -81,8 +84,11 @@ fun CategoryListScreen(
                 .padding(innerPadding),
         ) {
             items(categories, key = { it.id }) { category ->
+                val hasSubCategories = category is Category.MetaCategory &&
+                    categories.any { it is Category.SubCategory && it.parent.id == category.id }
                 CategoryRow(
                     category = category,
+                    hasSubCategories = hasSubCategories,
                     onClick = { onNavigateToCategoryEdit(category.id) },
                     onLongClick = { menuCategoryId = category.id },
                     menuExpanded = menuCategoryId == category.id,
@@ -90,6 +96,18 @@ fun CategoryListScreen(
                     onDeleteClick = {
                         menuCategoryId = null
                         viewModel.deleteCategory(category.id)
+                    },
+                    onAddToGroupClick = {
+                        menuCategoryId = null
+                        viewModel.startAddToGroup(category.id)
+                    },
+                    onMoveToAnotherGroupClick = {
+                        menuCategoryId = null
+                        viewModel.startMoveToAnotherGroup(category.id)
+                    },
+                    onRemoveFromGroupClick = {
+                        menuCategoryId = null
+                        viewModel.removeFromGroup(category.id)
                     },
                 )
             }
@@ -128,17 +146,31 @@ fun CategoryListScreen(
             },
         )
     }
+
+    // @spec CAT-UI-051, CAT-UI-052
+    pendingGroupPicker?.let { state ->
+        GroupPickerDialog(
+            state = state,
+            onSelect = { parentId -> viewModel.reparentCategory(state.categoryId, parentId) },
+            onCreateNewGroup = { name -> viewModel.reparentWithNewGroup(state.categoryId, name) },
+            onDismiss = { viewModel.dismissGroupPicker() },
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CategoryRow(
     category: Category,
+    hasSubCategories: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     menuExpanded: Boolean,
     onMenuDismiss: () -> Unit,
     onDeleteClick: () -> Unit,
+    onAddToGroupClick: () -> Unit,
+    onMoveToAnotherGroupClick: () -> Unit,
+    onRemoveFromGroupClick: () -> Unit,
 ) {
     // @spec CAT-UI-001
     val startPadding = if (category is Category.SubCategory) 40.dp else 16.dp
@@ -161,13 +193,97 @@ private fun CategoryRow(
                 )
             }
         }
+        // @spec CAT-UI-003
         DropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
             DropdownMenuItem(
                 text = { Text("Delete") },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                 onClick = onDeleteClick,
             )
+            if (category is Category.MetaCategory && !hasSubCategories) {
+                DropdownMenuItem(
+                    text = { Text("Add to group") },
+                    onClick = onAddToGroupClick,
+                )
+            }
+            if (category is Category.SubCategory) {
+                DropdownMenuItem(
+                    text = { Text("Move to another group") },
+                    onClick = onMoveToAnotherGroupClick,
+                )
+                DropdownMenuItem(
+                    text = { Text("Remove from group") },
+                    onClick = onRemoveFromGroupClick,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun GroupPickerDialog(
+    state: GroupPickerState,
+    onSelect: (parentId: String) -> Unit,
+    onCreateNewGroup: (name: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showNameEntry by remember { mutableStateOf(false) }
+    var newGroupName by remember { mutableStateOf("") }
+
+    if (showNameEntry) {
+        AlertDialog(
+            onDismissRequest = { showNameEntry = false; newGroupName = "" },
+            title = { Text("New group name") },
+            text = {
+                OutlinedTextField(
+                    value = newGroupName,
+                    onValueChange = { newGroupName = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { onCreateNewGroup(newGroupName.trim()) },
+                    enabled = newGroupName.isNotBlank(),
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameEntry = false; newGroupName = "" }) { Text("Back") }
+            },
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(if (state.isMoveOperation) "Move to group" else "Add to group") },
+            text = {
+                Column {
+                    state.eligibleParents.forEach { parent ->
+                        TextButton(
+                            onClick = { onSelect(parent.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = parent.name,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                    TextButton(
+                        onClick = { showNameEntry = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = "+ Create new group",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            },
+        )
     }
 }
 
