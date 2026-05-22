@@ -147,6 +147,28 @@ class QuickLogViewModelTest {
         assertTrue(vm.saveResult.value is SaveResult.ValidationError)
     }
 
+    // @spec EL-UI-073
+    @Test fun `expandMetaCategory sets expandedMetaCategoryId`() = runTest {
+        vm.expandMetaCategory("m1")
+        assertEquals("m1", vm.expandedMetaCategoryId.value)
+    }
+
+    // @spec EL-UI-073
+    @Test fun `expandMetaCategory null clears expandedMetaCategoryId`() = runTest {
+        vm.expandMetaCategory("m1")
+        vm.expandMetaCategory(null)
+        assertNull(vm.expandedMetaCategoryId.value)
+    }
+
+    // @spec EL-UI-073
+    @Test fun `selectCategory clears expandedMetaCategoryId`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        vm.expandMetaCategory("c1")
+        vm.selectCategory(cat)
+        assertNull(vm.expandedMetaCategoryId.value)
+    }
+
     // @spec EL-NAV-002b
     @Test fun `reset after successful save returns saveResult to Idle`() = runTest {
         val cat = makeCategory("c1")

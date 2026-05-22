@@ -20,7 +20,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 // @spec EL-UI-013, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-052b, EL-UI-054, EL-UI-055b,
-// EL-NAV-002, EL-PROC-001
+// EL-UI-073, EL-UI-074, EL-UI-075, EL-UI-076, EL-NAV-002, EL-PROC-001
 @HiltViewModel
 class QuickLogViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -32,6 +32,7 @@ class QuickLogViewModel @Inject constructor(
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
 
     val selectedCategory = MutableStateFlow<Category?>(null)
+    val expandedMetaCategoryId = MutableStateFlow<String?>(null)
     val timestamp = MutableStateFlow<Instant>(Instant.now(clock))
     val notes = MutableStateFlow("")
     val imagePath = MutableStateFlow<String?>(null)
@@ -48,12 +49,22 @@ class QuickLogViewModel @Inject constructor(
                 if (selected != null && cats.none { it.id == selected.id }) {
                     selectedCategory.value = null
                 }
+                // @spec EL-UI-076
+                val expandedId = expandedMetaCategoryId.value
+                if (expandedId != null && cats.filterIsInstance<Category.MetaCategory>().none { it.id == expandedId }) {
+                    expandedMetaCategoryId.value = null
+                }
             }
         }
     }
 
     fun selectCategory(category: Category) {
         selectedCategory.value = category
+        expandedMetaCategoryId.value = null
+    }
+
+    fun expandMetaCategory(id: String?) {
+        expandedMetaCategoryId.value = id
     }
 
     suspend fun save() {
@@ -96,6 +107,7 @@ class QuickLogViewModel @Inject constructor(
         val path = imagePath.value
         if (path != null) imageStore.delete(path)
         selectedCategory.value = null
+        expandedMetaCategoryId.value = null
         notes.value = ""
         imagePath.value = null
         value.value = null

@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -76,9 +78,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-// @spec EL-UI-001, EL-UI-011, EL-UI-012, EL-UI-013, EL-UI-013b, EL-UI-017, EL-UI-018,
-// EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022, EL-UI-023, EL-UI-023b,
-// EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-045, EL-NAV-002, EL-PROC-001, APP-NAV-002
+// @spec EL-UI-001, EL-UI-010, EL-UI-011, EL-UI-012, EL-UI-013, EL-UI-013b, EL-UI-014,
+// EL-UI-017, EL-UI-018, EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022,
+// EL-UI-023, EL-UI-023b, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-045, EL-UI-070,
+// EL-UI-071, EL-UI-072, EL-UI-073, EL-UI-074, EL-UI-075, EL-NAV-002, EL-PROC-001, APP-NAV-002
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -145,8 +148,18 @@ fun HomeScreen(
     Scaffold(
         topBar = { TopAppBar(title = { Text("Timeline") }) },
         floatingActionButton = {
+            // @spec EL-UI-013, EL-UI-075
             FloatingActionButton(onClick = {
-                activeFilter?.let { quickLogVm.selectCategory(it) }
+                when (val f = activeFilter) {
+                    is ActiveFilter.Sub -> quickLogVm.selectCategory(f.sub)
+                    is ActiveFilter.TopLevel -> {
+                        val hasSubCats = categories.filterIsInstance<Category.SubCategory>()
+                            .any { it.parent.id == f.category.id }
+                        if (hasSubCats) quickLogVm.expandMetaCategory(f.category.id)
+                        else quickLogVm.selectCategory(f.category)
+                    }
+                    is ActiveFilter.All -> {}
+                }
                 showSheet = true
             }) {
                 Icon(Icons.Default.Add, contentDescription = "Log event")
@@ -155,26 +168,64 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            // @spec EL-UI-010, EL-UI-012, EL-UI-014, EL-UI-070, EL-UI-071
             if (categories.isNotEmpty()) {
+                val metaCategories = categories.filterIsInstance<Category.MetaCategory>()
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
                         FilterChip(
-                            selected = activeFilter == null,
-                            onClick = { homeVm.setFilter(null) },
+                            selected = activeFilter is ActiveFilter.All,
+                            onClick = { homeVm.setFilter(ActiveFilter.All) },
                             label = { Text("All") },
                         )
                     }
-                    items(categories) { cat ->
-                        FilterChip(
-                            selected = activeFilter?.id == cat.id,
-                            onClick = {
-                                homeVm.setFilter(if (activeFilter?.id == cat.id) null else cat)
-                            },
-                            label = { Text("${cat.resolvedEmoji} ${cat.name}") },
-                        )
+                    metaCategories.forEach { meta ->
+                        val isMetaSelected = when (val f = activeFilter) {
+                            is ActiveFilter.TopLevel -> f.category.id == meta.id
+                            else -> false
+                        }
+                        val showSubChips = when (val f = activeFilter) {
+                            is ActiveFilter.TopLevel -> f.category.id == meta.id
+                            is ActiveFilter.Sub -> f.parent.id == meta.id
+                            else -> false
+                        }
+                        item(key = "meta-${meta.id}") {
+                            FilterChip(
+                                selected = isMetaSelected,
+                                onClick = {
+                                    val f = activeFilter
+                                    when {
+                                        f is ActiveFilter.TopLevel && f.category.id == meta.id ->
+                                            homeVm.setFilter(ActiveFilter.All)
+                                        else -> homeVm.setFilter(ActiveFilter.TopLevel(meta))
+                                    }
+                                },
+                                label = { Text("${meta.resolvedEmoji} ${meta.name}") },
+                            )
+                        }
+                        if (showSubChips) {
+                            val subCats = categories.filterIsInstance<Category.SubCategory>()
+                                .filter { it.parent.id == meta.id }
+                            items(subCats, key = { "sub-${it.id}" }) { sub ->
+                                val isSubSelected = when (val f = activeFilter) {
+                                    is ActiveFilter.Sub -> f.sub.id == sub.id
+                                    else -> false
+                                }
+                                FilterChip(
+                                    selected = isSubSelected,
+                                    onClick = {
+                                        homeVm.setFilter(
+                                            if (isSubSelected) ActiveFilter.TopLevel(meta)
+                                            else ActiveFilter.Sub(meta, sub)
+                                        )
+                                    },
+                                    label = { Text("${sub.resolvedEmoji} ${sub.name}") },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -384,7 +435,7 @@ private fun DayHeader(date: LocalDate) {
 }
 
 // @spec EL-UI-013, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-052b, EL-UI-054, EL-UI-055b,
-// EL-NAV-002, EL-PROC-001
+// EL-UI-072, EL-UI-073, EL-UI-074, EL-NAV-002, EL-PROC-001
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickLogSheet(
@@ -393,6 +444,7 @@ private fun QuickLogSheet(
     onDismiss: () -> Unit,
 ) {
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val expandedMetaCategoryId by viewModel.expandedMetaCategoryId.collectAsState()
     val notes by viewModel.notes.collectAsState()
     val value by viewModel.value.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
@@ -406,23 +458,67 @@ private fun QuickLogSheet(
 
     if (selectedCategory == null) {
         // Step 1 — Category picker
+        val metaCategories = categories.filterIsInstance<Category.MetaCategory>()
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Choose a category", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(12.dp))
+            // @spec EL-UI-072, EL-UI-073, EL-UI-074
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.height(300.dp),
             ) {
-                items(categories) { cat ->
-                    Button(
-                        onClick = { viewModel.selectCategory(cat) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(cat.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)
-                            Text(cat.name, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                metaCategories.forEach { meta ->
+                    val subCats = categories.filterIsInstance<Category.SubCategory>()
+                        .filter { it.parent.id == meta.id }
+                    val isExpanded = expandedMetaCategoryId == meta.id && subCats.isNotEmpty()
+                    if (isExpanded) {
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "meta-${meta.id}") {
+                            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        "${meta.resolvedEmoji} ${meta.name}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                    Button(
+                                        onClick = { viewModel.selectCategory(meta) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(meta.resolvedColor),
+                                            contentColor = Color(foregroundColorForBackground(meta.resolvedColor)),
+                                        ),
+                                    ) { Text("Log to ${meta.name} directly") }
+                                    subCats.forEach { sub ->
+                                        TextButton(
+                                            onClick = { viewModel.selectCategory(sub) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) { Text("${sub.resolvedEmoji} ${sub.name}") }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        item(key = "meta-${meta.id}") {
+                            Button(
+                                onClick = {
+                                    if (subCats.isNotEmpty()) viewModel.expandMetaCategory(meta.id)
+                                    else viewModel.selectCategory(meta)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(meta.resolvedColor),
+                                    contentColor = Color(foregroundColorForBackground(meta.resolvedColor)),
+                                ),
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(meta.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)
+                                    Text(meta.name, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                }
+                            }
                         }
                     }
                 }

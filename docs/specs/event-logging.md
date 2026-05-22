@@ -14,12 +14,12 @@ LLD: `docs/llds/event-logging.md`
 
 ## Category Filter
 
-- [ ] **EL-UI-010**: The timeline screen shall display a horizontally scrollable row of category filter chips; an "All" chip shall appear first, followed by one chip per MetaCategory.
-- [ ] **EL-UI-011**: While ActiveFilter.TopLevel is set, the timeline shall display events belonging to the MetaCategory and all of its SubCategories. While ActiveFilter.Sub is set, the timeline shall display only events belonging to that SubCategory.
-- [ ] **EL-UI-012**: When the user taps the "All" chip, the system shall clear the active filter. When the user taps the active MetaCategory chip while ActiveFilter.TopLevel is set, the system shall clear the filter to All. When the user taps a MetaCategory chip while ActiveFilter.Sub is set for a SubCategory of that MetaCategory, the system shall set the filter to ActiveFilter.TopLevel for that MetaCategory.
-- [ ] **EL-UI-013**: While ActiveFilter.Sub is set, opening the quick-log sheet shall open directly to step 2 for the selected SubCategory. While ActiveFilter.TopLevel is set and the MetaCategory has SubCategories, opening the quick-log sheet shall open step 1 with that MetaCategory pre-expanded. While ActiveFilter.TopLevel is set and the MetaCategory has no SubCategories, opening the quick-log sheet shall open directly to step 2.
-- [ ] **EL-UI-013b**: When any category referenced by the active filter is deleted externally, the system shall clear the filter to All and display all events.
-- [ ] **EL-UI-014**: When the user taps an inactive MetaCategory chip, the system shall set ActiveFilter.TopLevel for that MetaCategory.
+- [x] **EL-UI-010**: The timeline screen shall display a horizontally scrollable row of category filter chips; an "All" chip shall appear first, followed by one chip per MetaCategory.
+- [x] **EL-UI-011**: While ActiveFilter.TopLevel is set, the timeline shall display events belonging to the MetaCategory and all of its SubCategories. While ActiveFilter.Sub is set, the timeline shall display only events belonging to that SubCategory.
+- [x] **EL-UI-012**: When the user taps the "All" chip, the system shall clear the active filter. When the user taps the active MetaCategory chip while ActiveFilter.TopLevel is set, the system shall clear the filter to All. When the user taps a MetaCategory chip while ActiveFilter.Sub is set for a SubCategory of that MetaCategory, the system shall set the filter to ActiveFilter.TopLevel for that MetaCategory.
+- [x] **EL-UI-013**: While ActiveFilter.Sub is set, opening the quick-log sheet shall open directly to step 2 for the selected SubCategory. While ActiveFilter.TopLevel is set and the MetaCategory has SubCategories, opening the quick-log sheet shall open step 1 with that MetaCategory pre-expanded. While ActiveFilter.TopLevel is set and the MetaCategory has no SubCategories, opening the quick-log sheet shall open directly to step 2.
+- [x] **EL-UI-013b**: When a category referenced by the active filter is deleted externally: if the filter is ActiveFilter.TopLevel and its MetaCategory is deleted, the system shall clear the filter to All; if the filter is ActiveFilter.Sub and its SubCategory is deleted, the system shall clear the filter to All; if the filter is ActiveFilter.Sub and its parent MetaCategory is deleted (the SubCategory is promoted to MetaCategory), the system shall promote the filter to ActiveFilter.TopLevel for the newly-promoted category.
+- [x] **EL-UI-014**: When the user taps an inactive MetaCategory chip, the system shall set ActiveFilter.TopLevel for that MetaCategory.
 - [ ] **EL-UI-015**: Each MetaCategory filter chip shall display a colored border using the category's resolvedColor when unselected and a filled background using the category's resolvedColor when active (ActiveFilter.TopLevel). SubCategory chips shall follow the same fill/border convention, active when ActiveFilter.Sub is set for that subcategory.
 - [ ] **EL-UI-016**: When a category filter is applied, the timeline shall scroll to keep the same calendar day approximately at the top of the view; if that day has no matching events, the timeline shall scroll to the nearest earlier day that does.
 - [x] **EL-UI-017**: When the user activates a category filter from the unfiltered state (All), the system shall record the current top day as the pre-filter scroll position.
@@ -38,7 +38,7 @@ LLD: `docs/llds/event-logging.md`
 
 ## Quick-Log Sheet
 
-- [ ] **EL-UI-030**: The quick-log sheet shall present a two-step flow: step 1 is a grid of MetaCategory items (resolved emoji + name); tapping a MetaCategory with no SubCategories advances to step 2; tapping a MetaCategory with SubCategories expands it inline within the grid.
+- [x] **EL-UI-030**: The quick-log sheet shall present a two-step flow: step 1 is a grid of MetaCategory items (resolved emoji + name); tapping a MetaCategory with no SubCategories advances to step 2; tapping a MetaCategory with SubCategories expands it inline within the grid.
 - [ ] **EL-UI-031**: Step 2 of the quick-log sheet shall display a value input appropriate for the selected category's value type, an optional single-photo field (at most one image), an optional notes field, a tappable timestamp field, and a save button.
 - [ ] **EL-UI-032**: The timestamp field in the quick-log sheet shall default to the time the sheet was opened, and shall be tappable to allow the user to edit the date and time.
 - [ ] **EL-UI-033**: For a None-type category, step 2 shall omit the value input field, making the flow completable in three taps (FAB → category → save).
@@ -72,13 +72,13 @@ LLD: `docs/llds/event-logging.md`
 
 ## Category Hierarchy — Filter and Quick-Log
 
-- [ ] **EL-UI-070**: When a MetaCategory chip is active (ActiveFilter.TopLevel), the system shall display that MetaCategory's SubCategory chips inline to the right of the MetaCategory chip in the same scrollable row, visually grouped.
-- [ ] **EL-UI-071**: When the user taps a SubCategory chip, the system shall set ActiveFilter.Sub for that SubCategory; the parent MetaCategory chip shall return to an unselected (border) style while the SubCategory chips remain visible; the tapped SubCategory chip shall appear active (filled).
-- [ ] **EL-UI-072**: Each MetaCategory cell in the quick-log step 1 grid shall display the resolved category color as a background tint or colored badge.
-- [ ] **EL-UI-073**: When the user taps a MetaCategory cell in the quick-log step 1 grid and that MetaCategory has SubCategories, the system shall expand that cell inline to show SubCategory options plus an option to log directly to the MetaCategory itself.
-- [ ] **EL-UI-074**: The first option in an expanded MetaCategory in the quick-log step 1 grid shall allow the user to log an event directly to the MetaCategory (not to a SubCategory); tapping it shall advance to step 2 with the MetaCategory as the selected category.
-- [ ] **EL-UI-075**: While ActiveFilter.TopLevel is active for a MetaCategory that has SubCategories, opening the quick-log sheet shall present step 1 with that MetaCategory already expanded.
-- [ ] **EL-UI-076**: When a MetaCategory is deleted while the quick-log sheet step 1 is showing that MetaCategory's expanded inline SubCategory options, the system shall collapse the expansion.
+- [x] **EL-UI-070**: When a MetaCategory chip is active (ActiveFilter.TopLevel), the system shall display that MetaCategory's SubCategory chips inline to the right of the MetaCategory chip in the same scrollable row, visually grouped.
+- [x] **EL-UI-071**: When the user taps a SubCategory chip, the system shall set ActiveFilter.Sub for that SubCategory; the parent MetaCategory chip shall return to an unselected (border) style while the SubCategory chips remain visible; the tapped SubCategory chip shall appear active (filled).
+- [x] **EL-UI-072**: Each MetaCategory cell in the quick-log step 1 grid shall display the resolved category color as a background tint or colored badge.
+- [x] **EL-UI-073**: When the user taps a MetaCategory cell in the quick-log step 1 grid and that MetaCategory has SubCategories, the system shall expand that cell inline to show SubCategory options plus an option to log directly to the MetaCategory itself.
+- [x] **EL-UI-074**: The first option in an expanded MetaCategory in the quick-log step 1 grid shall allow the user to log an event directly to the MetaCategory (not to a SubCategory); tapping it shall advance to step 2 with the MetaCategory as the selected category.
+- [x] **EL-UI-075**: While ActiveFilter.TopLevel is active for a MetaCategory that has SubCategories, opening the quick-log sheet shall present step 1 with that MetaCategory already expanded.
+- [x] **EL-UI-076**: When a MetaCategory is deleted while the quick-log sheet step 1 is showing that MetaCategory's expanded inline SubCategory options, the system shall collapse the expansion.
 
 ## Value Type Mismatch UI
 

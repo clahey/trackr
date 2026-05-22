@@ -48,6 +48,9 @@ interface EventDao {
     """)
     fun countByCategoryIncludingInheriting(categoryId: String): Flow<Int>
 
+    @Query("SELECT * FROM events WHERE categoryId IN (:ids) ORDER BY timestamp DESC, createdAt DESC, id ASC")
+    fun getByCategoryIds(ids: Collection<String>): Flow<List<EventEntity>>
+
     @Upsert
     suspend fun upsert(entity: EventEntity)
 
