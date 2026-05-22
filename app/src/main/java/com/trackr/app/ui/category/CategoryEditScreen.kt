@@ -15,13 +15,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -49,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackr.app.domain.Category
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
 import com.trackr.app.ui.theme.categoryColorPalette
@@ -57,25 +63,36 @@ import kotlinx.coroutines.launch
 
 // @spec CAT-UI-017, CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// CAT-UI-054, DM-PROC-019, APP-NAV-004
+// CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057, CAT-UI-058,
+// CAT-UI-059, CAT-UI-060, CAT-NAV-010, CAT-NAV-011, DM-PROC-019, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CategoryEditScreen(
     onNavigateBack: (errorMessage: String?) -> Unit,
+    onNavigateToCreateSubCategory: (parentId: String) -> Unit = {},
     viewModel: CategoryEditViewModel = hiltViewModel(),
 ) {
     val name by viewModel.name.collectAsState()
     val emojiState by viewModel.emojiState.collectAsState()
     val colorState by viewModel.colorState.collectAsState()
+    val effectiveEmoji by viewModel.effectiveEmoji.collectAsState()
     val effectiveColor by viewModel.effectiveColor.collectAsState()
     val effectiveValueType by viewModel.effectiveValueType.collectAsState()
     val unit by viewModel.unit.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
     val navigateBack by viewModel.navigateBack.collectAsState()
+    val isEmojiInherited by viewModel.isEmojiInherited.collectAsState()
+    val isColorInherited by viewModel.isColorInherited.collectAsState()
+    val isValueTypeInherited by viewModel.isValueTypeInherited.collectAsState()
+    val parentCategory by viewModel.parentCategory.collectAsState()
     val isEditMode = viewModel.isEditMode
 
+    val isSubCategoryMode = parentCategory != null
+    val isMetaCategoryEditMode = isEditMode && !isSubCategoryMode
+
     val scope = rememberCoroutineScope()
+    var overflowMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(navigateBack) {
         if (navigateBack) onNavigateBack("Category not found.")
@@ -99,6 +116,39 @@ fun CategoryEditScreen(
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
                         }
                     }
+                    // @spec CAT-UI-053, CAT-NAV-010
+                    if (isMetaCategoryEditMode) {
+                        IconButton(onClick = {
+                            viewModel.editingCategoryId?.let { onNavigateToCreateSubCategory(it) }
+                        }) {
+                            Icon(Icons.Default.Add, contentDescription = "Create subcategory")
+                        }
+                    }
+                    // @spec CAT-UI-058
+                    if (isSubCategoryMode && isEditMode) {
+                        Box {
+                            IconButton(onClick = { overflowMenuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                            }
+                            DropdownMenu(
+                                expanded = overflowMenuExpanded,
+                                onDismissRequest = { overflowMenuExpanded = false },
+                            ) {
+                                // @spec CAT-NAV-011
+                                DropdownMenuItem(
+                                    text = { Text("Remove from group") },
+                                    onClick = {
+                                        overflowMenuExpanded = false
+                                        viewModel.removeFromGroup()
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Move to another group") },
+                                    onClick = { overflowMenuExpanded = false },
+                                )
+                            }
+                        }
+                    }
                 },
             )
         }
@@ -111,6 +161,14 @@ fun CategoryEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // @spec CAT-UI-059, CAT-UI-060
+            PreviewCard(
+                emoji = effectiveEmoji,
+                color = effectiveColor,
+                name = name,
+                valueType = effectiveValueType,
+            )
+
             OutlinedTextField(
                 value = name,
                 onValueChange = { viewModel.name.value = it },
@@ -120,17 +178,52 @@ fun CategoryEditScreen(
                         (saveResult as SaveResult.ValidationError).field == "name",
             )
 
-            OutlinedTextField(
-                value = emojiState ?: "",
-                onValueChange = { viewModel.emojiState.value = it },
-                label = { Text("Emoji") },
-                modifier = Modifier.fillMaxWidth(),
-                isError = saveResult is SaveResult.ValidationError &&
-                        (saveResult as SaveResult.ValidationError).field == "emoji",
-            )
+            // @spec CAT-UI-055
+            if (isSubCategoryMode) {
+                EmojiFieldWithInherit(
+                    emojiState = emojiState,
+                    effectiveEmoji = effectiveEmoji,
+                    isInherited = isEmojiInherited,
+                    isError = saveResult is SaveResult.ValidationError &&
+                            (saveResult as SaveResult.ValidationError).field == "emoji",
+                    onValueChange = { viewModel.emojiState.value = it },
+                    onInherit = { viewModel.emojiState.value = null },
+                )
+            } else {
+                OutlinedTextField(
+                    value = emojiState ?: "",
+                    onValueChange = { viewModel.emojiState.value = it },
+                    label = { Text("Emoji") },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = saveResult is SaveResult.ValidationError &&
+                            (saveResult as SaveResult.ValidationError).field == "emoji",
+                )
+            }
 
             Text("Color", style = MaterialTheme.typography.labelMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // @spec CAT-UI-056
+                if (isSubCategoryMode) {
+                    val parentColor = parentCategory!!.color
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(parentColor))
+                            .then(
+                                if (isColorInherited) Modifier.border(3.dp, Color.White, CircleShape)
+                                else Modifier
+                            )
+                            .clickable { viewModel.colorState.value = null },
+                    ) {
+                        Text(
+                            text = "↑",
+                            color = Color(foregroundColorForBackground(parentColor)),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
                 categoryColorPalette.forEach { paletteColor ->
                     val isSelected = paletteColor == colorState
                     Box(
@@ -156,9 +249,13 @@ fun CategoryEditScreen(
                 }
             }
 
+            // @spec CAT-UI-057
             ValueTypeSelector(
                 selected = effectiveValueType,
+                isValueTypeInherited = isValueTypeInherited,
+                parentCategory = if (isSubCategoryMode) parentCategory else null,
                 onSelect = { viewModel.valueTypeState.value = it },
+                onSelectInherit = { viewModel.valueTypeState.value = null },
             )
 
             valueTypeWarning?.let { tier ->
@@ -197,9 +294,93 @@ fun CategoryEditScreen(
     }
 }
 
+@Composable
+private fun PreviewCard(
+    emoji: String,
+    color: Long,
+    name: String,
+    valueType: ValueType,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(color)),
+            ) {
+                Text(
+                    text = emoji.ifEmpty { "?" },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = name.ifEmpty { "Category name" },
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = valueTypeLabel(valueType),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmojiFieldWithInherit(
+    emojiState: String?,
+    effectiveEmoji: String,
+    isInherited: Boolean,
+    isError: Boolean,
+    onValueChange: (String?) -> Unit,
+    onInherit: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (isInherited) {
+            OutlinedTextField(
+                value = effectiveEmoji,
+                onValueChange = {},
+                label = { Text("Emoji") },
+                modifier = Modifier.weight(1f),
+                readOnly = true,
+                enabled = false,
+                isError = isError,
+            )
+            TextButton(onClick = { onValueChange("") }) { Text("Custom") }
+        } else {
+            OutlinedTextField(
+                value = emojiState ?: "",
+                onValueChange = { onValueChange(it) },
+                label = { Text("Emoji") },
+                modifier = Modifier.weight(1f),
+                isError = isError,
+            )
+            TextButton(onClick = onInherit) { Text("Inherit") }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ValueTypeSelector(selected: ValueType, onSelect: (ValueType) -> Unit) {
+private fun ValueTypeSelector(
+    selected: ValueType,
+    isValueTypeInherited: Boolean,
+    parentCategory: Category.MetaCategory?,
+    onSelect: (ValueType) -> Unit,
+    onSelectInherit: () -> Unit,
+) {
     val types = listOf(
         ValueType.None,
         ValueType.Scale,
@@ -211,9 +392,15 @@ private fun ValueTypeSelector(selected: ValueType, onSelect: (ValueType) -> Unit
     )
     var expanded by remember { mutableStateOf(false) }
 
+    val displayLabel = if (parentCategory != null && isValueTypeInherited) {
+        "Same as ${parentCategory.name} (${valueTypeLabel(parentCategory.valueType)})"
+    } else {
+        valueTypeLabel(selected)
+    }
+
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
-            value = valueTypeLabel(selected),
+            value = displayLabel,
             onValueChange = {},
             readOnly = true,
             label = { Text("Value type") },
@@ -221,6 +408,13 @@ private fun ValueTypeSelector(selected: ValueType, onSelect: (ValueType) -> Unit
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (parentCategory != null) {
+                DropdownMenuItem(
+                    text = { Text("Same as ${parentCategory.name} (${valueTypeLabel(parentCategory.valueType)})") },
+                    onClick = { onSelectInherit(); expanded = false },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
+            }
             types.forEach { type ->
                 DropdownMenuItem(
                     text = { Text(valueTypeLabel(type)) },

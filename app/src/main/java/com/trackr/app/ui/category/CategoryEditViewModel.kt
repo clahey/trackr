@@ -37,6 +37,7 @@ class CategoryEditViewModel @Inject constructor(
     private val parentId: String? = savedStateHandle["parentId"]
 
     val isEditMode: Boolean get() = categoryId != null
+    val editingCategoryId: String? get() = categoryId
 
     val name = MutableStateFlow("")
 

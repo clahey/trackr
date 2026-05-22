@@ -154,6 +154,10 @@ fun AppNavHost(
                     }
                     navController.popBackStack()
                 },
+                // @spec CAT-NAV-010
+                onNavigateToCreateSubCategory = { parentId ->
+                    navController.navigate(Routes.categoryEditNewSubCategory(parentId))
+                },
             )
         }
     }
