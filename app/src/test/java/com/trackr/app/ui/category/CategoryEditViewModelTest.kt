@@ -50,7 +50,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-020
     @Test fun `save with empty name produces validation error`() = runTest {
         vm.name.value = ""
-        vm.emoji.value = "🏃"
+        vm.emojiState.value = "🏃"
         vm.save()
         val result = vm.saveResult.value
         assertTrue(result is SaveResult.ValidationError)
@@ -60,7 +60,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-020
     @Test fun `save with whitespace-only name produces validation error`() = runTest {
         vm.name.value = "   "
-        vm.emoji.value = "🏃"
+        vm.emojiState.value = "🏃"
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.ValidationError)
     }
@@ -68,7 +68,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-021
     @Test fun `save with empty emoji produces validation error`() = runTest {
         vm.name.value = "Running"
-        vm.emoji.value = ""
+        vm.emojiState.value = ""
         vm.save()
         val result = vm.saveResult.value
         assertTrue(result is SaveResult.ValidationError)
@@ -78,7 +78,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-022
     @Test fun `save with multi-grapheme emoji produces validation error`() = runTest {
         vm.name.value = "Running"
-        vm.emoji.value = "🏃🏃"
+        vm.emojiState.value = "🏃🏃"
         vm.save()
         val result = vm.saveResult.value
         assertTrue(result is SaveResult.ValidationError)
@@ -90,7 +90,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-040
     @Test fun `new category gets a UUID on save`() = runTest {
         vm.name.value = "Running"
-        vm.emoji.value = "🏃"
+        vm.emojiState.value = "🏃"
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.Success)
         val savedCategory = getSavedCategory()
@@ -101,7 +101,7 @@ class CategoryEditViewModelTest {
     @Test fun `new category gets sortOrder currentMin minus 1`() = runTest {
         repo.saveCategory(makeCategory("existing", sortOrder = 5))
         vm.name.value = "Running"
-        vm.emoji.value = "🏃"
+        vm.emojiState.value = "🏃"
         vm.save()
         assertEquals(4, getSavedCategoryByName("Running").sortOrder)
     }
@@ -109,38 +109,38 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-042
     @Test fun `new category gets allowEmptyText true`() = runTest {
         vm.name.value = "Running"
-        vm.emoji.value = "🏃"
+        vm.emojiState.value = "🏃"
         vm.save()
         assertTrue(getSavedCategory().allowEmptyText)
     }
 
     // @spec CAT-UI-043
     @Test fun `new category default color pre-populated from counter on init`() = runTest {
-        assertEquals(0xFFE53935L, vm.color.value)
+        assertEquals(0xFFE53935L, vm.colorState.value)
     }
 
     // @spec CAT-UI-043
     @Test fun `new category default color is saved`() = runTest {
         vm.name.value = "Running"
-        vm.emoji.value = "🏃"
+        vm.emojiState.value = "🏃"
         vm.save()
         assertEquals(0xFFE53935L, getSavedCategory().color)
     }
 
     // @spec CAT-UI-043
     @Test fun `second new category gets next palette color`() = runTest {
-        vm.name.value = "Running"; vm.emoji.value = "🏃"; vm.save()
+        vm.name.value = "Running"; vm.emojiState.value = "🏃"; vm.save()
         vm = CategoryEditViewModel(repo, SavedStateHandle())
-        vm.name.value = "Sleep"; vm.emoji.value = "💤"; vm.save()
+        vm.name.value = "Sleep"; vm.emojiState.value = "💤"; vm.save()
         assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color)
         assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)
     }
 
     // @spec CAT-UI-043
     @Test fun `new category saves picker-selected color when user overrides default`() = runTest {
-        vm.color.value = 0xFF1E88E5L // Blue
+        vm.colorState.value = 0xFF1E88E5L // Blue
         vm.name.value = "Running"
-        vm.emoji.value = "🏃"
+        vm.emojiState.value = "🏃"
         vm.save()
         assertEquals(0xFF1E88E5L, getSavedCategory().color)
     }
@@ -149,9 +149,9 @@ class CategoryEditViewModelTest {
     @Test fun `existing category saves picker-selected color`() = runTest {
         repo.saveCategory(makeCategory("c1", color = 0xFFE53935L))
         vm = editVm("c1")
-        vm.color.value = 0xFF43A047L // Green
+        vm.colorState.value = 0xFF43A047L // Green
         vm.name.value = "c1"
-        vm.emoji.value = "📌"
+        vm.emojiState.value = "📌"
         vm.save()
         assertEquals(0xFF43A047L, getSavedCategoryById("c1").color)
     }
@@ -163,7 +163,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         assertNull(vm.valueTypeWarning.value)
     }
 
@@ -171,7 +171,7 @@ class CategoryEditViewModelTest {
     @Test fun `no warning when no events even for non-reversible conversion`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         assertNull(vm.valueTypeWarning.value)
     }
 
@@ -180,7 +180,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         assertEquals(ValueTypeWarningTier.IrreversibleSafe, vm.valueTypeWarning.value)
     }
 
@@ -189,7 +189,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Duration))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         assertEquals(ValueTypeWarningTier.IrreversibleSafe, vm.valueTypeWarning.value)
     }
 
@@ -198,7 +198,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         assertEquals(ValueTypeWarningTier.Partial, vm.valueTypeWarning.value)
     }
 
@@ -207,7 +207,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Boolean
+        vm.valueTypeState.value = ValueType.Boolean
         assertEquals(ValueTypeWarningTier.Partial, vm.valueTypeWarning.value)
     }
 
@@ -216,7 +216,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.None
+        vm.valueTypeState.value = ValueType.None
         assertEquals(ValueTypeWarningTier.Unsafe, vm.valueTypeWarning.value)
     }
 
@@ -225,7 +225,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Duration
+        vm.valueTypeState.value = ValueType.Duration
         assertEquals(ValueTypeWarningTier.Unsafe, vm.valueTypeWarning.value)
     }
 
@@ -234,9 +234,9 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.None
+        vm.valueTypeState.value = ValueType.None
         assertNotNull(vm.valueTypeWarning.value)
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         assertNull(vm.valueTypeWarning.value)
     }
 
@@ -247,7 +247,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         vm.save()
         assertEquals(EventValue.NumberValue(0.0, null), eventValue("c1"))
     }
@@ -257,7 +257,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Scale
+        vm.valueTypeState.value = ValueType.Scale
         vm.save()
         assertEquals(EventValue.Scale(5), eventValue("c1"))
     }
@@ -267,7 +267,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Boolean
+        vm.valueTypeState.value = ValueType.Boolean
         vm.save()
         assertEquals(EventValue.BooleanValue(true), eventValue("c1"))
     }
@@ -277,7 +277,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue(""), eventValue("c1"))
     }
@@ -287,7 +287,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Duration
+        vm.valueTypeState.value = ValueType.Duration
         vm.save()
         assertEquals(EventValue.DurationValue(Duration.ZERO), eventValue("c1"))
     }
@@ -297,7 +297,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Scale))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.Scale(7)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         vm.save()
         assertEquals(EventValue.NumberValue(7.0, null), eventValue("c1"))
     }
@@ -307,7 +307,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Scale))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.Scale(7)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue("7"), eventValue("c1"))
     }
@@ -317,7 +317,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.BooleanValue(true)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue("Yes"), eventValue("c1"))
     }
@@ -327,7 +327,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Boolean))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.BooleanValue(false)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue("No"), eventValue("c1"))
     }
@@ -337,7 +337,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.NumberValue(3.5, "kg")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue("3.5 kg"), eventValue("c1"))
     }
@@ -347,7 +347,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.NumberValue(3.5, null)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue("3.5"), eventValue("c1"))
     }
@@ -358,7 +358,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Duration))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.DurationValue(dur)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue(dur.toString()), eventValue("c1"))
     }
@@ -370,7 +370,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("Yes")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Boolean
+        vm.valueTypeState.value = ValueType.Boolean
         vm.save()
         assertEquals(EventValue.BooleanValue(true), eventValue("c1"))
     }
@@ -380,7 +380,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("No")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Boolean
+        vm.valueTypeState.value = ValueType.Boolean
         vm.save()
         assertEquals(EventValue.BooleanValue(false), eventValue("c1"))
     }
@@ -390,7 +390,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("3.5")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         vm.save()
         assertEquals(EventValue.NumberValue(3.5, null), eventValue("c1"))
     }
@@ -400,7 +400,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("3.5 kg")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         vm.save()
         assertEquals(EventValue.NumberValue(3.5, "kg"), eventValue("c1"))
     }
@@ -410,7 +410,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("7")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Scale
+        vm.valueTypeState.value = ValueType.Scale
         vm.save()
         assertEquals(EventValue.Scale(7), eventValue("c1"))
     }
@@ -420,7 +420,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.None
+        vm.valueTypeState.value = ValueType.None
         vm.save()
         assertNull(eventValue("c1"))
     }
@@ -432,7 +432,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("maybe")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Boolean
+        vm.valueTypeState.value = ValueType.Boolean
         vm.save()
         assertEquals(EventValue.TextValue("maybe"), eventValue("c1"))
     }
@@ -442,7 +442,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("hello")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         vm.save()
         assertEquals(EventValue.TextValue("hello"), eventValue("c1"))
     }
@@ -452,7 +452,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("11")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Scale
+        vm.valueTypeState.value = ValueType.Scale
         vm.save()
         assertEquals(EventValue.TextValue("11"), eventValue("c1"))
     }
@@ -462,7 +462,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("hello")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.None
+        vm.valueTypeState.value = ValueType.None
         vm.save()
         assertEquals(EventValue.TextValue("hello"), eventValue("c1"))
     }
@@ -472,7 +472,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Exercise
+        vm.valueTypeState.value = ValueType.Exercise
         vm.save()
         assertEquals(EventValue.ExerciseValue(3, 15), eventValue("c1"))
     }
@@ -482,7 +482,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.ExerciseValue(4, 12)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         vm.save()
         assertEquals(EventValue.TextValue("4 × 12"), eventValue("c1"))
     }
@@ -492,7 +492,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("5 × 8")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Exercise
+        vm.valueTypeState.value = ValueType.Exercise
         vm.save()
         assertEquals(EventValue.ExerciseValue(5, 8), eventValue("c1"))
     }
@@ -502,7 +502,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("4 x 10")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Exercise
+        vm.valueTypeState.value = ValueType.Exercise
         vm.save()
         assertEquals(EventValue.ExerciseValue(4, 10), eventValue("c1"))
     }
@@ -512,7 +512,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("bench press")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Exercise
+        vm.valueTypeState.value = ValueType.Exercise
         vm.save()
         assertEquals(EventValue.TextValue("bench press"), eventValue("c1"))
     }
@@ -522,7 +522,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.TextValue("3 × 0")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Exercise
+        vm.valueTypeState.value = ValueType.Exercise
         vm.save()
         assertEquals(EventValue.TextValue("3 × 0"), eventValue("c1"))
     }
@@ -532,7 +532,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.ExerciseValue(3, 15)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Text
+        vm.valueTypeState.value = ValueType.Text
         assertNull(vm.valueTypeWarning.value)
     }
 
@@ -541,7 +541,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.None))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Exercise
+        vm.valueTypeState.value = ValueType.Exercise
         assertEquals(ValueTypeWarningTier.IrreversibleSafe, vm.valueTypeWarning.value)
     }
 
@@ -550,7 +550,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))
         repo.saveEvent(makeEvent("e1", "c1"))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Exercise
+        vm.valueTypeState.value = ValueType.Exercise
         assertEquals(ValueTypeWarningTier.Partial, vm.valueTypeWarning.value)
     }
 
@@ -559,7 +559,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.ExerciseValue(3, 15)))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.Number
+        vm.valueTypeState.value = ValueType.Number
         assertEquals(ValueTypeWarningTier.Unsafe, vm.valueTypeWarning.value)
     }
 
@@ -568,7 +568,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
         repo.saveEvent(makeEvent("e1", "c1", EventValue.NumberValue(3.5, "kg")))
         vm = editVm("c1")
-        vm.valueType.value = ValueType.None
+        vm.valueTypeState.value = ValueType.None
         vm.save()
         assertEquals(EventValue.NumberValue(3.5, "kg"), eventValue("c1"))
     }

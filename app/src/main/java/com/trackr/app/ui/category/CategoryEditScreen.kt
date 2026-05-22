@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 
 // @spec CAT-UI-017, CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// APP-NAV-004
+// CAT-UI-054, DM-PROC-019, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CategoryEditScreen(
@@ -65,9 +65,10 @@ fun CategoryEditScreen(
     viewModel: CategoryEditViewModel = hiltViewModel(),
 ) {
     val name by viewModel.name.collectAsState()
-    val emoji by viewModel.emoji.collectAsState()
-    val color by viewModel.color.collectAsState()
-    val valueType by viewModel.valueType.collectAsState()
+    val emojiState by viewModel.emojiState.collectAsState()
+    val colorState by viewModel.colorState.collectAsState()
+    val effectiveColor by viewModel.effectiveColor.collectAsState()
+    val effectiveValueType by viewModel.effectiveValueType.collectAsState()
     val unit by viewModel.unit.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
@@ -120,8 +121,8 @@ fun CategoryEditScreen(
             )
 
             OutlinedTextField(
-                value = emoji,
-                onValueChange = { viewModel.emoji.value = it },
+                value = emojiState ?: "",
+                onValueChange = { viewModel.emojiState.value = it },
                 label = { Text("Emoji") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = saveResult is SaveResult.ValidationError &&
@@ -131,7 +132,7 @@ fun CategoryEditScreen(
             Text("Color", style = MaterialTheme.typography.labelMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 categoryColorPalette.forEach { paletteColor ->
-                    val isSelected = paletteColor == color
+                    val isSelected = paletteColor == colorState
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -141,23 +142,23 @@ fun CategoryEditScreen(
                                 if (isSelected) Modifier.border(3.dp, Color.White, CircleShape)
                                 else Modifier
                             )
-                            .clickable { viewModel.color.value = paletteColor },
+                            .clickable { viewModel.colorState.value = paletteColor },
                     )
                 }
-                if (color !in categoryColorPalette) {
+                if (colorState != null && colorState !in categoryColorPalette) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(color))
+                            .background(Color(effectiveColor))
                             .border(3.dp, Color.White, CircleShape),
                     )
                 }
             }
 
             ValueTypeSelector(
-                selected = valueType,
-                onSelect = { viewModel.valueType.value = it },
+                selected = effectiveValueType,
+                onSelect = { viewModel.valueTypeState.value = it },
             )
 
             valueTypeWarning?.let { tier ->
@@ -175,7 +176,7 @@ fun CategoryEditScreen(
                 )
             }
 
-            if (valueType == ValueType.Number) {
+            if (effectiveValueType == ValueType.Number) {
                 OutlinedTextField(
                     value = unit,
                     onValueChange = { viewModel.unit.value = it },

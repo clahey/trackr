@@ -11,10 +11,13 @@ import com.trackr.app.ui.theme.categoryColorForIndex
 import com.trackr.app.ui.theme.categoryColorPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -23,7 +26,7 @@ enum class ValueTypeWarningTier { IrreversibleSafe, Partial, Unsafe }
 
 // @spec CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// APP-NAV-004
+// CAT-UI-054, DM-PROC-019, DM-PROC-021, APP-NAV-004
 @HiltViewModel
 class CategoryEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -31,14 +34,45 @@ class CategoryEditViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val categoryId: String? = savedStateHandle["categoryId"]
+    private val parentId: String? = savedStateHandle["parentId"]
 
     val isEditMode: Boolean get() = categoryId != null
 
     val name = MutableStateFlow("")
-    val emoji = MutableStateFlow("")
-    val color = MutableStateFlow(0xFFE53935L)
-    val valueType = MutableStateFlow<ValueType>(ValueType.None)
+
+    // Nullable raw state — null means inherit from parent (SubCategory only).
+    // For MetaCategory mode these are always non-null after init.
+    // @spec CAT-UI-054
+    val emojiState = MutableStateFlow<String?>(null)
+    val colorState = MutableStateFlow<Long?>(null)
+    val valueTypeState = MutableStateFlow<ValueType?>(null)
+
     val unit = MutableStateFlow("")
+
+    private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
+    val parentCategory: StateFlow<Category.MetaCategory?> = _parentCategory.asStateFlow()
+
+    // Effective values resolve null state to the parent's value.
+    val effectiveEmoji: StateFlow<String> = combine(emojiState, _parentCategory) { e, parent ->
+        e ?: parent?.emoji ?: ""
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    val effectiveColor: StateFlow<Long> = combine(colorState, _parentCategory) { c, parent ->
+        c ?: parent?.color ?: 0xFFE53935L
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0xFFE53935L)
+
+    val effectiveValueType: StateFlow<ValueType> = combine(valueTypeState, _parentCategory) { v, parent ->
+        v ?: parent?.valueType ?: ValueType.None
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, ValueType.None)
+
+    val isEmojiInherited: StateFlow<Boolean> = emojiState.map { it == null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val isColorInherited: StateFlow<Boolean> = colorState.map { it == null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val isValueTypeInherited: StateFlow<Boolean> = valueTypeState.map { it == null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private val _navigateBack = MutableStateFlow(false)
     val navigateBack: StateFlow<Boolean> = _navigateBack.asStateFlow()
@@ -46,86 +80,164 @@ class CategoryEditViewModel @Inject constructor(
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
 
-    private val _eventCount = MutableStateFlow(0)
-    val eventCount: StateFlow<Int> = _eventCount.asStateFlow()
-
     private val _valueTypeWarning = MutableStateFlow<ValueTypeWarningTier?>(null)
     val valueTypeWarning: StateFlow<ValueTypeWarningTier?> = _valueTypeWarning.asStateFlow()
 
     private val _originalValueType = MutableStateFlow<ValueType?>(null)
 
+    // Live event counts in edit mode; zero in create mode.
+    val ownEventCount: StateFlow<Int> = if (categoryId != null) {
+        repository.getEventCountForCategory(categoryId, includeSubCategoriesWithNullType = false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    } else MutableStateFlow(0)
+
+    val subCategoryCount: StateFlow<Int> = if (categoryId != null) {
+        repository.getSubCategoryCount(categoryId)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    } else MutableStateFlow(0)
+
     init {
-        if (categoryId != null) {
-            viewModelScope.launch {
-                val cat = repository.getCategoryById(categoryId).first()
-                if (cat == null) {
-                    _navigateBack.value = true
-                    return@launch
+        when {
+            categoryId != null -> {
+                viewModelScope.launch {
+                    val cat = repository.getCategoryById(categoryId).first()
+                    if (cat == null) { _navigateBack.value = true; return@launch }
+                    name.value = cat.name
+                    unit.value = cat.unit ?: ""
+                    when (cat) {
+                        is Category.MetaCategory -> {
+                            emojiState.value = cat.emoji
+                            colorState.value = cat.color
+                            valueTypeState.value = cat.valueType
+                        }
+                        is Category.SubCategory -> {
+                            emojiState.value = cat.emoji
+                            colorState.value = cat.color
+                            valueTypeState.value = cat.valueType
+                            _parentCategory.value = cat.parent
+                        }
+                    }
+                    _originalValueType.value = cat.resolvedValueType
+
+                    val includeInheriting = cat is Category.MetaCategory
+                    viewModelScope.launch {
+                        // @spec CAT-UI-030
+                        combine(
+                            effectiveValueType,
+                            _originalValueType,
+                            repository.getEventCountForCategory(
+                                categoryId,
+                                includeSubCategoriesWithNullType = includeInheriting,
+                            ),
+                        ) { type, orig, count ->
+                            if (orig == null || type == orig || count == 0) null
+                            else warningTierFor(orig, type)
+                        }.collect { _valueTypeWarning.value = it }
+                    }
                 }
-                name.value = cat.name
-                emoji.value = cat.resolvedEmoji
-                color.value = cat.resolvedColor
-                valueType.value = cat.resolvedValueType
-                unit.value = cat.unit ?: ""
-                _originalValueType.value = cat.resolvedValueType
             }
-            viewModelScope.launch {
-                combine(
-                    valueType,
-                    _originalValueType,
-                    repository.getEventCountForCategory(categoryId),
-                ) { type, orig, count ->
-                    if (orig == null || type == orig || count == 0) null
-                    else warningTierFor(orig, type)
-                }.collect { _valueTypeWarning.value = it }
+
+            parentId != null -> {
+                // SubCategory create mode: load parent, leave state null (inherit).
+                // Do NOT advance color counter (CAT-UI-043).
+                viewModelScope.launch {
+                    val parent = repository.getCategoryById(parentId).first()
+                    if (parent is Category.MetaCategory) {
+                        _parentCategory.value = parent
+                    } else {
+                        _navigateBack.value = true
+                    }
+                }
             }
-        } else {
-            // @spec CAT-UI-043
-            viewModelScope.launch {
-                color.value = categoryColorForIndex(
-                    repository.getAndIncrementNextCategoryColorIndex(categoryColorPalette.size)
-                )
+
+            else -> {
+                // MetaCategory create mode.
+                emojiState.value = ""
+                valueTypeState.value = ValueType.None
+                // @spec CAT-UI-043
+                viewModelScope.launch {
+                    colorState.value = categoryColorForIndex(
+                        repository.getAndIncrementNextCategoryColorIndex(categoryColorPalette.size)
+                    )
+                }
             }
         }
     }
 
     suspend fun save() {
         val nameVal = name.value.trim()
-        if (nameVal.isEmpty()) {
-            _saveResult.value = SaveResult.ValidationError("name")
-            return
-        }
-        val emojiVal = emoji.value
-        if (emojiVal.isEmpty()) {
-            _saveResult.value = SaveResult.ValidationError("emoji")
-            return
-        }
-        if (emojiVal.graphemeClusterCount() != 1) {
-            _saveResult.value = SaveResult.ValidationError("emoji")
-            return
+        if (nameVal.isEmpty()) { _saveResult.value = SaveResult.ValidationError("name"); return }
+
+        val emojiVal = emojiState.value
+        if (emojiVal != null) {
+            if (emojiVal.isEmpty()) { _saveResult.value = SaveResult.ValidationError("emoji"); return }
+            if (emojiVal.graphemeClusterCount() != 1) {
+                _saveResult.value = SaveResult.ValidationError("emoji"); return
+            }
+        } else if (_parentCategory.value == null) {
+            // MetaCategory must have an emoji; only SubCategories can inherit (null).
+            _saveResult.value = SaveResult.ValidationError("emoji"); return
         }
 
-        val originalType = _originalValueType.value
+        val parent = _parentCategory.value
         val sortOrder = categoryId?.let { repository.getCategoryById(it).first()?.sortOrder }
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)
 
-        val category = Category.MetaCategory(
-            id = categoryId ?: UUID.randomUUID().toString(),
-            name = nameVal,
-            emoji = emojiVal,
-            color = color.value,
-            valueType = valueType.value,
-            unit = unit.value.takeIf { it.isNotBlank() },
-            allowEmptyText = true,
-            sortOrder = sortOrder,
-        )
+        val category: Category = if (parent != null) {
+            // @spec CAT-UI-041
+            Category.SubCategory(
+                id = categoryId ?: UUID.randomUUID().toString(),
+                name = nameVal,
+                emoji = emojiState.value,
+                color = colorState.value,
+                valueType = valueTypeState.value,
+                unit = unit.value.takeIf { it.isNotBlank() },
+                allowEmptyText = true,
+                sortOrder = sortOrder,
+                parent = parent,
+            )
+        } else {
+            Category.MetaCategory(
+                id = categoryId ?: UUID.randomUUID().toString(),
+                name = nameVal,
+                emoji = emojiState.value ?: "",
+                color = colorState.value ?: 0xFFE53935L,
+                valueType = valueTypeState.value ?: ValueType.None,
+                unit = unit.value.takeIf { it.isNotBlank() },
+                allowEmptyText = true,
+                sortOrder = sortOrder,
+            )
+        }
+
+        val originalType = _originalValueType.value
+        // @spec DM-PROC-021
         if (categoryId != null && originalType != null && category.resolvedValueType != originalType) {
             repository.saveCategoryAndMigrateEvents(category, originalType)
         } else {
             repository.saveCategory(category)
         }
-
         _saveResult.value = SaveResult.Success
+    }
+
+    // @spec DM-PROC-019, CAT-NAV-011
+    fun removeFromGroup() {
+        val id = categoryId ?: return
+        viewModelScope.launch {
+            val cat = repository.getCategoryById(id).first() as? Category.SubCategory ?: return@launch
+            repository.saveCategory(
+                Category.MetaCategory(
+                    id = cat.id,
+                    name = cat.name,
+                    emoji = cat.resolvedEmoji,
+                    color = cat.resolvedColor,
+                    valueType = cat.resolvedValueType,
+                    unit = cat.unit,
+                    allowEmptyText = cat.allowEmptyText,
+                    sortOrder = cat.sortOrder,
+                )
+            )
+            _saveResult.value = SaveResult.Success
+        }
     }
 
     // @spec CAT-UI-030, CAT-UI-036, CAT-UI-037, CAT-UI-038
