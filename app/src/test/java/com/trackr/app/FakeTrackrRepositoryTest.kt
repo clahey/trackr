@@ -1,14 +1,19 @@
 package com.trackr.app
 
 import com.trackr.app.domain.Category
+import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FakeTrackrRepositoryTest {
@@ -79,6 +84,63 @@ class FakeTrackrRepositoryTest {
         } catch (e: IllegalArgumentException) {
             // expected
         }
+    }
+
+    // @spec CAT-UI-001
+    @Test fun `getCategories sorts SubCategories after parent even when SubCategory sortOrder is lower`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent", sortOrder = 10)
+        val child = makeSubCategory("child", parent = parent, sortOrder = 1)
+        val other = makeCategory("other", sortOrder = 5)
+        repo.setCategories(parent, child, other)
+        val result = repo.getCategories().first()
+        assertEquals(listOf("other", "parent", "child"), result.map { it.id })
+    }
+
+    // @spec CAT-UI-006
+    @Test fun `deleteMetaCategoryAndPromoteSubcategories promotes SubCategories and deletes parent events only`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent = parent)
+        repo.setCategories(parent, child)
+        val anchor = Instant.parse("2024-01-15T12:00:00Z")
+        repo.setEvents(
+            Event("e_parent", "parent", anchor, null, null, emptyList(), anchor),
+            Event("e_child", "child", anchor, null, null, emptyList(), anchor),
+        )
+        repo.deleteMetaCategoryAndPromoteSubcategories("parent")
+        val cats = repo.getCategories().first()
+        assertFalse("parent should be deleted", cats.any { it.id == "parent" })
+        assertTrue("child should be promoted to MetaCategory", cats.any { it.id == "child" && it is Category.MetaCategory })
+        assertNotNull("child's event should survive", repo.getEventById("e_child").first())
+        assertNull("parent's event should be deleted", repo.getEventById("e_parent").first())
+    }
+
+    // @spec DM-PROC-022
+    @Test fun `getCategories surfaces orphaned SubCategory as MetaCategory when parent is deleted`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent = parent)
+        repo.setCategories(parent, child)
+        repo.deleteCategory("parent")
+        val result = repo.getCategories().first()
+        assertEquals(1, result.size)
+        assertTrue("orphaned SubCategory should surface as MetaCategory", result[0] is Category.MetaCategory)
+        assertEquals("child", result[0].id)
+    }
+
+    // @spec DM-PROC-022
+    @Test fun `getCategories uses null-field fallbacks when surfacing orphaned SubCategory`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent = parent)  // emoji=null, color=null, valueType=null
+        repo.setCategories(parent, child)
+        repo.deleteCategory("parent")
+        val result = repo.getCategories().first()
+        val meta = result[0] as Category.MetaCategory
+        assertEquals("orphaned SubCategory emoji fallback", parent.emoji, meta.emoji)
+        assertEquals("orphaned SubCategory color fallback", parent.color, meta.color)
+        assertEquals("orphaned SubCategory valueType fallback", parent.valueType, meta.valueType)
     }
 
     private fun makeCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(

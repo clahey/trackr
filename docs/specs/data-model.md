@@ -58,15 +58,16 @@ LLD: `docs/llds/data-model.md`
 
 ## Category Hierarchy
 
-- [ ] **DM-DATA-025**: The system shall represent Category as a sealed class with two variants: MetaCategory (top-level, no parent) and SubCategory (child of exactly one MetaCategory).
-- [ ] **DM-DATA-026**: A MetaCategory shall carry non-null emoji, color, and valueType fields; it shall have no parentId or parent reference.
-- [ ] **DM-DATA-027**: A SubCategory shall carry nullable emoji, color, and valueType fields where null indicates inheritance from the parent; it shall carry a non-null MetaCategory parent reference populated at the repository layer.
+- [x] **DM-DATA-025**: The system shall represent Category as a sealed class with two variants: MetaCategory (top-level, no parent) and SubCategory (child of exactly one MetaCategory).
+- [x] **DM-DATA-026**: A MetaCategory shall carry non-null emoji, color, and valueType fields; it shall have no parentId or parent reference.
+- [x] **DM-DATA-027**: A SubCategory shall carry nullable emoji, color, and valueType fields where null indicates inheritance from the parent; it shall carry a non-null MetaCategory parent reference populated at the repository layer.
 - [x] **DM-DATA-028**: The system shall enforce a two-level constraint: a category with SubCategory children shall not be nested under another category; a SubCategory shall not be given children. Violations shall be rejected at the repository layer.
-- [ ] **DM-PROC-017**: When loading Category records, the system shall assemble MetaCategory and SubCategory domain objects using a single LEFT JOIN of the categories table on parentId, making the assembly atomic with respect to concurrent reads.
-- [ ] **DM-PROC-018**: The `Category` sealed class shall declare abstract members `resolvedEmoji: String`, `resolvedColor: Long`, and `resolvedValueType: ValueType`; `MetaCategory` shall implement each by returning its own field directly; `SubCategory` shall implement each by returning its override field when non-null, or the parent's value otherwise.
-- [ ] **DM-PROC-019**: When un-nesting a SubCategory (removing it from its group), the system shall resolve any null (inherited) fields to the parent's current values at the time of the operation before persisting the record as a MetaCategory.
+- [x] **DM-PROC-017**: When loading Category records, the system shall assemble MetaCategory and SubCategory domain objects from a single flat query of the categories table, making the assembly atomic with respect to concurrent reads. (Implementation: single `getAll()` query followed by an in-memory two-pass — first pass builds a MetaCategory map keyed by id, second pass attaches SubCategories to their parent; SubCategories whose parent id is absent are surfaced as MetaCategories per DM-PROC-022.)
+- [x] **DM-PROC-018**: The `Category` sealed class shall declare abstract members `resolvedEmoji: String`, `resolvedColor: Long`, and `resolvedValueType: ValueType`; `MetaCategory` shall implement each by returning its own field directly; `SubCategory` shall implement each by returning its override field when non-null, or the parent's value otherwise.
+- [x] **DM-PROC-019**: When un-nesting a SubCategory (removing it from its group), the system shall resolve any null (inherited) fields to the parent's current values at the time of the operation before persisting the record as a MetaCategory.
 - [x] **DM-PROC-020**: When reparenting a category into a group, the system shall preserve all current explicit field values as overrides regardless of whether they match the new parent's values.
-- [ ] **DM-PROC-021**: When migrating events due to a MetaCategory valueType change, the system shall include events belonging to SubCategories whose valueType is null (inheriting); SubCategories with an explicit valueType override shall be excluded from the migration.
+- [x] **DM-PROC-021**: When migrating events due to a MetaCategory valueType change, the system shall include events belonging to SubCategories whose valueType is null (inheriting); SubCategories with an explicit valueType override shall be excluded from the migration.
+- [x] **DM-PROC-022**: When assembling Category records, if a SubCategory's parentId references an entity not present in the query result, the system shall surface that SubCategory as a MetaCategory using its own stored field values; any null fields (emoji, color, valueType) shall be resolved using the same null-field fallbacks used for MetaCategory assembly.
 
 ## Ordering and Invariants
 

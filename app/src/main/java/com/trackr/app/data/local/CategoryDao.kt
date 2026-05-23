@@ -41,4 +41,7 @@ abstract class CategoryDao {
 
     @Query("SELECT COUNT(*) FROM categories WHERE parentId = :parentId")
     abstract suspend fun countByParentIdOnce(parentId: String): Int
+
+    @Query("SELECT * FROM categories WHERE parentId = :parentId")
+    abstract suspend fun getChildrenByParentIdOnce(parentId: String): List<CategoryEntity>
 }

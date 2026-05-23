@@ -29,8 +29,17 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     private val nextColorKey = intPreferencesKey("next_category_color_index")
 
+    // @spec CAT-UI-001
     override fun getCategories(): Flow<List<Category>> =
-        categoryDao.getAll().map { it.toDomainList() }
+        categoryDao.getAll().map { entities ->
+            val domain = entities.toDomainList()
+            val metaMap = domain.filterIsInstance<Category.MetaCategory>().associateBy { it.id }
+            domain.sortedWith(compareBy(
+                { cat -> if (cat is Category.SubCategory) metaMap[cat.parent.id]?.sortOrder ?: cat.sortOrder else cat.sortOrder },
+                { it is Category.SubCategory },
+                { it.sortOrder },
+            ))
+        }
 
     override fun getCategoryById(id: String): Flow<Category?> =
         getCategories().map { it.find { c -> c.id == id } }
@@ -87,6 +96,26 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override suspend fun deleteCategory(id: String) {
         val imagePaths = eventDao.getByCategoryOnce(id).flatMap { it.imagePaths() }
         categoryDao.deleteById(id)
+        imagePaths.forEach { imageStore.delete(it) }
+    }
+
+    // @spec CAT-UI-006
+    override suspend fun deleteMetaCategoryAndPromoteSubcategories(id: String) {
+        var imagePaths: List<String> = emptyList()
+        db.withTransaction {
+            val parent = categoryDao.getByIdOnce(id)
+            val children = categoryDao.getChildrenByParentIdOnce(id)
+            for (child in children) {
+                categoryDao.upsert(child.copy(
+                    parentId = null,
+                    emoji = child.emoji ?: parent?.emoji ?: "",
+                    color = child.color ?: parent?.color ?: 0xFFE53935L,
+                    valueType = child.valueType ?: parent?.valueType ?: "none",
+                ))
+            }
+            imagePaths = eventDao.getByCategoryOnce(id).flatMap { it.imagePaths() }
+            categoryDao.deleteById(id)  // Room CASCADE deletes the category's events
+        }
         imagePaths.forEach { imageStore.delete(it) }
     }
 

@@ -24,25 +24,38 @@ fun List<CategoryEntity>.toDomainList(): List<Category> {
             )
         }
     }
+    // @spec DM-PROC-022
     return map { entity ->
         if (entity.parentId == null) {
             metaMap[entity.id]!!
         } else {
             val parent = metaMap[entity.parentId]
-                ?: return@map null
-            Category.SubCategory(
-                id = entity.id,
-                name = entity.name,
-                emoji = entity.emoji,
-                color = entity.color,
-                valueType = entity.valueType?.let { ValueTypeConverter.decode(it) },
-                unit = entity.unit,
-                allowEmptyText = entity.allowEmptyText,
-                sortOrder = entity.sortOrder,
-                parent = parent,
-            )
+            if (parent == null) {
+                Category.MetaCategory(
+                    id = entity.id,
+                    name = entity.name,
+                    emoji = entity.emoji ?: "",
+                    color = entity.color ?: 0xFFE53935L,
+                    valueType = entity.valueType?.let { ValueTypeConverter.decode(it) } ?: ValueType.None,
+                    unit = entity.unit,
+                    allowEmptyText = entity.allowEmptyText,
+                    sortOrder = entity.sortOrder,
+                )
+            } else {
+                Category.SubCategory(
+                    id = entity.id,
+                    name = entity.name,
+                    emoji = entity.emoji,
+                    color = entity.color,
+                    valueType = entity.valueType?.let { ValueTypeConverter.decode(it) },
+                    unit = entity.unit,
+                    allowEmptyText = entity.allowEmptyText,
+                    sortOrder = entity.sortOrder,
+                    parent = parent,
+                )
+            }
         }
-    }.filterNotNull()
+    }
 }
 
 fun Category.toEntity(): CategoryEntity = when (this) {

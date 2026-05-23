@@ -13,22 +13,26 @@ Image files are a second resource managed by this segment. File lifecycle (write
 ```kotlin
 interface TrackrRepository {
     // Categories
-    fun getCategories(): Flow<List<Category>>
+    fun getCategories(): Flow<List<Category>>  // hierarchical sort: MetaCategories by sortOrder, SubCategories after parent
     fun getCategoryById(id: String): Flow<Category?>
     suspend fun saveCategory(category: Category)   // upsert; caller sets sortOrder
+    suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)  // atomic upsert + event migration
     suspend fun deleteCategory(id: String)
+    suspend fun deleteMetaCategoryAndPromoteSubcategories(id: String)  // atomic: promote children + delete parent
     suspend fun reorderCategories(orderedIds: List<String>)  // reassigns sortOrder to match list
-    fun getEventCountForCategory(categoryId: String): Flow<Int>
+    fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
+    fun getSubCategoryCount(categoryId: String): Flow<Int>
 
     // Events
-    fun getEvents(start: Long? = null, end: Long? = null): Flow<List<Event>>
+    fun getEvents(start: Instant? = null, end: Instant? = null): Flow<List<Event>>
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>
+    fun getEventsByCategoryIds(ids: Collection<String>): Flow<List<Event>>
     fun getEventById(id: String): Flow<Event?>
     suspend fun saveEvent(event: Event)            // upsert
     suspend fun deleteEvent(id: String)
 
     // Preferences
-    suspend fun getAndIncrementNextCategoryColorIndex(): Int  // atomically returns current index then increments
+    suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int  // atomically returns current index then increments
 
     // Lifecycle
     suspend fun onStartup()
@@ -131,7 +135,13 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **`saveEvent` image diffing:** reads the old entity before upserting, computes removed paths (`old - new`), upserts, then deletes removed files. Upsert-before-delete ensures a failed upsert leaves storage intact; orphaned files from a crash after upsert are recovered at startup.
 
+**`getCategories` sort order:** after `toDomainList()`, results are sorted hierarchically: MetaCategories by their own `sortOrder` ascending, with each MetaCategory's SubCategories appearing immediately after, sorted by their own `sortOrder`. SubCategories that surface as MetaCategories (per orphan handling below) sort by their own `sortOrder`.
+
 **`deleteCategory`:** collects image paths for all child events, deletes the DB row (Room CASCADE removes child rows atomically), then deletes files.
+
+**`deleteMetaCategoryAndPromoteSubcategories`:** runs inside a single Room transaction. Within the transaction: looks up the parent entity, fetches its child entities (by parentId), upserts each child with `parentId = null` (resolving null emoji/color/valueType fields to the parent's stored values), collects image paths for the parent's own events, then deletes the parent DB row (CASCADE removes its events). Image file deletion happens after the transaction commits.
+
+**Orphaned SubCategory handling in `toDomainList()`:** if a `CategoryEntity` has a non-null `parentId` that is not present among the loaded entities, it is surfaced as a `Category.MetaCategory` using its own stored fields, with null-field fallbacks matching MetaCategory assembly (`"" / 0xFFE53935L / ValueType.None`). This can occur when a MetaCategory is deleted mid-session or when the DB is in an inconsistent state; see DM-PROC-022.
 
 **`onStartup`:** called once at app startup. `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row. Future implementations may use it for different initialization behavior (sync, token refresh, etc.).
 

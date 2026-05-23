@@ -57,6 +57,18 @@ class CategoryListViewModelHierarchyTest {
         assertEquals(listOf("top", "parent", "child1", "child2"), result.map { it.id })
     }
 
+    // @spec CAT-UI-001
+    @Test fun `categories list places SubCategories after parent even when SubCategory sortOrder is lower`() = runTest {
+        val parent = makeMetaCategory("parent", sortOrder = 10)
+        val child = makeSubCategory("child", parent = parent, sortOrder = 1)
+        val other = makeMetaCategory("other", sortOrder = 5)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        repo.saveCategory(other)
+        val result = vm.categories.first()
+        assertEquals(listOf("other", "parent", "child"), result.map { it.id })
+    }
+
     // ---------- Delete gate ----------
 
     // @spec CAT-UI-004

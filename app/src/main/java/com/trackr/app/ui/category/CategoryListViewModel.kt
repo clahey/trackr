@@ -71,25 +71,10 @@ class CategoryListViewModel @Inject constructor(
         val pending = _pendingDeleteConfirmation.value ?: return
         viewModelScope.launch {
             if (pending.isMetaCategory) {
-                repository.getCategories().first()
-                    .filterIsInstance<Category.SubCategory>()
-                    .filter { it.parent.id == pending.categoryId }
-                    .forEach { sub ->
-                        repository.saveCategory(
-                            Category.MetaCategory(
-                                id = sub.id,
-                                name = sub.name,
-                                emoji = sub.resolvedEmoji,
-                                color = sub.resolvedColor,
-                                valueType = sub.resolvedValueType,
-                                unit = sub.unit,
-                                allowEmptyText = sub.allowEmptyText,
-                                sortOrder = sub.sortOrder,
-                            )
-                        )
-                    }
+                repository.deleteMetaCategoryAndPromoteSubcategories(pending.categoryId)
+            } else {
+                repository.deleteCategory(pending.categoryId)
             }
-            repository.deleteCategory(pending.categoryId)
             _pendingDeleteConfirmation.value = null
         }
     }

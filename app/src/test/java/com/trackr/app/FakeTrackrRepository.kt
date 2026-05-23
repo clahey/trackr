@@ -17,7 +17,27 @@ class FakeTrackrRepository : TrackrRepository {
     private val events = MutableStateFlow<List<Event>>(emptyList())
     private var nextColorIndex = 0
 
-    override fun getCategories(): Flow<List<Category>> = categories.map { it.sortedBy { c -> c.sortOrder } }
+    // @spec CAT-UI-001, DM-PROC-022
+    override fun getCategories(): Flow<List<Category>> = categories.map { list ->
+        val metaIds = list.filterIsInstance<Category.MetaCategory>().map { it.id }.toSet()
+        val resolved = list.map { cat ->
+            if (cat is Category.SubCategory && cat.parent.id !in metaIds) {
+                Category.MetaCategory(
+                    id = cat.id, name = cat.name,
+                    emoji = cat.emoji ?: cat.parent.emoji,
+                    color = cat.color ?: cat.parent.color,
+                    valueType = cat.valueType ?: cat.parent.valueType,
+                    unit = cat.unit, allowEmptyText = cat.allowEmptyText, sortOrder = cat.sortOrder,
+                )
+            } else cat
+        }
+        val metaMap = resolved.filterIsInstance<Category.MetaCategory>().associateBy { it.id }
+        resolved.sortedWith(compareBy(
+            { cat -> if (cat is Category.SubCategory) metaMap[cat.parent.id]?.sortOrder ?: cat.sortOrder else cat.sortOrder },
+            { it is Category.SubCategory },
+            { it.sortOrder },
+        ))
+    }
     override fun getCategoryById(id: String): Flow<Category?> = categories.map { it.find { c -> c.id == id } }
     // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
@@ -61,6 +81,28 @@ class FakeTrackrRepository : TrackrRepository {
 
     override suspend fun deleteCategory(id: String) {
         categories.update { it.filter { c -> c.id != id } }
+        events.update { it.filter { e -> e.categoryId != id } }
+    }
+
+    // @spec CAT-UI-006
+    override suspend fun deleteMetaCategoryAndPromoteSubcategories(id: String) {
+        categories.update { list ->
+            val promoted = list.filterIsInstance<Category.SubCategory>()
+                .filter { it.parent.id == id }
+                .map { sub ->
+                    Category.MetaCategory(
+                        id = sub.id,
+                        name = sub.name,
+                        emoji = sub.resolvedEmoji,
+                        color = sub.resolvedColor,
+                        valueType = sub.resolvedValueType,
+                        unit = sub.unit,
+                        allowEmptyText = sub.allowEmptyText,
+                        sortOrder = sub.sortOrder,
+                    )
+                }
+            list.filter { it.id != id && !(it is Category.SubCategory && it.parent.id == id) } + promoted
+        }
         events.update { it.filter { e -> e.categoryId != id } }
     }
 
