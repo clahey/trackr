@@ -18,8 +18,8 @@ LLD: `docs/llds/category-management.md`
 - [ ] **CAT-UI-010**: The category edit screen shall display input fields for name, emoji, color, and value type.
 - [ ] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
 - [ ] **CAT-UI-011**: While value type is Number, the category edit screen shall display a unit input field; for all other value types the unit field shall be hidden.
-- [ ] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
-- [ ] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
+- [x] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
+- [x] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
 - [ ] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
 - [ ] **CAT-UI-015**: When editing an existing category whose color is not in the preset palette, the color picker shall display the current color as a distinct swatch above the preset palette, pre-selected; the user may keep it or replace it by tapping a preset.
 - [ ] **CAT-UI-016**: The out-of-palette current color swatch shall not be shown when creating a new category.
@@ -79,6 +79,6 @@ LLD: `docs/llds/category-management.md`
 - [ ] **CAT-NAV-002**: When the user taps a category row on the category list screen, the system shall navigate to the category edit screen in edit mode for that category.
 - [ ] **CAT-NAV-003**: When the user saves a category on the edit screen, the system shall navigate back to the category list.
 - [ ] **CAT-NAV-004**: When the user taps back or cancel on the category edit screen without saving, the system shall navigate back to the category list without persisting any changes.
-- [ ] **CAT-NAV-005**: When the user confirms deletion of a category from the edit screen toolbar, the system shall delete the category and navigate back to the category list.
+- [x] **CAT-NAV-005**: When the user confirms deletion of a category from the edit screen toolbar, the system shall delete the category and navigate back to the category list.
 - [x] **CAT-NAV-010**: When the user taps "Create subcategory" on a MetaCategory edit screen, the system shall navigate to the category edit screen in create mode with the parentId set to the MetaCategory's id.
 - [x] **CAT-NAV-011**: When the user confirms "Remove from group" on a SubCategory edit screen, the system shall promote the SubCategory to a MetaCategory (per DM-PROC-019) and navigate back to the category list.

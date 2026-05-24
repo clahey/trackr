@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -61,10 +62,11 @@ import com.trackr.app.ui.theme.categoryColorPalette
 import com.trackr.app.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.launch
 
-// @spec CAT-UI-017, CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
+// @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013, CAT-UI-017,
+// CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
 // CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057, CAT-UI-058,
-// CAT-UI-059, CAT-UI-060, CAT-NAV-010, CAT-NAV-011, DM-PROC-019, APP-NAV-004
+// CAT-UI-059, CAT-UI-060, CAT-NAV-005, CAT-NAV-010, CAT-NAV-011, DM-PROC-019, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CategoryEditScreen(
@@ -91,6 +93,7 @@ fun CategoryEditScreen(
     val isSubCategoryMode = parentCategory != null
     val isMetaCategoryEditMode = isEditMode && !isSubCategoryMode
 
+    val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
     var overflowMenuExpanded by remember { mutableStateOf(false) }
 
@@ -99,6 +102,39 @@ fun CategoryEditScreen(
     }
     LaunchedEffect(saveResult) {
         if (saveResult is SaveResult.Success) onNavigateBack(null)
+    }
+
+    // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
+    pendingDelete?.let { confirmation ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDelete() },
+            title = { Text("Delete category?") },
+            text = {
+                val text = if (confirmation.isMetaCategory) {
+                    buildString {
+                        if (confirmation.ownEventCount > 0) {
+                            val n = confirmation.ownEventCount
+                            append("$n ${if (n == 1) "event" else "events"} from this category will be permanently deleted.")
+                        }
+                        if (confirmation.subCategoryCount > 0) {
+                            if (isNotEmpty()) append(" ")
+                            val n = confirmation.subCategoryCount
+                            append("$n ${if (n == 1) "subcategory" else "subcategories"} will be promoted to top-level categories.")
+                        }
+                    }
+                } else {
+                    val n = confirmation.ownEventCount
+                    "This will permanently delete $n ${if (n == 1) "event" else "events"} logged under this category."
+                }
+                Text(text)
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmDelete() }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDelete() }) { Text("Cancel") }
+            },
+        )
     }
 
     Scaffold(
@@ -111,8 +147,9 @@ fun CategoryEditScreen(
                     }
                 },
                 actions = {
+                    // @spec CAT-UI-012, CAT-UI-013, CAT-UI-004, CAT-UI-005, CAT-NAV-005
                     if (isEditMode) {
-                        IconButton(onClick = { /* delete not yet wired */ }) {
+                        IconButton(onClick = { viewModel.requestDelete() }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
                         }
                     }

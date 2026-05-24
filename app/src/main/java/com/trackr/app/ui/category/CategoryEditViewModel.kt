@@ -24,9 +24,10 @@ import javax.inject.Inject
 
 enum class ValueTypeWarningTier { IrreversibleSafe, Partial, Unsafe }
 
-// @spec CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
+// @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013,
+// CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// CAT-UI-054, DM-PROC-019, DM-PROC-021, APP-NAV-004
+// CAT-UI-054, CAT-NAV-005, DM-PROC-019, DM-PROC-021, APP-NAV-004
 @HiltViewModel
 class CategoryEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -77,6 +78,9 @@ class CategoryEditViewModel @Inject constructor(
 
     private val _navigateBack = MutableStateFlow(false)
     val navigateBack: StateFlow<Boolean> = _navigateBack.asStateFlow()
+
+    private val _pendingDeleteConfirmation = MutableStateFlow<DeleteConfirmation?>(null)
+    val pendingDeleteConfirmation: StateFlow<DeleteConfirmation?> = _pendingDeleteConfirmation.asStateFlow()
 
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
@@ -239,6 +243,44 @@ class CategoryEditViewModel @Inject constructor(
             )
             _saveResult.value = SaveResult.Success
         }
+    }
+
+    // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
+    fun requestDelete() {
+        val id = categoryId ?: return
+        val ownCount = ownEventCount.value
+        val subCount = subCategoryCount.value
+        val isMeta = _parentCategory.value == null
+        if (ownCount == 0 && (!isMeta || subCount == 0)) {
+            viewModelScope.launch {
+                repository.deleteCategory(id)
+                _saveResult.value = SaveResult.Success
+            }
+        } else {
+            _pendingDeleteConfirmation.value = DeleteConfirmation(
+                categoryId = id,
+                ownEventCount = ownCount,
+                subCategoryCount = subCount,
+                isMetaCategory = isMeta,
+            )
+        }
+    }
+
+    fun confirmDelete() {
+        val pending = _pendingDeleteConfirmation.value ?: return
+        viewModelScope.launch {
+            if (pending.isMetaCategory) {
+                repository.deleteMetaCategoryAndPromoteSubcategories(pending.categoryId)
+            } else {
+                repository.deleteCategory(pending.categoryId)
+            }
+            _pendingDeleteConfirmation.value = null
+            _saveResult.value = SaveResult.Success
+        }
+    }
+
+    fun cancelDelete() {
+        _pendingDeleteConfirmation.value = null
     }
 
     // @spec CAT-UI-030, CAT-UI-036, CAT-UI-037, CAT-UI-038
