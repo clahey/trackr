@@ -25,6 +25,18 @@ data class DeleteConfirmation(
     val isMetaCategory: Boolean = false,
 )
 
+// @spec CAT-UI-004, CAT-UI-005
+// Returns null when the category qualifies for immediate silent deletion.
+fun deletionConfirmationIfNeeded(
+    categoryId: String,
+    ownEventCount: Int,
+    subCategoryCount: Int,
+    isMetaCategory: Boolean,
+): DeleteConfirmation? {
+    if (ownEventCount == 0 && (!isMetaCategory || subCategoryCount == 0)) return null
+    return DeleteConfirmation(categoryId, ownEventCount, subCategoryCount, isMetaCategory)
+}
+
 data class GroupPickerState(
     val categoryId: String,
     val eligibleParents: List<Category.MetaCategory>,
@@ -52,17 +64,10 @@ class CategoryListViewModel @Inject constructor(
         viewModelScope.launch {
             val ownCount = repository.getEventCountForCategory(id).first()
             val subCount = repository.getSubCategoryCount(id).first()
-            if (ownCount == 0 && subCount == 0) {
-                repository.deleteCategory(id)
-            } else {
-                val isMeta = repository.getCategoryById(id).first() is Category.MetaCategory
-                _pendingDeleteConfirmation.value = DeleteConfirmation(
-                    id,
-                    ownEventCount = ownCount,
-                    subCategoryCount = subCount,
-                    isMetaCategory = isMeta,
-                )
-            }
+            val isMeta = repository.getCategoryById(id).first() is Category.MetaCategory
+            val confirmation = deletionConfirmationIfNeeded(id, ownCount, subCount, isMeta)
+            if (confirmation == null) repository.deleteCategory(id)
+            else _pendingDeleteConfirmation.value = confirmation
         }
     }
 

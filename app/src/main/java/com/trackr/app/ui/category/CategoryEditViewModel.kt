@@ -248,21 +248,15 @@ class CategoryEditViewModel @Inject constructor(
     // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
     fun requestDelete() {
         val id = categoryId ?: return
-        val ownCount = ownEventCount.value
-        val subCount = subCategoryCount.value
         val isMeta = _parentCategory.value == null
-        if (ownCount == 0 && (!isMeta || subCount == 0)) {
+        val confirmation = deletionConfirmationIfNeeded(id, ownEventCount.value, subCategoryCount.value, isMeta)
+        if (confirmation == null) {
             viewModelScope.launch {
                 repository.deleteCategory(id)
                 _saveResult.value = SaveResult.Success
             }
         } else {
-            _pendingDeleteConfirmation.value = DeleteConfirmation(
-                categoryId = id,
-                ownEventCount = ownCount,
-                subCategoryCount = subCount,
-                isMetaCategory = isMeta,
-            )
+            _pendingDeleteConfirmation.value = confirmation
         }
     }
 
