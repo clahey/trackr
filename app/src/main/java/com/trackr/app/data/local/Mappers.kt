@@ -8,22 +8,17 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
 
+private fun CategoryEntity.toMetaCategory() = Category.MetaCategory(
+    id = id, name = name,
+    emoji = emoji ?: "",
+    color = color ?: 0xFFE53935L,
+    valueType = valueType?.let { ValueTypeConverter.decode(it) } ?: ValueType.None,
+    unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
+)
+
 fun List<CategoryEntity>.toDomainList(): List<Category> {
     val metaMap = mutableMapOf<String, Category.MetaCategory>()
-    forEach { entity ->
-        if (entity.parentId == null) {
-            metaMap[entity.id] = Category.MetaCategory(
-                id = entity.id,
-                name = entity.name,
-                emoji = entity.emoji ?: "",
-                color = entity.color ?: 0xFFE53935L,
-                valueType = entity.valueType?.let { ValueTypeConverter.decode(it) } ?: ValueType.None,
-                unit = entity.unit,
-                allowEmptyText = entity.allowEmptyText,
-                sortOrder = entity.sortOrder,
-            )
-        }
-    }
+    forEach { entity -> if (entity.parentId == null) metaMap[entity.id] = entity.toMetaCategory() }
     // @spec DM-PROC-022
     return map { entity ->
         if (entity.parentId == null) {
@@ -31,16 +26,7 @@ fun List<CategoryEntity>.toDomainList(): List<Category> {
         } else {
             val parent = metaMap[entity.parentId]
             if (parent == null) {
-                Category.MetaCategory(
-                    id = entity.id,
-                    name = entity.name,
-                    emoji = entity.emoji ?: "",
-                    color = entity.color ?: 0xFFE53935L,
-                    valueType = entity.valueType?.let { ValueTypeConverter.decode(it) } ?: ValueType.None,
-                    unit = entity.unit,
-                    allowEmptyText = entity.allowEmptyText,
-                    sortOrder = entity.sortOrder,
-                )
+                entity.toMetaCategory()
             } else {
                 Category.SubCategory(
                     id = entity.id,
@@ -55,6 +41,23 @@ fun List<CategoryEntity>.toDomainList(): List<Category> {
                 )
             }
         }
+    }
+}
+
+// @spec DM-PROC-022
+fun CategoryWithParent.toDomain(): Category {
+    if (category.parentId == null) return category.toMetaCategory()
+    val parentMeta = parent?.toMetaCategory()
+    return if (parentMeta != null) {
+        Category.SubCategory(
+            id = category.id, name = category.name,
+            emoji = category.emoji, color = category.color,
+            valueType = category.valueType?.let { ValueTypeConverter.decode(it) },
+            unit = category.unit, allowEmptyText = category.allowEmptyText,
+            sortOrder = category.sortOrder, parent = parentMeta,
+        )
+    } else {
+        category.toMetaCategory()
     }
 }
 

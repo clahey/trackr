@@ -32,17 +32,15 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     // @spec CAT-UI-001
     override fun getCategories(): Flow<List<Category>> =
         categoryDao.getAll().map { entities ->
-            val domain = entities.toDomainList()
-            val metaMap = domain.filterIsInstance<Category.MetaCategory>().associateBy { it.id }
-            domain.sortedWith(compareBy(
-                { cat -> if (cat is Category.SubCategory) metaMap[cat.parent.id]?.sortOrder ?: cat.sortOrder else cat.sortOrder },
+            entities.toDomainList().sortedWith(compareBy(
+                { cat -> if (cat is Category.SubCategory) cat.parent.sortOrder else cat.sortOrder },
                 { it is Category.SubCategory },
                 { it.sortOrder },
             ))
         }
 
     override fun getCategoryById(id: String): Flow<Category?> =
-        getCategories().map { it.find { c -> c.id == id } }
+        categoryDao.getByIdWithParent(id).map { it?.toDomain() }
 
     // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {

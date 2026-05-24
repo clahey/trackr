@@ -31,9 +31,8 @@ class FakeTrackrRepository : TrackrRepository {
                 )
             } else cat
         }
-        val metaMap = resolved.filterIsInstance<Category.MetaCategory>().associateBy { it.id }
         resolved.sortedWith(compareBy(
-            { cat -> if (cat is Category.SubCategory) metaMap[cat.parent.id]?.sortOrder ?: cat.sortOrder else cat.sortOrder },
+            { cat -> if (cat is Category.SubCategory) cat.parent.sortOrder else cat.sortOrder },
             { it is Category.SubCategory },
             { it.sortOrder },
         ))
@@ -50,7 +49,13 @@ class FakeTrackrRepository : TrackrRepository {
                     "Cannot nest category '${category.id}': it has $childCount SubCategory children"
                 }
             }
-            list.filter { it.id != category.id } + category
+            val updated = list.filter { it.id != category.id } + category
+            if (category is Category.MetaCategory) {
+                updated.map { cat ->
+                    if (cat is Category.SubCategory && cat.parent.id == category.id) cat.copy(parent = category)
+                    else cat
+                }
+            } else updated
         }
     }
 
