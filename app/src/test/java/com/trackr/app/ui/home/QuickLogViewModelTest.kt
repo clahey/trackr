@@ -40,9 +40,10 @@ class QuickLogViewModelTest {
         id: String,
         valueType: ValueType = ValueType.None,
         allowEmptyText: Boolean = true,
+        unit: String? = null,
     ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = valueType, unit = null, allowEmptyText = allowEmptyText, sortOrder = 0,
+        valueType = valueType, unit = unit, allowEmptyText = allowEmptyText, sortOrder = 0,
     )
 
     @Before fun setUp() {
@@ -178,5 +179,38 @@ class QuickLogViewModelTest {
         assertEquals(SaveResult.Success, vm.saveResult.value)
         vm.reset()
         assertEquals(SaveResult.Idle, vm.saveResult.value)
+    }
+
+    // @spec EL-UI-068
+    @Test fun `selectCategory converts compatible value when switching category type`() = runTest {
+        val scaleCat = makeCategory("c1", valueType = ValueType.Scale)
+        val numCat = makeCategory("c2", valueType = ValueType.Number)
+        repo.setCategories(scaleCat, numCat)
+        vm.selectCategory(scaleCat)
+        vm.value.value = EventValue.Scale(5)
+        vm.selectCategory(numCat)
+        assertEquals(EventValue.NumberValue(5.0, null), vm.value.value)
+    }
+
+    // @spec EL-UI-068
+    @Test fun `selectCategory clears value when conversion produces null`() = runTest {
+        val textCat = makeCategory("c1", valueType = ValueType.Text)
+        val noneCat = makeCategory("c2", valueType = ValueType.None)
+        repo.setCategories(textCat, noneCat)
+        vm.selectCategory(textCat)
+        vm.value.value = EventValue.TextValue("")
+        vm.selectCategory(noneCat)
+        assertNull(vm.value.value)
+    }
+
+    // @spec EL-UI-068
+    @Test fun `selectCategory preserves value unchanged when no conversion path exists`() = runTest {
+        val boolCat = makeCategory("c1", valueType = ValueType.Boolean)
+        val scaleCat = makeCategory("c2", valueType = ValueType.Scale)
+        repo.setCategories(boolCat, scaleCat)
+        vm.selectCategory(boolCat)
+        vm.value.value = EventValue.BooleanValue(true)
+        vm.selectCategory(scaleCat)
+        assertEquals(EventValue.BooleanValue(true), vm.value.value)
     }
 }

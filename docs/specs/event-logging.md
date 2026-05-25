@@ -10,7 +10,7 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-002**: Each event row shall display the category emoji, category name, a value summary formatted for the event's value type, and the time of day from the event's timestamp. (Category fields are blank when the event is orphaned.)
 - [x] **EL-UI-004**: Each event row shall be presented as an elevated card visually distinct from the screen background.
 - [x] **EL-UI-005**: Each event row shall display the category color as a filled circle avatar on the left; the category emoji shall be centered inside the circle using the WCAG foreground color computed by `foregroundColorForBackground(categoryColor)`.
-- [ ] **EL-UI-003**: Day group headers shall display "Today" for the current date, "Yesterday" for the prior date, and the full date for all older days.
+- [x] **EL-UI-003**: Day group headers shall display "Today" for the current date, "Yesterday" for the prior date, and the full date for all older days.
 
 ## Category Filter
 
@@ -47,7 +47,7 @@ LLD: `docs/llds/event-logging.md`
 ## Event Edit Screen
 
 - [x] **EL-UI-040**: The event edit screen shall display editable fields for timestamp, value, notes, and images.
-- [ ] **EL-UI-041**: The event edit screen shall display a delete action in the toolbar.
+- [x] **EL-UI-041**: The event edit screen shall display a delete action in the toolbar.
 - [ ] **EL-UI-045**: When the event edit screen loads and the requested event is not found in the repository, the system shall navigate back to the timeline and display a snackbar on the timeline screen reading "Event not found."
 - [x] **EL-UI-042**: When the user taps the delete action on the event edit screen, the system shall show a confirmation dialog before deleting.
 - [x] **EL-UI-043**: While an event carries an Unknown or ErrorValue, the value field on the edit screen shall be read-only; the timestamp, notes, and image fields shall remain editable.
@@ -56,9 +56,9 @@ LLD: `docs/llds/event-logging.md`
 
 ## Value Input
 
-- [ ] **EL-UI-050**: For Scale-type categories, the value input shall be a horizontal slider with integer snap accepting values in the range 1–10.
+- [x] **EL-UI-050**: For Scale-type categories, the value input shall be a horizontal slider with integer snap accepting values in the range 1–10.
 - [ ] **EL-UI-051**: For Boolean-type categories, the value input shall be a two-button row labeled "Yes" and "No".
-- [ ] **EL-UI-052**: For Number-type categories, the value input shall consist of a numeric text field and a separate unit text field; the unit field shall be pre-filled from the category's unit and shall be user-editable; an empty unit field shall be saved as null (unitless).
+- [x] **EL-UI-052**: For Number-type categories, the value input shall consist of a numeric text field and a separate unit text field; the unit field shall be pre-filled from the category's unit and shall be user-editable; an empty unit field shall be saved as null (unitless).
 - [ ] **EL-UI-053**: For Text-type categories, the value input shall be a multi-line text field.
 - [x] **EL-UI-054**: While the selected Text-type category has `allowEmptyText` set to false, the system shall not allow saving with an empty text value.
 - [ ] **EL-UI-055**: For Duration-type categories, the value input shall be three separate numeric fields for hours, minutes, and seconds; the value shall be stored as a `kotlin.time.Duration`.
@@ -83,12 +83,12 @@ LLD: `docs/llds/event-logging.md`
 ## Value Type Mismatch UI
 
 - [x] **EL-UI-061**: When an event row in the timeline has a non-null value that does not satisfy `matchesValueType(value, category.valueType)`, the system shall display the raw stored value (formatted by `formatValue`) followed by a warning indicator; the value shall not be corrected in the database by viewing the timeline.
-- [x] **EL-UI-062**: When the event edit screen loads and `matchesValueType(event.value, category.valueType)` is false and `event.value` is non-null, the system shall display a value action banner below the value input reading "Stored value doesn't match the category type."
-- [x] **EL-UI-063**: When the `conversionOutcome` for the loaded event is `Converted(v)`, the banner action button shall be labeled "Convert to [description]" where description is a human-readable rendering of `v`.
-- [x] **EL-UI-064**: When the `conversionOutcome` is `UsedDefault(v)`, the banner action button shall be labeled "Replace with default: [description]" where description is a human-readable rendering of `v`.
-- [x] **EL-UI-065**: When the `conversionOutcome` is `Discard` (category type is None or Unknown), the banner action button shall be labeled "Discard value".
-- [x] **EL-UI-066**: When the user taps the banner action button, the system shall dismiss the banner and set the event's value form field: for `Converted(v)` or `UsedDefault(v)`, to `v`; for `Discard`, to null (only reachable when category type is None or Unknown).
-- [x] **EL-UI-067**: When the user manually edits a value input field such that the resulting value satisfies `matchesValueType`, the system shall dismiss the banner automatically without requiring the user to tap the action button.
+- [x] **EL-UI-062**: When the value input is given a non-null `value` and a `valueType` such that `matchesValueType(value, valueType)` is false, the system shall display a value action banner above the input reading "Stored value doesn't match the category type.", and shall render the editable input for the value's own type (not the target `valueType`) so the user can refine the existing value before accepting the banner action; for `ErrorValue` and when the outcome is `Discard`, no editable input is shown.
+- [x] **EL-UI-063**: When the outcome of `convertOrDefault(value, valueType)` is `Converted(v)`, the banner action button shall be labeled "Convert to [description]" where description is a human-readable rendering of `v`.
+- [x] **EL-UI-064**: When the outcome is `UsedDefault(v)`, the banner action button shall be labeled "Replace with default: [description]" where description is a human-readable rendering of `v`.
+- [x] **EL-UI-065**: When the outcome is `Discard` (category type is None or Unknown), the banner action button shall be labeled "Discard value".
+- [x] **EL-UI-066**: When the user taps the banner action button, the system shall dismiss the banner and update the value: for `Converted(v)` or `UsedDefault(v)`, to `v`; for `Discard`, to null.
+- [x] **EL-UI-068**: When the user selects a different category in the quick-log sheet and the current value is non-null, the system shall apply `convertEventValue(value, newCategory.resolvedValueType)`; if the result is null, the value shall be cleared; if the result is non-null, the value shall be updated to the converted form.
 
 ## Image Handling
 

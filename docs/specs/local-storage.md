@@ -6,10 +6,10 @@ LLD: `docs/llds/local-storage.md`
 
 ## Repository Interface
 
-- [ ] **LS-BE-001**: The system shall expose all category and event reads as `Flow`, so that UI layers receive updates reactively whenever the underlying data changes.
-- [ ] **LS-BE-002**: The system shall expose all category and event writes as `suspend` functions callable from a coroutine context.
-- [ ] **LS-BE-003**: `saveCategory` and `saveEvent` shall each perform an upsert — inserting the record if it does not exist, updating it if it does.
-- [ ] **LS-BE-004**: `getEvents` shall accept optional start and end `Instant` bounds; when a bound is null the query shall be unbounded on that side.
+- [x] **LS-BE-001**: The system shall expose all category and event reads as `Flow`, so that UI layers receive updates reactively whenever the underlying data changes.
+- [x] **LS-BE-002**: The system shall expose all category and event writes as `suspend` functions callable from a coroutine context.
+- [x] **LS-BE-003**: `saveCategory` and `saveEvent` shall each perform an upsert — inserting the record if it does not exist, updating it if it does.
+- [x] **LS-BE-004**: `getEvents` shall accept optional start and end `Instant` bounds; when a bound is null the query shall be unbounded on that side.
 
 ## Category Persistence
 
@@ -36,11 +36,11 @@ LLD: `docs/llds/local-storage.md`
 
 ## TypeConverters
 
-- [ ] **LS-BE-050**: The `EventValueConverter` shall encode and decode `EventValue?` to and from a nullable JSON string, delegating full encode/decode logic (including `ErrorValue` verbatim passthrough and invariant repair) to the rules specified in `docs/specs/data-model.md § EventValue TypeConverter`.
+- [x] **LS-BE-050**: The `EventValueConverter` shall encode and decode `EventValue?` to and from a nullable JSON string, delegating full encode/decode logic (including `ErrorValue` verbatim passthrough and invariant repair) to the rules specified in `docs/specs/data-model.md § EventValue TypeConverter`.
 - [x] **LS-BE-051**: The `InstantConverter` shall encode `java.time.Instant` as epoch milliseconds (Long) and decode a Long back to an `Instant`.
-- [ ] **LS-BE-052**: The `DurationAsSecondsSerializer` shall encode `kotlin.time.Duration` as total seconds (Long) and decode a Long back to a `Duration`.
+- [x] **LS-BE-052**: The `DurationAsSecondsSerializer` shall encode `kotlin.time.Duration` as total seconds (Long) and decode a Long back to a `Duration`.
 - [x] **LS-BE-053**: The `StringListConverter` shall encode `List<String>` as a JSON array string; on decode failure it shall return `emptyList()` rather than propagating an exception.
-- [ ] **LS-BE-054**: The `ValueTypeConverter` shall encode known `ValueType` variants as fixed lowercase name strings and encode `Unknown(raw)` as the raw string verbatim; unknown strings decoded from the database shall produce `ValueType.Unknown(raw)`.
+- [x] **LS-BE-054**: The `ValueTypeConverter` shall encode known `ValueType` variants as fixed lowercase name strings and encode `Unknown(raw)` as the raw string verbatim; unknown strings decoded from the database shall produce `ValueType.Unknown(raw)`.
 
 ## DataStore
 
@@ -49,11 +49,11 @@ LLD: `docs/llds/local-storage.md`
 
 ## ImageStore
 
-- [ ] **LS-BE-060**: `ImageStore.newFile` shall return a new `File` with a UUID-based name in the app-private image directory for the UI to write to.
-- [ ] **LS-BE-061**: `ImageStore.delete` shall delete the file at the given absolute path; if the file does not exist the call shall be a no-op.
-- [ ] **LS-BE-062**: `ImageStore.allStoredPaths` shall return the absolute paths of all files currently in the image storage directory.
+- [x] **LS-BE-060**: `ImageStore.newFile` shall return a new `File` with a UUID-based name in the app-private image directory for the UI to write to.
+- [x] **LS-BE-061**: `ImageStore.delete` shall delete the file at the given absolute path; if the file does not exist the call shall be a no-op.
+- [x] **LS-BE-062**: `ImageStore.allStoredPaths` shall return the absolute paths of all files currently in the image storage directory.
 
 ## Schema Integrity
 
-- [ ] **LS-BE-070**: The Room database shall have destructive migration disabled; any schema change must be accompanied by an explicit migration.
-- [ ] **LS-BE-071**: The `EventEntity.categoryId` foreign key shall be declared with `CASCADE DELETE` so that deleting a category atomically removes all its child events.
+- [x] **LS-BE-070**: The Room database shall have destructive migration disabled; any schema change must be accompanied by an explicit migration.
+- [x] **LS-BE-071**: The `EventEntity.categoryId` foreign key shall be declared with `CASCADE DELETE` so that deleting a category atomically removes all its child events.

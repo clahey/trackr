@@ -546,6 +546,7 @@ private fun QuickLogSheet(
                     onValueChange = { viewModel.value.value = it },
                     valueType = cat.resolvedValueType,
                     autoFocus = true,
+                    defaultUnit = cat.unit,
                 )
                 if (saveResult is SaveResult.ValidationError) {
                     Text(

@@ -8,6 +8,7 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
+import com.trackr.app.domain.convertEventValue
 import com.trackr.app.ui.SaveResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +21,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 // @spec EL-UI-013, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-052b, EL-UI-054, EL-UI-055b,
-// EL-UI-073, EL-UI-074, EL-UI-075, EL-UI-076, EL-NAV-002, EL-PROC-001
+// EL-UI-068, EL-UI-073, EL-UI-074, EL-UI-075, EL-UI-076, EL-NAV-002, EL-PROC-001
 @HiltViewModel
 class QuickLogViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -58,7 +59,12 @@ class QuickLogViewModel @Inject constructor(
         }
     }
 
+    // @spec EL-UI-068
     fun selectCategory(category: Category) {
+        val current = value.value
+        if (current != null) {
+            value.value = convertEventValue(current, category.resolvedValueType)
+        }
         selectedCategory.value = category
         expandedMetaCategoryId.value = null
     }

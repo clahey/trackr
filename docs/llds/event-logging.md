@@ -107,9 +107,9 @@ Mismatches can also arise when the app reads data from a newer app version — a
 
 ### Value type mismatch
 
-A **value action banner** is shown on the edit screen whenever `conversionOutcome` is non-null — i.e., the stored value cannot be meaningfully used as-is for the category's current type. This covers three cases:
+A **value action banner** is shown inside `ValueInputField` whenever the `value` and `valueType` parameters do not satisfy `matchesValueType` — i.e., the stored value cannot be meaningfully used as-is for the category's current type. This covers three cases:
 
-1. **Type mismatch** — the stored `EventValue` is a concrete type that does not match the category's `valueType` (e.g., `TextValue("hello")` on an Exercise category). Happens when migration leaves some events unconverted.
+1. **Type mismatch** — the stored `EventValue` is a concrete type that does not match the category's `valueType` (e.g., `TextValue("hello")` on an Exercise category). Happens when migration leaves some events unconverted, or when the user switches category in the quick-log sheet after entering a value.
 2. **`ErrorValue`** — the stored value could not be decoded at all. Read-only per EL-UI-043; the banner offers a "replace with default" action.
 3. **`Unknown` category type** — the category's type is unrecognized by this app version; no input is possible.
 
@@ -122,16 +122,15 @@ A **value action banner** is shown on the edit screen whenever `conversionOutcom
 
 **Timeline display:** events with `!matchesValueType(event.value, category.valueType)` display the raw stored value via the existing `formatValue` followed by a warning icon. No DB write on view.
 
-**Edit screen — value action banner:** shown below the value input whenever `conversionOutcome` is non-null. Contains:
+**Value action banner (inside `ValueInputField`):** shown whenever `value` is non-null and `!matchesValueType(value, valueType)`. Contains:
 - A short description: *"Stored value doesn't match the category type."*
-- An action button whose label depends on `conversionOutcome`, using `describeValue(v: EventValue): String` for the value descriptions (a UI-layer function that produces verbose human-readable text — e.g., `"2 sets × 5 reps"` for `ExerciseValue(2, 5)`, `"7/10"` for `Scale(7)`, `"Yes"` for `BooleanValue(true)`, `"3.5 kg"` for `NumberValue(3.5, "kg")`):
+- An action button whose label depends on `convertOrDefault(value, valueType)`, using `describeValue(v: EventValue): String` for the value descriptions (a UI-layer function that produces verbose human-readable text — e.g., `"2 sets × 5 reps"` for `ExerciseValue(2, 5)`, `"7/10"` for `Scale(7)`, `"Yes"` for `BooleanValue(true)`, `"3.5 kg"` for `NumberValue(3.5, "kg")`):
   - `Converted(v)`: **"Convert to [describeValue(v)]"**
   - `UsedDefault(v)`: **"Replace with default: [describeValue(v)]"**
   - `Discard`: **"Discard value"**
-  - In all cases, tapping clears the banner and sets `value`: for `Converted(v)` or `UsedDefault(v)`, to `v`; for `Discard`, to null (only reachable when category type is None or Unknown).
+  - In all cases, tapping clears the banner and calls `onValueChange`: for `Converted(v)` or `UsedDefault(v)`, with `v`; for `Discard`, with null.
 - The banner is informational — the Save button remains enabled while the banner is visible. If the user saves without resolving the banner, the mismatched value is persisted unchanged.
-
-**Edit screen — value input while banner is shown:** the value input fields render using the category's type with whatever fallback defaults `ValueInputField` uses for a mismatched value (the same `?: Default()` fallback already present). The value is not in a valid editable state until the action button is tapped or the user manually edits a field (which itself updates `value` and can clear the banner automatically if the new value matches).
+- While the banner is shown, `ValueInputField` renders the input for the **value's own type** (not the target `valueType`), so the user can refine the existing value (e.g., edit a TextValue to "Yes" before accepting a Boolean conversion) before tapping the action button. For `ErrorValue` and for `Discard` outcomes (None or Unknown target), no editable input is shown; the banner action is the only resolution path.
 
 ## ViewModels
 
@@ -172,6 +171,7 @@ sealed class DayEntry {
 - `selectedCategory: StateFlow<Category?>` — set when user picks in step 1
 - Form state: `timestamp`, `value`, `notes`, `imagePath` (single, nullable)
 - `timestamp` defaults to `Instant.now()` at sheet open; user-editable
+- `selectCategory(category)`: sets `selectedCategory`; if `value` is non-null, applies `convertEventValue(value, category.resolvedValueType)` — if the result is null (None target or no conversion path), `value` is cleared; if the result is non-null, `value` is updated to the converted form. Any remaining mismatch after conversion is surfaced by `ValueInputField`'s banner.
 - `save()`: validates, generates a UUID for the new event, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, emits `SaveResult`
 - `reset()`: called when sheet is dismissed (with or without saving); clears all form state including `saveResult` back to `Idle`, and deletes any captured-but-unsaved image file
 - **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1. If a MetaCategory is deleted while the user has expanded it in step 1, the expansion collapses.
@@ -183,8 +183,7 @@ sealed class DayEntry {
 - `save()`: diffs image paths, calls `repository.saveEvent()`
 - `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()`
 - **Stale event guard:** if `getEventById` returns null on init, sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The timeline screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
-- `conversionOutcome: StateFlow<ConversionOutcome?>` — pre-computed result of `convertOrDefault`; null when no mismatch; drives banner visibility and the action button label (Converted → "Convert to X", UsedDefault → "Replace with default: X", Discard → "Discard value")
-- `applyConversion()`: sets `value` to the outcome's value for Converted/UsedDefault, or null for Discard (only reachable when category type is None or Unknown); `isValueEditable` is set to true; banner clears reactively via `conversionOutcome` becoming null
+- Mismatch detection and the value action banner are owned by `ValueInputField`; `EventEditViewModel` does not compute `conversionOutcome` or expose `applyConversion()`, and does not expose `isValueEditable`
 
 ## Image Handling
 
