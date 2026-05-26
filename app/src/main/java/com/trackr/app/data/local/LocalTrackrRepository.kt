@@ -11,6 +11,7 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
 import com.trackr.app.domain.convertEventValue
+import com.trackr.app.ui.theme.DEFAULT_CATEGORY_COLOR
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -93,7 +94,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
                 categoryDao.upsert(child.copy(
                     parentId = null,
                     emoji = child.emoji ?: parent?.emoji ?: "",
-                    color = child.color ?: parent?.color ?: 0xFFE53935L,
+                    color = child.color ?: parent?.color ?: DEFAULT_CATEGORY_COLOR,
                     valueType = child.valueType ?: parent?.valueType ?: "none",
                 ))
             }

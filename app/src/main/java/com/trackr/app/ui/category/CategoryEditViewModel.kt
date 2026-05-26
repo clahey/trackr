@@ -7,6 +7,7 @@ import com.trackr.app.data.TrackrRepository
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import com.trackr.app.ui.theme.DEFAULT_CATEGORY_COLOR
 import com.trackr.app.ui.theme.categoryColorForIndex
 import com.trackr.app.ui.theme.categoryColorPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -60,8 +61,8 @@ class CategoryEditViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val effectiveColor: StateFlow<Long> = combine(colorState, _parentCategory) { c, parent ->
-        c ?: parent?.color ?: 0xFFE53935L
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0xFFE53935L)
+        c ?: parent?.color ?: DEFAULT_CATEGORY_COLOR
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_CATEGORY_COLOR)
 
     val effectiveValueType: StateFlow<ValueType> = combine(valueTypeState, _parentCategory) { v, parent ->
         v ?: parent?.valueType ?: ValueType.None
@@ -206,7 +207,7 @@ class CategoryEditViewModel @Inject constructor(
                 id = categoryId ?: UUID.randomUUID().toString(),
                 name = nameVal,
                 emoji = emojiState.value ?: "",
-                color = colorState.value ?: 0xFFE53935L,
+                color = colorState.value ?: DEFAULT_CATEGORY_COLOR,
                 valueType = valueTypeState.value ?: ValueType.None,
                 unit = unit.value.takeIf { it.isNotBlank() },
                 allowEmptyText = true,

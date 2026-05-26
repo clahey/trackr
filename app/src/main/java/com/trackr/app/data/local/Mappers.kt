@@ -7,11 +7,12 @@ import com.trackr.app.data.local.converters.ValueTypeConverter
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
+import com.trackr.app.ui.theme.DEFAULT_CATEGORY_COLOR
 
 private fun CategoryEntity.toMetaCategory() = Category.MetaCategory(
     id = id, name = name,
     emoji = emoji ?: "",
-    color = color ?: 0xFFE53935L,
+    color = color ?: DEFAULT_CATEGORY_COLOR,
     valueType = valueType?.let { ValueTypeConverter.decode(it) } ?: ValueType.None,
     unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
 )
