@@ -176,7 +176,7 @@ Jetpack DataStore Preferences stores simple app-wide state that doesn't belong i
 
 ## Room Database
 
-Two entities (`CategoryEntity`, `EventEntity`), version 1, `exportSchema = true`. Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
+Two entities (`CategoryEntity`, `EventEntity`), version 2, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
 
 ## Migration Strategy
 
