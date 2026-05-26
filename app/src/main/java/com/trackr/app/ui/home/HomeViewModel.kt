@@ -56,23 +56,17 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
 
     init {
         viewModelScope.launch {
-            combine(_activeFilter, repository.getCategories()) { filter, cats ->
-                when (filter) {
-                    is ActiveFilter.All -> null
-                    is ActiveFilter.TopLevel -> {
-                        val childIds = cats.filterIsInstance<Category.SubCategory>()
-                            .filter { it.parent.id == filter.category.id }
-                            .map { it.id }.toSet()
-                        setOf(filter.category.id) + childIds
+            combine(
+                _activeFilter.flatMapLatest { filter ->
+                    when (filter) {
+                        is ActiveFilter.All -> repository.getEvents()
+                        is ActiveFilter.TopLevel -> repository.getEventsByCategoryIdIncludingChildren(filter.category.id)
+                        is ActiveFilter.Sub -> repository.getEventsByCategoryIdIncludingChildren(filter.sub.id)
                     }
-                    is ActiveFilter.Sub -> setOf(filter.sub.id)
-                }
-            }.flatMapLatest { ids ->
-                if (ids == null) repository.getEvents()
-                else repository.getEventsByCategoryIds(ids)
-            }
-            .combine(repository.getCategories()) { events, categories -> events to categories }
-            .combine(_pendingDelete) { (events, categories), pending ->
+                },
+                repository.getCategories(),
+                _pendingDelete,
+            ) { events, categories, pending ->
                 Triple(events, categories, pending)
             }
             .collect { (events, categories, pending) ->

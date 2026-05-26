@@ -27,6 +27,7 @@ interface TrackrRepository {
     fun getEvents(start: Instant? = null, end: Instant? = null): Flow<List<Event>>
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>
     fun getEventsByCategoryIds(ids: Collection<String>): Flow<List<Event>>
+    fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>>  // id + all SubCategories (any valueType)
     fun getEventById(id: String): Flow<Event?>
     suspend fun saveEvent(event: Event)            // upsert
     suspend fun deleteEvent(id: String)
@@ -120,7 +121,8 @@ This mirrors the `ErrorValue` forward-compatibility contract: an old app version
 | `getById(id)` | `Flow<EventEntity?>` | |
 | `getByIdOnce(id)` | `EventEntity?` | suspend; for pre-deletion cleanup |
 | `getByCategoryOnce(categoryId)` | `List<EventEntity>` | suspend; for category deletion cleanup |
-| `getByCategoryIncludingInheriting(categoryId)` | `List<EventEntity>` | suspend; returns events for categoryId plus any SubCategory whose `valueType IS NULL` (inheriting); used by event migration on MetaCategory valueType change |
+| `getByCategoryIncludingChildren(categoryId)` | `Flow<List<EventEntity>>` | live; returns events for categoryId plus all SubCategories (any valueType); used for filtered timeline |
+| `getByCategoryIncludingChildrenWithNullTypeOnce(categoryId)` | `List<EventEntity>` | suspend; returns events for categoryId plus SubCategories with `valueType IS NULL` only; used by event migration on MetaCategory valueType change |
 | `getAllOnce()` | `List<EventEntity>` | suspend; for startup orphan scan |
 | `countByCategory(categoryId)` | `Flow<Int>` | live count; for edit screen UI state |
 | `countByCategoryIncludingInheriting(categoryId)` | `Flow<Int>` | live count including inheriting SubCategories; same JOIN pattern as `getByCategoryIncludingInheriting` |

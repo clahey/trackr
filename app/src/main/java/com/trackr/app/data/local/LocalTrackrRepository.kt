@@ -66,7 +66,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
                 }
             }
             categoryDao.upsert(category.toEntity())
-            eventDao.getByCategoryIncludingInheriting(category.id).forEach { entity ->
+            eventDao.getByCategoryIncludingChildrenWithNullTypeOnce(category.id).forEach { entity ->
                 val event = entity.toDomain()
                 val newValue = convertEventValue(event.value, targetType)
                 if (newValue != event.value) {
@@ -133,6 +133,10 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     override fun getEventsByCategoryIds(ids: Collection<String>): Flow<List<Event>> =
         eventDao.getByCategoryIds(ids).map { it.map { e -> e.toDomain() } }
+
+    // @spec EL-UI-011
+    override fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>> =
+        eventDao.getByCategoryIncludingChildren(id).map { it.map { e -> e.toDomain() } }
 
     override fun getEventById(id: String): Flow<Event?> =
         eventDao.getById(id).map { it?.toDomain() }
