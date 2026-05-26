@@ -6,7 +6,7 @@ LLD: `docs/llds/category-management.md`
 
 ## Category List
 
-- [ ] **CAT-UI-001**: The system shall display all categories on the list screen in hierarchical sort order: MetaCategories sorted by their own `sortOrder` ascending, with each MetaCategory's SubCategories appearing immediately after their parent sorted by their own `sortOrder` ascending before the next MetaCategory. Each row shows resolved emoji, name, and resolved value type; SubCategory rows are visually indented.
+- [x] **CAT-UI-001**: The system shall display all categories on the list screen in hierarchical sort order: MetaCategories sorted by their own `sortOrder` ascending, with each MetaCategory's SubCategories appearing immediately after their parent sorted by their own `sortOrder` ascending before the next MetaCategory. Each row shows resolved emoji, name, and resolved value type; SubCategory rows are visually indented.
 - [ ] **CAT-UI-002**: The category list screen shall display a drag handle on each row; when the user drops a row after dragging, the system shall persist the new order via `reorderCategories`; SubCategories may only be reordered within their parent's group, and MetaCategories may only be reordered within the top-level list.
 - [x] **CAT-UI-003**: When the user long-presses a category row, the system shall present a context menu; all rows include Delete; a MetaCategory with no SubCategories additionally includes "Add to group"; a SubCategory additionally includes "Move to another group" and "Remove from group".
 - [x] **CAT-UI-004**: When the user initiates deletion of a category that has zero of its own events and, for a MetaCategory, zero SubCategories, the system shall delete it immediately without a confirmation dialog.
@@ -16,11 +16,11 @@ LLD: `docs/llds/category-management.md`
 ## Category Edit — Display
 
 - [ ] **CAT-UI-010**: The category edit screen shall display input fields for name, emoji, color, and value type.
-- [ ] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
+- [x] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
 - [ ] **CAT-UI-011**: While value type is Number, the category edit screen shall display a unit input field; for all other value types the unit field shall be hidden.
 - [x] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
 - [x] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
-- [ ] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
+- [x] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
 - [ ] **CAT-UI-015**: When editing an existing category whose color is not in the preset palette, the color picker shall display the current color as a distinct swatch above the preset palette, pre-selected; the user may keep it or replace it by tapping a preset.
 - [ ] **CAT-UI-016**: The out-of-palette current color swatch shall not be shown when creating a new category.
 

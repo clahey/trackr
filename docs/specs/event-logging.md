@@ -40,9 +40,9 @@ LLD: `docs/llds/event-logging.md`
 
 - [x] **EL-UI-030**: The quick-log sheet shall present a two-step flow: step 1 is a grid of MetaCategory items (resolved emoji + name); tapping a MetaCategory with no SubCategories advances to step 2; tapping a MetaCategory with SubCategories expands it inline within the grid.
 - [ ] **EL-UI-031**: Step 2 of the quick-log sheet shall display a value input appropriate for the selected category's value type, an optional single-photo field (at most one image), an optional notes field, a tappable timestamp field, and a save button.
-- [ ] **EL-UI-031a**: While no image is attached in the quick-log sheet, the system shall display an "Add image" button; tapping it shall present a choice of "Take photo" (camera) or "Choose from gallery".
-- [ ] **EL-UI-031b**: While an image is attached in the quick-log sheet, the system shall display a photo indicator with a Remove button and a Replace button; tapping Remove shall delete the image file and clear the attached image; tapping Replace shall present the same "Take photo" / "Choose from gallery" choice and, on selection, delete the previous image file and attach the new one.
-- [ ] **EL-UI-044a**: The event edit screen shall display an "Add image" button that presents a choice of "Take photo" (camera) or "Choose from gallery"; each image added is appended to the event's image list with no cap on total count.
+- [x] **EL-UI-031a**: While no image is attached in the quick-log sheet, the system shall display an "Add image" button; tapping it shall present a choice of "Take photo" (camera) or "Choose from gallery".
+- [x] **EL-UI-031b**: While an image is attached in the quick-log sheet, the system shall display a photo indicator with a Remove button and a Replace button; tapping Remove shall delete the image file and clear the attached image; tapping Replace shall present the same "Take photo" / "Choose from gallery" choice and, on selection, delete the previous image file and attach the new one.
+- [x] **EL-UI-044a**: The event edit screen shall display an "Add image" button that presents a choice of "Take photo" (camera) or "Choose from gallery"; each image added is appended to the event's image list with no cap on total count.
 - [ ] **EL-UI-032**: The timestamp field in the quick-log sheet shall default to the time the sheet was opened, and shall be tappable to allow the user to edit the date and time.
 - [ ] **EL-UI-033**: For a None-type category, step 2 shall omit the value input field, making the flow completable in three taps (FAB → category → save).
 - [x] **EL-UI-034**: When the category selected in the quick-log sheet is deleted externally while the sheet is open at step 2, the system shall reset to step 1.
@@ -51,12 +51,12 @@ LLD: `docs/llds/event-logging.md`
 
 - [x] **EL-UI-040**: The event edit screen shall display editable fields for timestamp, value, notes, and images.
 - [x] **EL-UI-041**: The event edit screen shall display a delete action in the toolbar.
-- [ ] **EL-UI-045**: When the event edit screen loads and the requested event is not found in the repository, the system shall navigate back to the timeline and display a snackbar on the timeline screen reading "Event not found."
+- [x] **EL-UI-045**: When the event edit screen loads and the requested event is not found in the repository, the system shall navigate back to the timeline and display a snackbar on the timeline screen reading "Event not found."
 - [x] **EL-UI-042**: When the user taps the delete action on the event edit screen, the system shall show a confirmation dialog before deleting.
 - [x] **EL-UI-043**: While an event carries an Unknown or ErrorValue, the value field on the edit screen shall be read-only; the timestamp, notes, and image fields shall remain editable.
 - [x] **EL-UI-046**: The event edit screen shall display the category emoji and name as a read-only header above the editable fields; the header is omitted when the category cannot be resolved.
-- [ ] **EL-UI-044**: The event edit screen shall allow adding images via camera or gallery and removing individual images with no cap on total image count.
-- [ ] **EL-UI-044b**: When the user removes an image on the event edit screen, the system shall remove it from the displayed list; the file shall be deleted when the event is saved (not immediately).
+- [x] **EL-UI-044**: The event edit screen shall allow adding images via camera or gallery and removing individual images with no cap on total image count.
+- [x] **EL-UI-044b**: When the user removes an image on the event edit screen, the system shall remove it from the displayed list; the file shall be deleted when the event is saved (not immediately).
 
 ## Value Input
 
