@@ -1,8 +1,10 @@
 package com.trackr.app.data.local
 
 import androidx.room.Embedded
+import androidx.room.Relation
 
 data class CategoryWithParent(
     @Embedded val category: CategoryEntity,
-    @Embedded(prefix = "parent_") val parent: CategoryEntity?,
+    @Relation(parentColumn = "parentId", entityColumn = "id")
+    val parent: CategoryEntity?,
 )

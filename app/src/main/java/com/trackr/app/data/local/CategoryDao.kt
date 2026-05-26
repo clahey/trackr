@@ -45,15 +45,7 @@ abstract class CategoryDao {
     @Query("SELECT * FROM categories WHERE parentId = :parentId")
     abstract suspend fun getChildrenByParentIdOnce(parentId: String): List<CategoryEntity>
 
-    @Query("""
-        SELECT c.id, c.name, c.emoji, c.color, c.valueType, c.unit, c.allowEmptyText, c.sortOrder, c.parentId,
-               p.id AS parent_id, p.name AS parent_name, p.emoji AS parent_emoji,
-               p.color AS parent_color, p.valueType AS parent_valueType, p.unit AS parent_unit,
-               p.allowEmptyText AS parent_allowEmptyText, p.sortOrder AS parent_sortOrder,
-               p.parentId AS parent_parentId
-        FROM categories c
-        LEFT JOIN categories p ON c.parentId = p.id
-        WHERE c.id = :id
-    """)
+    @Transaction
+    @Query("SELECT * FROM categories WHERE id = :id")
     abstract fun getByIdWithParent(id: String): Flow<CategoryWithParent?>
 }

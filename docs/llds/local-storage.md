@@ -100,8 +100,12 @@ This mirrors the `ErrorValue` forward-compatibility contract: an old app version
 | Method | Return | Notes |
 |---|---|---|
 | `getAll()` | `Flow<List<CategoryEntity>>` | ordered by `sortOrder ASC` |
-| `getById(id)` | `Flow<CategoryEntity?>` | |
+| `getAllOnce()` | `List<CategoryEntity>` | suspend |
 | `getByIdOnce(id)` | `CategoryEntity?` | suspend; for pre-deletion cleanup |
+| `getByIdWithParent(id)` | `Flow<CategoryWithParent?>` | `@Transaction`; uses `@Relation` to fetch parent row in a second query |
+| `countByParentId(parentId)` | `Flow<Int>` | |
+| `countByParentIdOnce(parentId)` | `Int` | suspend |
+| `getChildrenByParentIdOnce(parentId)` | `List<CategoryEntity>` | suspend |
 | `getMinSortOrder()` | `Int?` | suspend; null if no categories exist; used when inserting new category at top |
 | `updateSortOrders(ids: List<String>)` | `Unit` | suspend; reassigns sequential sortOrder values (0, 1, 2…) matching the provided order |
 | `upsert(entity)` | `Unit` | suspend |
@@ -126,6 +130,8 @@ Sort order (`timestamp DESC, createdAt DESC, id ASC`) matches the canonical orde
 ## Entity ↔ Domain Mappers
 
 Extension functions in the `local` package. `CategoryEntity.toDomain()`, `Category.toEntity()`, `EventEntity.toDomain()`, `Event.toEntity()`. Each maps field-for-field, delegating type conversion to the converters above.
+
+**`CategoryWithParent`**: a Room result POJO with `@Embedded val category: CategoryEntity` and `@Relation(parentColumn = "parentId", entityColumn = "id") val parent: CategoryEntity?`. Room fetches the parent in a second `SELECT * FROM categories WHERE id IN (...)` query within the same transaction. Used only by `getCategoryById` in the repository.
 
 ## LocalTrackrRepository
 
