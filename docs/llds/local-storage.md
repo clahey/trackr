@@ -120,8 +120,11 @@ This mirrors the `ErrorValue` forward-compatibility contract: an old app version
 | `getById(id)` | `Flow<EventEntity?>` | |
 | `getByIdOnce(id)` | `EventEntity?` | suspend; for pre-deletion cleanup |
 | `getByCategoryOnce(categoryId)` | `List<EventEntity>` | suspend; for category deletion cleanup |
+| `getByCategoryIncludingInheriting(categoryId)` | `List<EventEntity>` | suspend; returns events for categoryId plus any SubCategory whose `valueType IS NULL` (inheriting); used by event migration on MetaCategory valueType change |
 | `getAllOnce()` | `List<EventEntity>` | suspend; for startup orphan scan |
 | `countByCategory(categoryId)` | `Flow<Int>` | live count; for edit screen UI state |
+| `countByCategoryIncludingInheriting(categoryId)` | `Flow<Int>` | live count including inheriting SubCategories; same JOIN pattern as `getByCategoryIncludingInheriting` |
+| `getByCategoryIds(ids)` | `Flow<List<EventEntity>>` | live; for filtered list UI |
 | `upsert(entity)` | `Unit` | suspend |
 | `deleteById(id)` | `Unit` | suspend |
 

@@ -33,6 +33,16 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE categoryId = :categoryId")
     suspend fun getByCategoryOnce(categoryId: String): List<EventEntity>
 
+    // @spec DM-PROC-021
+    @Query("""
+        SELECT * FROM events
+        WHERE categoryId = :categoryId
+           OR categoryId IN (
+               SELECT id FROM categories WHERE parentId = :categoryId AND valueType IS NULL
+           )
+    """)
+    suspend fun getByCategoryIncludingInheriting(categoryId: String): List<EventEntity>
+
     @Query("SELECT * FROM events")
     suspend fun getAllOnce(): List<EventEntity>
 

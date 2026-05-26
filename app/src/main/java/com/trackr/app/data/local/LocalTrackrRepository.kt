@@ -66,28 +66,14 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
                 }
             }
             categoryDao.upsert(category.toEntity())
-            val affectedCategoryIds = buildAffectedCategoryIds(category)
-            affectedCategoryIds.forEach { catId ->
-                eventDao.getByCategoryOnce(catId).forEach { entity ->
-                    val event = entity.toDomain()
-                    val newValue = convertEventValue(event.value, targetType)
-                    if (newValue != event.value) {
-                        eventDao.upsert(event.copy(value = newValue).toEntity())
-                    }
+            eventDao.getByCategoryIncludingInheriting(category.id).forEach { entity ->
+                val event = entity.toDomain()
+                val newValue = convertEventValue(event.value, targetType)
+                if (newValue != event.value) {
+                    eventDao.upsert(event.copy(value = newValue).toEntity())
                 }
             }
         }
-    }
-
-    // Returns the category itself plus any SubCategories that inherit its valueType (null valueType).
-    private suspend fun buildAffectedCategoryIds(category: Category): List<String> {
-        if (category !is Category.MetaCategory) return listOf(category.id)
-        val all = categoryDao.getAllOnce().toDomainList()
-        val inheritingChildIds = all
-            .filterIsInstance<Category.SubCategory>()
-            .filter { it.parent.id == category.id && it.valueType == null }
-            .map { it.id }
-        return listOf(category.id) + inheritingChildIds
     }
 
     // @spec LS-BE-031
