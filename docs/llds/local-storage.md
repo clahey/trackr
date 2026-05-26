@@ -26,7 +26,6 @@ interface TrackrRepository {
     // Events
     fun getEvents(start: Instant? = null, end: Instant? = null): Flow<List<Event>>
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>
-    fun getEventsByCategoryIds(ids: Collection<String>): Flow<List<Event>>
     fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>>  // id + all SubCategories (any valueType)
     fun getEventById(id: String): Flow<Event?>
     suspend fun saveEvent(event: Event)            // upsert
@@ -126,7 +125,6 @@ This mirrors the `ErrorValue` forward-compatibility contract: an old app version
 | `getAllOnce()` | `List<EventEntity>` | suspend; for startup orphan scan |
 | `countByCategory(categoryId)` | `Flow<Int>` | live count; for edit screen UI state |
 | `countByCategoryIncludingChildrenWithNullType(categoryId)` | `Flow<Int>` | live count for categoryId plus SubCategories with `valueType IS NULL`; same JOIN pattern as `getByCategoryIncludingChildrenWithNullTypeOnce` |
-| `getByCategoryIds(ids)` | `Flow<List<EventEntity>>` | live; for filtered list UI |
 | `upsert(entity)` | `Unit` | suspend |
 | `deleteById(id)` | `Unit` | suspend |
 

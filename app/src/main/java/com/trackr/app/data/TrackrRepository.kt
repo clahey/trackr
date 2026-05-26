@@ -20,7 +20,6 @@ interface TrackrRepository {
 
     fun getEvents(start: Instant? = null, end: Instant? = null): Flow<List<Event>>
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>
-    fun getEventsByCategoryIds(ids: Collection<String>): Flow<List<Event>>
     // @spec EL-UI-011
     fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>>
     fun getEventById(id: String): Flow<Event?>

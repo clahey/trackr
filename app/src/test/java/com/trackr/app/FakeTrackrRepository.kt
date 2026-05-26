@@ -149,10 +149,6 @@ class FakeTrackrRepository : TrackrRepository {
         events.map { it.filter { e -> e.categoryId == categoryId }
             .sortedWith(compareByDescending<Event> { it.timestamp }.thenByDescending { it.createdAt }.thenBy { it.id }) }
 
-    override fun getEventsByCategoryIds(ids: Collection<String>): Flow<List<Event>> =
-        events.map { it.filter { e -> e.categoryId in ids }
-            .sortedWith(compareByDescending<Event> { it.timestamp }.thenByDescending { it.createdAt }.thenBy { it.id }) }
-
     // @spec EL-UI-011
     override fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>> =
         combine(categories, events) { cats, evts ->

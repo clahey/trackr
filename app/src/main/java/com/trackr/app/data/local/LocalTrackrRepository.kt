@@ -131,9 +131,6 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getEventsByCategory(categoryId: String): Flow<List<Event>> =
         eventDao.getByCategory(categoryId).map { it.map { e -> e.toDomain() } }
 
-    override fun getEventsByCategoryIds(ids: Collection<String>): Flow<List<Event>> =
-        eventDao.getByCategoryIds(ids).map { it.map { e -> e.toDomain() } }
-
     // @spec EL-UI-011
     override fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>> =
         eventDao.getByCategoryIncludingChildren(id).map { it.map { e -> e.toDomain() } }
