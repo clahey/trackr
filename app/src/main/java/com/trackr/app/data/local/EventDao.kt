@@ -67,7 +67,7 @@ interface EventDao {
                SELECT id FROM categories WHERE parentId = :categoryId AND valueType IS NULL
            )
     """)
-    fun countByCategoryIncludingInheriting(categoryId: String): Flow<Int>
+    fun countByCategoryIncludingChildrenWithNullType(categoryId: String): Flow<Int>
 
     @Query("SELECT * FROM events WHERE categoryId IN (:ids) ORDER BY timestamp DESC, createdAt DESC, id ASC")
     fun getByCategoryIds(ids: Collection<String>): Flow<List<EventEntity>>

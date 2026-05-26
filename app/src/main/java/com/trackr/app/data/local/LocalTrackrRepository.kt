@@ -109,7 +109,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> =
         if (includeSubCategoriesWithNullType)
-            eventDao.countByCategoryIncludingInheriting(categoryId)
+            eventDao.countByCategoryIncludingChildrenWithNullType(categoryId)
         else
             eventDao.countByCategory(categoryId)
 
