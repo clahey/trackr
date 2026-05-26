@@ -103,16 +103,19 @@ class QuickLogViewModelTest {
     }
 
     // @spec EL-PROC-001
+    // @spec EL-NAV-002b, EL-UI-032
     @Test fun `reset clears form state`() = runTest {
         val cat = makeCategory("c1")
         repo.setCategories(cat)
         vm.selectCategory(cat)
         vm.notes.value = "some notes"
         vm.imagePath.value = "/images/capture.jpg"
+        vm.timestamp.value = Instant.parse("2020-01-01T00:00:00Z")
         vm.reset()
         assertNull(vm.selectedCategory.value)
         assertEquals("", vm.notes.value)
         assertNull(vm.imagePath.value)
+        assertEquals(anchor, vm.timestamp.value)
     }
 
     // @spec EL-PROC-001

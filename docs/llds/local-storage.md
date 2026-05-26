@@ -172,9 +172,9 @@ Jetpack DataStore Preferences stores simple app-wide state that doesn't belong i
 
 | Key | Type | Initial value | Notes |
 |---|---|---|---|
-| `next_category_color_index` | `Int` | `0` | Monotonically increasing; never reset on deletion |
+| `next_category_color_index` | `Int` | `0` | Wraps modulo palette size; never reset on deletion |
 
-`LocalTrackrRepository.getAndIncrementNextCategoryColorIndex()` reads the current value, writes `value + 1`, and returns the original value — atomically within a DataStore transaction. The caller receives the index to apply; the store always holds the next one.
+`LocalTrackrRepository.getAndIncrementNextCategoryColorIndex(paletteSize)` reads the current value, writes `(value + 1) % paletteSize`, and returns the original value — atomically within a DataStore transaction. The caller receives the index to apply; the store always holds the next one.
 
 ## Room Database
 
@@ -190,7 +190,7 @@ Version 1; no prior version. Future migrations added via `addMigrations()` on th
 |---|---|---|---|
 | Repository interface location | Defined in this segment | Separate `domain` module | No separate module at this scale; the interface is the seam, not the module boundary |
 | Next color index storage | DataStore Preferences | Room metadata table; SharedPreferences | DataStore is the idiomatic Jetpack replacement for SharedPreferences; a Room table would be over-engineered for a single integer |
-| Next color index strategy | Monotonically incrementing int; never reset on deletion | Compute from current category count | Count-based would repeat colors after deletions; a stored counter guarantees each new category gets the next unused palette slot |
+| Next color index strategy | Wrapping counter `(n + 1) % paletteSize`; never reset on deletion | Compute from current category count | Count-based would repeat colors after deletions; a stored counter that cycles through the palette guarantees even distribution |
 | DAO write style | `@Upsert` (Room 2.5+) | `@Insert(onConflict = REPLACE)`; separate insert/update | `@Upsert` is correct and idiomatic; REPLACE deletes-then-inserts which resets FKs |
 | Flow vs. suspend for reads | `Flow` | `suspend` returning snapshot | `Flow` gives reactive UI updates for free |
 | ValueType storage | Sealed class serialized to name string; `Unknown(raw)` round-trips verbatim | Enum ordinal; enum name with TEXT fallback | Sealed class enables lossless round-trip of unknown future variants; TEXT fallback silently loses the original value |

@@ -169,6 +169,7 @@ sealed class DayEntry {
 
 - `categories: StateFlow<List<Category>>` — from `repository.getCategories()`
 - `selectedCategory: StateFlow<Category?>` — set when user picks in step 1
+- `expandedMetaCategoryId: MutableStateFlow<String?>` — which MetaCategory is expanded in the step 1 grid; null = none expanded
 - Form state: `timestamp`, `value`, `notes`, `imagePath` (single, nullable)
 - `timestamp` defaults to `Instant.now()` at sheet open; user-editable
 - `selectCategory(category)`: sets `selectedCategory`; if `value` is non-null, applies `convertEventValue(value, category.resolvedValueType)` — if the result is null (None target or no conversion path), `value` is cleared; if the result is non-null, `value` is updated to the converted form. Any remaining mismatch after conversion is surfaced by `ValueInputField`'s banner.
@@ -182,7 +183,7 @@ sealed class DayEntry {
 - Full form state mirroring `Event` fields
 - `save()`: diffs image paths, calls `repository.saveEvent()`
 - `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()`
-- **Stale event guard:** if `getEventById` returns null on init, sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The timeline screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
+- **Stale event guard:** if `getEventById` returns null on init, emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`; the UI layer invokes `onNavigateBack(errorMessage)` with a non-null message, which the caller (timeline) displays as a snackbar.
 - Mismatch detection and the value action banner are owned by `ValueInputField`; `EventEditViewModel` does not compute `conversionOutcome` or expose `applyConversion()`, and does not expose `isValueEditable`
 
 ## Image Handling

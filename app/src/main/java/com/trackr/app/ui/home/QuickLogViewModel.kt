@@ -129,11 +129,13 @@ class QuickLogViewModel @Inject constructor(
         imagePath.value = null
     }
 
+    // @spec EL-NAV-002b, EL-UI-032
     fun reset() {
         val path = imagePath.value
         if (path != null) imageStore.delete(path)
         selectedCategory.value = null
         expandedMetaCategoryId.value = null
+        timestamp.value = Instant.now(clock)
         notes.value = ""
         imagePath.value = null
         value.value = null
