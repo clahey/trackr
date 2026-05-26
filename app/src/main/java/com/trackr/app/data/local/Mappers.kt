@@ -47,7 +47,6 @@ fun List<CategoryEntity>.toDomainList(): List<Category> {
 
 // @spec DM-PROC-022
 fun CategoryWithParent.toDomain(): Category {
-    if (category.parentId == null) return category.toMetaCategory()
     val parentMeta = parent?.toMetaCategory()
     return if (parentMeta != null) {
         Category.SubCategory(
