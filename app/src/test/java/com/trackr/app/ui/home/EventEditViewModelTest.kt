@@ -195,4 +195,34 @@ class EventEditViewModelTest {
         assertNull(vm.category.value)
     }
 
+    // @spec EL-UI-044a
+    @Test fun `createImageFile creates a file tracked by imageStore`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        val path = vm.createImageFile()
+        assertTrue(imageStore.allStoredPaths().contains(path))
+    }
+
+    // @spec EL-UI-044a
+    @Test fun `cancelImage deletes the given file`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        val path = vm.createImageFile()
+        vm.cancelImage(path)
+        assertTrue(imageStore.wasDeleted(path))
+    }
+
+    // @spec EL-PROC-002
+    @Test fun `cancel deletes a file created but not committed via createImageFile`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        val path = vm.createImageFile()
+        vm.addImage(path)
+        vm.cancel()
+        assertTrue(imageStore.wasDeleted(path))
+    }
+
 }

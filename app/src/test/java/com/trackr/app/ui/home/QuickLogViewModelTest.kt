@@ -213,4 +213,53 @@ class QuickLogViewModelTest {
         vm.selectCategory(scaleCat)
         assertEquals(EventValue.BooleanValue(true), vm.value.value)
     }
+
+    // @spec EL-UI-031a, EL-UI-031b
+    @Test fun `createImageFile creates a file tracked by imageStore`() {
+        val path = vm.createImageFile()
+        assertTrue(imageStore.allStoredPaths().contains(path))
+    }
+
+    // @spec EL-UI-031b
+    @Test fun `commitImage sets imagePath`() {
+        val path = vm.createImageFile()
+        vm.commitImage(path)
+        assertEquals(path, vm.imagePath.value)
+    }
+
+    // @spec EL-UI-031b
+    @Test fun `commitImage when replacing deletes old file and sets new`() {
+        val old = vm.createImageFile()
+        vm.commitImage(old)
+        val new = vm.createImageFile()
+        vm.commitImage(new)
+        assertTrue(imageStore.wasDeleted(old))
+        assertEquals(new, vm.imagePath.value)
+    }
+
+    // @spec EL-UI-031b
+    @Test fun `cancelImage deletes the given file`() {
+        val path = vm.createImageFile()
+        vm.cancelImage(path)
+        assertTrue(imageStore.wasDeleted(path))
+    }
+
+    // @spec EL-UI-031b
+    @Test fun `cancelImage when replacing leaves existing imagePath unchanged`() {
+        val old = vm.createImageFile()
+        vm.commitImage(old)
+        val pending = vm.createImageFile()
+        vm.cancelImage(pending)
+        assertEquals(old, vm.imagePath.value)
+        assertTrue(imageStore.wasDeleted(pending))
+    }
+
+    // @spec EL-UI-031b
+    @Test fun `removeImage deletes file and clears imagePath`() {
+        val path = vm.createImageFile()
+        vm.commitImage(path)
+        vm.removeImage()
+        assertTrue(imageStore.wasDeleted(path))
+        assertNull(vm.imagePath.value)
+    }
 }

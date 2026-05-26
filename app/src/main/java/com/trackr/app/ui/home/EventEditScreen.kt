@@ -1,5 +1,8 @@
 package com.trackr.app.ui.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,21 +31,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackr.app.ui.SaveResult
 import com.trackr.app.ui.components.ValueInputField
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val timestampFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
 
-// @spec EL-UI-040, EL-UI-042, EL-UI-043, EL-UI-044, EL-UI-045, EL-NAV-005, EL-NAV-006, EL-PROC-002, APP-NAV-003
+// @spec EL-UI-040, EL-UI-042, EL-UI-043, EL-UI-044, EL-UI-044a, EL-UI-044b, EL-UI-045,
+// EL-NAV-005, EL-NAV-006, EL-PROC-002, APP-NAV-003
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventEditScreen(
@@ -60,6 +70,40 @@ fun EventEditScreen(
     val navigateBack by viewModel.navigateBack.collectAsState()
 
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var pendingCameraPath by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val path = pendingCameraPath ?: return@rememberLauncherForActivityResult
+        if (success) viewModel.addImage(path) else viewModel.cancelImage(path)
+        pendingCameraPath = null
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch(Dispatchers.IO) {
+            val path = viewModel.createImageFile()
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.File(path).outputStream().use { input.copyTo(it) }
+                }
+                withContext(Dispatchers.Main) { viewModel.addImage(path) }
+            } catch (_: Exception) {
+                viewModel.cancelImage(path)
+            }
+        }
+    }
+
+    fun launchCamera() {
+        val path = viewModel.createImageFile()
+        pendingCameraPath = path
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", java.io.File(path)
+        )
+        cameraLauncher.launch(uri)
+    }
 
     LaunchedEffect(navigateBack) {
         if (navigateBack) onNavigateBack("Event not found.")
@@ -81,6 +125,24 @@ fun EventEditScreen(
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.cancelDelete() }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text("Add image") },
+            confirmButton = {
+                TextButton(onClick = { showImageSourceDialog = false; launchCamera() }) {
+                    Text("Take photo")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) { Text("Choose from gallery") }
             },
         )
     }
@@ -143,21 +205,23 @@ fun EventEditScreen(
                 minLines = 2,
             )
 
+            // @spec EL-UI-044a, EL-UI-044b
             if (imagePaths.isNotEmpty()) {
-                Text("Images (${imagePaths.size})")
+                Text("Images (${imagePaths.size})", style = MaterialTheme.typography.labelMedium)
                 imagePaths.forEach { path ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(path, modifier = Modifier.weight(1f))
+                        Text(path, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                         IconButton(onClick = { viewModel.removeImage(path) }) {
                             Icon(Icons.Default.Delete, contentDescription = "Remove image")
                         }
                     }
                 }
             }
+            TextButton(onClick = { showImageSourceDialog = true }) { Text("Add image") }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -170,4 +234,3 @@ fun EventEditScreen(
         }
     }
 }
-

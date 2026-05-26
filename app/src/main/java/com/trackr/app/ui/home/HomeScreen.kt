@@ -62,8 +62,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
@@ -434,8 +437,8 @@ private fun DayHeader(date: LocalDate) {
     )
 }
 
-// @spec EL-UI-013, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-052b, EL-UI-054, EL-UI-055b,
-// EL-UI-072, EL-UI-073, EL-UI-074, EL-NAV-002, EL-PROC-001
+// @spec EL-UI-013, EL-UI-030, EL-UI-031a, EL-UI-031b, EL-UI-032, EL-UI-034, EL-UI-052b,
+// EL-UI-054, EL-UI-055b, EL-UI-072, EL-UI-073, EL-UI-074, EL-NAV-002, EL-PROC-001
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickLogSheet(
@@ -446,14 +449,61 @@ private fun QuickLogSheet(
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val expandedMetaCategoryId by viewModel.expandedMetaCategoryId.collectAsState()
     val notes by viewModel.notes.collectAsState()
+    val imagePath by viewModel.imagePath.collectAsState()
     val value by viewModel.value.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
-    val galleryLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        uri?.let { viewModel.imagePath.value = it.toString() }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var pendingCameraPath by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val path = pendingCameraPath ?: return@rememberLauncherForActivityResult
+        if (success) viewModel.commitImage(path) else viewModel.cancelImage(path)
+        pendingCameraPath = null
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch(Dispatchers.IO) {
+            val path = viewModel.createImageFile()
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.File(path).outputStream().use { input.copyTo(it) }
+                }
+                withContext(Dispatchers.Main) { viewModel.commitImage(path) }
+            } catch (_: Exception) {
+                viewModel.cancelImage(path)
+            }
+        }
+    }
+
+    fun launchCamera() {
+        val path = viewModel.createImageFile()
+        pendingCameraPath = path
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", java.io.File(path)
+        )
+        cameraLauncher.launch(uri)
+    }
+
+    if (showImageSourceDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text("Add image") },
+            confirmButton = {
+                TextButton(onClick = { showImageSourceDialog = false; launchCamera() }) {
+                    Text("Take photo")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) { Text("Choose from gallery") }
+            },
+        )
     }
 
     if (selectedCategory == null) {
@@ -564,14 +614,15 @@ private fun QuickLogSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            TextButton(
-                onClick = {
-                    galleryLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
-            ) {
-                Text(if (viewModel.imagePath.value != null) "Photo added ✓" else "Add photo")
+            // @spec EL-UI-031a, EL-UI-031b
+            if (imagePath == null) {
+                TextButton(onClick = { showImageSourceDialog = true }) { Text("Add image") }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Photo added ✓", modifier = Modifier.weight(1f))
+                    TextButton(onClick = { viewModel.removeImage() }) { Text("Remove") }
+                    TextButton(onClick = { showImageSourceDialog = true }) { Text("Replace") }
+                }
             }
 
             Button(

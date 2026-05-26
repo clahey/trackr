@@ -187,9 +187,19 @@ sealed class DayEntry {
 
 ## Image Handling
 
-**Quick-log:** captures at most one image. The image file is written to `ImageStore.newFile()` at capture time. If the user dismisses the sheet without saving, `QuickLogViewModel.reset()` deletes the file.
+**FileProvider** — camera capture requires sharing a `file://` URI with the system camera app via `FileProvider`. The app declares a `FileProvider` in `AndroidManifest.xml` (authority `${packageName}.fileprovider`) backed by `res/xml/file_paths.xml` exposing `context.filesDir`. No `CAMERA` permission is required on Android 10+ when delegating to the system camera via `TakePicture` intent.
 
-**Event edit:** multiple images. Add via camera or gallery (each appended to `imagePaths`). Remove individually (tapping a remove button on the thumbnail). The repository diffs old vs. new paths on `saveEvent` and deletes removed files.
+**Camera capture flow (both screens):**
+1. Create file: `imageStore.newFile()` → hold absolute path as the pending camera path in the ViewModel
+2. Convert to FileProvider URI: `FileProvider.getUriForFile(context, authority, File(path))`
+3. Launch `TakePicture` contract
+4. Result `true` → commit path to image state; result `false` → delete file, discard path
+
+**Gallery flow:** `PickVisualMedia` returns a content URI. Copy to `imageStore.newFile()` via `contentResolver.openInputStream(uri)`. Store the resulting absolute file path — never store a content URI (violates DM-DATA-034; does not survive process restart). If the copy fails, delete the destination file and surface no image added.
+
+**Quick-log:** `imagePath: MutableStateFlow<String?>` holds the single image path (null = no image). While null, show an "Add image" button that opens a dialog with "Take photo" and "Choose from gallery". While non-null, show a photo indicator with a **Remove** button (deletes file, clears `imagePath`) and a **Replace** button (opens picker; on selection, deletes old file and sets new path). `reset()` already deletes and clears `imagePath`. For camera, `imagePath` doubles as the pending camera path — if camera result is `false`, delete and clear it.
+
+**Event edit:** `pendingCameraPath: MutableStateFlow<String?> = null` tracks the file created before launching the camera. On camera result `true`, append `pendingCameraPath` to `imagePaths` and clear it. On result `false`, delete and clear. `cancel()` and `onCleared()` delete `pendingCameraPath` (if non-null) in addition to new images not in `originalImagePaths`. Gallery picks are copied to app-private storage then appended to `imagePaths` directly (no pending state needed). The "Add image" button is always visible; show an "Add image" button that opens a dialog with "Take photo" and "Choose from gallery".
 
 **Unsaved captures — edit screen:** `EventEditViewModel` tracks newly captured paths separately. On explicit cancel (back without save) or `onCleared()`, any newly captured path not present in the saved event's `imagePaths` is deleted via `ImageStore`. Process kill before `onCleared()` is the only gap — recovered by the startup orphan scan.
 
@@ -217,6 +227,9 @@ Home (timeline)
 | Default timestamp | `Instant.now()` at sheet open | Now at save time | User-editable timestamp should show the current time as its default from the moment the sheet opens, not when they tap save |
 | `ErrorValue` / `Unknown` in edit | Read-only value field; other fields remain editable | Block editing entirely; allow raw edit | Preserving notes/timestamp/image editing is useful even when the value is unreadable; raw JSON edit is dangerous |
 | Unsaved image cleanup | ViewModel tracks newly captured paths; cleans up on cancel / `onCleared()` | Rely on startup orphan scan | Startup scan is a safety net, not the primary path; prompt cleanup avoids accumulating stale files during a session; process-kill gap covered by scan |
+| Gallery storage | Copy content URI to app-private file at pick time | Store content URI string | Content URIs are not guaranteed to survive process restart; DM-DATA-034 requires absolute file-system paths |
+| Camera permission | No explicit `CAMERA` permission; use `TakePicture` intent | Request `CAMERA` permission | `TakePicture` delegates to system camera which already holds the permission; avoids a runtime permission prompt |
+| Quick-log image UI (photo present) | Photo indicator + Remove button + Replace button | Remove only; Replace only (re-tap Add) | Remove-only requires two taps to change photo; re-tapping Add to replace is not discoverable; explicit Remove + Replace is clear and efficient |
 | Category deleted during quick-log step 2 | `QuickLogViewModel` observes `categories`; drops `selectedCategory` and returns to step 1 if it disappears | Block deletion while sheet is open; crash | Reactive Flow already provides the signal; returning to step 1 is graceful and requires no special locking |
 | Process-kill during image capture | Recovered by startup orphan scan | Transactional capture (not feasible) | File system and process lifecycle can't be made atomic; orphan scan is the standard recovery pattern already established in `local-storage` |
 | `DayGroup` location | ViewModel-layer data class | Domain model; UI-only | Not a persistence concept; belongs to the presentation layer |

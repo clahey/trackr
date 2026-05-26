@@ -90,6 +90,13 @@ class EventEditViewModel @Inject constructor(
         _saveResult.value = SaveResult.Success
     }
 
+    // @spec EL-UI-044a
+    fun createImageFile(): String = imageStore.newFile().absolutePath
+
+    fun cancelImage(path: String) {
+        imageStore.delete(path)
+    }
+
     fun addImage(path: String) {
         imagePaths.value = imagePaths.value + path
     }

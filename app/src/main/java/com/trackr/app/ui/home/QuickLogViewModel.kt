@@ -20,8 +20,9 @@ import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
-// @spec EL-UI-013, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-052b, EL-UI-054, EL-UI-055b,
-// EL-UI-068, EL-UI-073, EL-UI-074, EL-UI-075, EL-UI-076, EL-NAV-002, EL-PROC-001
+// @spec EL-UI-013, EL-UI-030, EL-UI-031a, EL-UI-031b, EL-UI-032, EL-UI-034, EL-UI-052b,
+// EL-UI-054, EL-UI-055b, EL-UI-068, EL-UI-073, EL-UI-074, EL-UI-075, EL-UI-076,
+// EL-NAV-002, EL-PROC-001
 @HiltViewModel
 class QuickLogViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -107,6 +108,25 @@ class QuickLogViewModel @Inject constructor(
         )
         repository.saveEvent(event)
         _saveResult.value = SaveResult.Success
+    }
+
+    // @spec EL-UI-031a, EL-UI-031b
+    fun createImageFile(): String = imageStore.newFile().absolutePath
+
+    fun commitImage(path: String) {
+        val old = imagePath.value
+        if (old != null && old != path) imageStore.delete(old)
+        imagePath.value = path
+    }
+
+    fun cancelImage(path: String) {
+        imageStore.delete(path)
+    }
+
+    fun removeImage() {
+        val path = imagePath.value ?: return
+        imageStore.delete(path)
+        imagePath.value = null
     }
 
     fun reset() {
