@@ -98,7 +98,7 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec CAT-UI-006
-    @Test fun `deleteMetaCategoryAndPromoteSubcategories promotes SubCategories and deletes parent events only`() = runTest {
+    @Test fun `deleteCategory on MetaCategory promotes SubCategories and deletes parent events only`() = runTest {
         val repo = FakeTrackrRepository()
         val parent = makeCategory("parent")
         val child = makeSubCategory("child", parent = parent)
@@ -108,7 +108,7 @@ class FakeTrackrRepositoryTest {
             Event("e_parent", "parent", anchor, null, null, emptyList(), anchor),
             Event("e_child", "child", anchor, null, null, emptyList(), anchor),
         )
-        repo.deleteMetaCategoryAndPromoteSubcategories("parent")
+        repo.deleteCategory("parent")
         val cats = repo.getCategories().first()
         assertFalse("parent should be deleted", cats.any { it.id == "parent" })
         assertTrue("child should be promoted to MetaCategory", cats.any { it.id == "child" && it is Category.MetaCategory })

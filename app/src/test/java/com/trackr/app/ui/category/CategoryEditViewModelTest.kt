@@ -594,6 +594,106 @@ class CategoryEditViewModelTest {
         assertFalse(vm.navigateBack.value)
     }
 
+    // ---------- Delete ----------
+
+    // @spec CAT-UI-004
+    @Test fun `requestDelete on MetaCategory with no events and no subcategories deletes immediately`() = runTest {
+        repo.saveCategory(makeCategory("m1"))
+        vm = editVm("m1")
+        vm.requestDelete()
+        assertNull(vm.pendingDeleteConfirmation.value)
+        assertTrue(repo.getCategories().first().isEmpty())
+    }
+
+    // @spec CAT-UI-004
+    @Test fun `requestDelete on SubCategory with no events deletes immediately`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        vm.requestDelete()
+        assertNull(vm.pendingDeleteConfirmation.value)
+        assertFalse(repo.getCategories().first().any { it.id == "child" })
+        assertTrue(repo.getCategories().first().any { it.id == "parent" })
+    }
+
+    // @spec CAT-UI-005
+    @Test fun `requestDelete on MetaCategory with subcategories shows confirmation with subCategoryCount`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("parent")
+        vm.requestDelete()
+        val confirmation = vm.pendingDeleteConfirmation.value
+        assertNotNull(confirmation)
+        assertEquals(1, confirmation!!.subCategoryCount)
+        assertEquals(0, confirmation.ownEventCount)
+    }
+
+    // @spec CAT-UI-005
+    @Test fun `requestDelete on SubCategory with events shows confirmation with ownEventCount`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        repo.saveEvent(makeEvent("e1", "child"))
+        repo.saveEvent(makeEvent("e2", "child"))
+        vm = editVm("child")
+        vm.requestDelete()
+        val confirmation = vm.pendingDeleteConfirmation.value
+        assertNotNull(confirmation)
+        assertEquals(2, confirmation!!.ownEventCount)
+        assertEquals(0, confirmation.subCategoryCount)
+    }
+
+    // @spec CAT-UI-006
+    @Test fun `confirmDelete on MetaCategory promotes subcategories and deletes parent's own events`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        repo.saveEvent(makeEvent("e_parent", "parent"))
+        repo.saveEvent(makeEvent("e_child", "child"))
+        vm = editVm("parent")
+        vm.requestDelete()
+        vm.confirmDelete()
+        val remaining = repo.getCategories().first()
+        assertFalse(remaining.any { it.id == "parent" })
+        assertTrue(remaining.any { it.id == "child" })
+        assertNull(repo.getEventById("e_parent").first())
+        assertNotNull(repo.getEventById("e_child").first())
+    }
+
+    // @spec CAT-UI-006
+    @Test fun `confirmDelete on SubCategory deletes it and its events`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        repo.saveEvent(makeEvent("e1", "child"))
+        vm = editVm("child")
+        vm.requestDelete()
+        vm.confirmDelete()
+        assertFalse(repo.getCategories().first().any { it.id == "child" })
+        assertNull(repo.getEventById("e1").first())
+        assertTrue(repo.getCategories().first().any { it.id == "parent" })
+    }
+
+    // @spec CAT-UI-005
+    @Test fun `cancelDelete on edit screen clears confirmation without deleting`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("parent")
+        vm.requestDelete()
+        vm.cancelDelete()
+        assertNull(vm.pendingDeleteConfirmation.value)
+        assertTrue(repo.getCategories().first().any { it.id == "parent" })
+    }
+
     // ---------- Helpers ----------
 
     private fun editVm(categoryId: String) =
@@ -619,6 +719,11 @@ class CategoryEditViewModelTest {
     ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = color,
         valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+    )
+
+    private fun makeSubCategory(id: String, parent: Category.MetaCategory) = Category.SubCategory(
+        id = id, name = id, emoji = null, color = null, valueType = null,
+        unit = null, allowEmptyText = true, sortOrder = 0, parent = parent,
     )
 
     private fun makeEvent(

@@ -17,8 +17,7 @@ interface TrackrRepository {
     fun getCategoryById(id: String): Flow<Category?>
     suspend fun saveCategory(category: Category)   // upsert; caller sets sortOrder
     suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)  // atomic upsert + event migration
-    suspend fun deleteCategory(id: String)
-    suspend fun deleteMetaCategoryAndPromoteSubcategories(id: String)  // atomic: promote children + delete parent
+    suspend fun deleteCategory(id: String)  // promotes SubCategories if MetaCategory; atomic
     suspend fun reorderCategories(orderedIds: List<String>)  // reassigns sortOrder to match list
     fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
     fun getSubCategoryCount(categoryId: String): Flow<Int>
@@ -146,9 +145,7 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **`getCategories` sort order:** after `toDomainList()`, results are sorted hierarchically: MetaCategories by their own `sortOrder` ascending, with each MetaCategory's SubCategories appearing immediately after, sorted by their own `sortOrder`. SubCategories that surface as MetaCategories (per orphan handling below) sort by their own `sortOrder`.
 
-**`deleteCategory`:** collects image paths for all child events, deletes the DB row (Room CASCADE removes child rows atomically), then deletes files.
-
-**`deleteMetaCategoryAndPromoteSubcategories`:** runs inside a single Room transaction. Within the transaction: looks up the parent entity, fetches its child entities (by parentId), upserts each child with `parentId = null` (resolving null emoji/color/valueType fields to the parent's stored values), collects image paths for the parent's own events, then deletes the parent DB row (CASCADE removes its events). Image file deletion happens after the transaction commits.
+**`deleteCategory`:** runs inside a single Room transaction. Within the transaction: fetches child entities (by parentId); if any exist, upserts each child with `parentId = null` (resolving null emoji/color/valueType fields to the parent's stored values); collects image paths for the parent's own events; deletes the parent DB row (CASCADE removes its own events but not promoted children). Image file deletion happens after the transaction commits. When there are no children the transaction is a no-op promotion step followed by the same delete.
 
 **Orphaned SubCategory handling in `toDomainList()`:** if a `CategoryEntity` has a non-null `parentId` that is not present among the loaded entities, it is surfaced as a `Category.MetaCategory` using its own stored fields, with null-field fallbacks matching MetaCategory assembly (`"" / 0xFFE53935L / ValueType.None`). This can occur when a MetaCategory is deleted mid-session or when the DB is in an inconsistent state; see DM-PROC-022.
 

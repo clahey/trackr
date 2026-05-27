@@ -78,14 +78,8 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     }
 
     // @spec LS-BE-031
-    override suspend fun deleteCategory(id: String) {
-        val imagePaths = eventDao.getByCategoryOnce(id).flatMap { it.imagePaths() }
-        categoryDao.deleteById(id)
-        imagePaths.forEach { imageStore.delete(it) }
-    }
-
     // @spec CAT-UI-006
-    override suspend fun deleteMetaCategoryAndPromoteSubcategories(id: String) {
+    override suspend fun deleteCategory(id: String) {
         var imagePaths: List<String> = emptyList()
         db.withTransaction {
             val parent = categoryDao.getByIdOnce(id)
@@ -99,7 +93,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
                 ))
             }
             imagePaths = eventDao.getByCategoryOnce(id).flatMap { it.imagePaths() }
-            categoryDao.deleteById(id)  // Room CASCADE deletes the category's events
+            categoryDao.deleteById(id)  // Room CASCADE deletes the category's own events
         }
         imagePaths.forEach { imageStore.delete(it) }
     }

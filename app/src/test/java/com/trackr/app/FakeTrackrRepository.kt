@@ -84,13 +84,8 @@ class FakeTrackrRepository : TrackrRepository {
         return setOf(category.id) + inheritingChildIds
     }
 
-    override suspend fun deleteCategory(id: String) {
-        categories.update { it.filter { c -> c.id != id } }
-        events.update { it.filter { e -> e.categoryId != id } }
-    }
-
     // @spec CAT-UI-006
-    override suspend fun deleteMetaCategoryAndPromoteSubcategories(id: String) {
+    override suspend fun deleteCategory(id: String) {
         categories.update { list ->
             val promoted = list.filterIsInstance<Category.SubCategory>()
                 .filter { it.parent.id == id }

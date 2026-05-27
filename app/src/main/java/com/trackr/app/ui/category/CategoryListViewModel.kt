@@ -22,7 +22,6 @@ data class DeleteConfirmation(
     val categoryId: String,
     val ownEventCount: Int,
     val subCategoryCount: Int = 0,
-    val isMetaCategory: Boolean = false,
 )
 
 // @spec CAT-UI-004, CAT-UI-005
@@ -31,10 +30,9 @@ fun deletionConfirmationIfNeeded(
     categoryId: String,
     ownEventCount: Int,
     subCategoryCount: Int,
-    isMetaCategory: Boolean,
 ): DeleteConfirmation? {
-    if (ownEventCount == 0 && (!isMetaCategory || subCategoryCount == 0)) return null
-    return DeleteConfirmation(categoryId, ownEventCount, subCategoryCount, isMetaCategory)
+    if (ownEventCount == 0 && subCategoryCount == 0) return null
+    return DeleteConfirmation(categoryId, ownEventCount, subCategoryCount)
 }
 
 data class GroupPickerState(
@@ -64,8 +62,7 @@ class CategoryListViewModel @Inject constructor(
         viewModelScope.launch {
             val ownCount = repository.getEventCountForCategory(id).first()
             val subCount = repository.getSubCategoryCount(id).first()
-            val isMeta = repository.getCategoryById(id).first() is Category.MetaCategory
-            val confirmation = deletionConfirmationIfNeeded(id, ownCount, subCount, isMeta)
+            val confirmation = deletionConfirmationIfNeeded(id, ownCount, subCount)
             if (confirmation == null) repository.deleteCategory(id)
             else _pendingDeleteConfirmation.value = confirmation
         }
@@ -75,11 +72,7 @@ class CategoryListViewModel @Inject constructor(
     fun confirmDelete() {
         val pending = _pendingDeleteConfirmation.value ?: return
         viewModelScope.launch {
-            if (pending.isMetaCategory) {
-                repository.deleteMetaCategoryAndPromoteSubcategories(pending.categoryId)
-            } else {
-                repository.deleteCategory(pending.categoryId)
-            }
+            repository.deleteCategory(pending.categoryId)
             _pendingDeleteConfirmation.value = null
         }
     }

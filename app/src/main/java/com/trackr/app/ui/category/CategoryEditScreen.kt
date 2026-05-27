@@ -38,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -106,34 +105,10 @@ fun CategoryEditScreen(
 
     // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
     pendingDelete?.let { confirmation ->
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelDelete() },
-            title = { Text("Delete category?") },
-            text = {
-                val text = if (confirmation.isMetaCategory) {
-                    buildString {
-                        if (confirmation.ownEventCount > 0) {
-                            val n = confirmation.ownEventCount
-                            append("$n ${if (n == 1) "event" else "events"} from this category will be permanently deleted.")
-                        }
-                        if (confirmation.subCategoryCount > 0) {
-                            if (isNotEmpty()) append(" ")
-                            val n = confirmation.subCategoryCount
-                            append("$n ${if (n == 1) "subcategory" else "subcategories"} will be promoted to top-level categories.")
-                        }
-                    }
-                } else {
-                    val n = confirmation.ownEventCount
-                    "This will permanently delete $n ${if (n == 1) "event" else "events"} logged under this category."
-                }
-                Text(text)
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.confirmDelete() }) { Text("Delete") }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelDelete() }) { Text("Cancel") }
-            },
+        DeleteCategoryDialog(
+            confirmation = confirmation,
+            onConfirm = { viewModel.confirmDelete() },
+            onDismiss = { viewModel.cancelDelete() },
         )
     }
 

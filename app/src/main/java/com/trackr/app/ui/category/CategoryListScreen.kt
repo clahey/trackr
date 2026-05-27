@@ -115,35 +115,10 @@ fun CategoryListScreen(
     }
 
     pendingDelete?.let { confirmation ->
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelDelete() },
-            title = { Text("Delete category?") },
-            text = {
-                // @spec CAT-UI-005
-                val text = if (confirmation.isMetaCategory) {
-                    buildString {
-                        if (confirmation.ownEventCount > 0) {
-                            val n = confirmation.ownEventCount
-                            append("$n ${if (n == 1) "event" else "events"} from this category will be permanently deleted.")
-                        }
-                        if (confirmation.subCategoryCount > 0) {
-                            if (isNotEmpty()) append(" ")
-                            val n = confirmation.subCategoryCount
-                            append("$n ${if (n == 1) "subcategory" else "subcategories"} will be promoted to top-level categories.")
-                        }
-                    }
-                } else {
-                    val n = confirmation.ownEventCount
-                    "This will permanently delete $n ${if (n == 1) "event" else "events"} logged under this category."
-                }
-                Text(text)
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.confirmDelete() }) { Text("Delete") }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelDelete() }) { Text("Cancel") }
-            },
+        DeleteCategoryDialog(
+            confirmation = confirmation,
+            onConfirm = { viewModel.confirmDelete() },
+            onDismiss = { viewModel.cancelDelete() },
         )
     }
 

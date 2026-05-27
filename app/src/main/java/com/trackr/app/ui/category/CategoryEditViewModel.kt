@@ -249,8 +249,7 @@ class CategoryEditViewModel @Inject constructor(
     // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
     fun requestDelete() {
         val id = categoryId ?: return
-        val isMeta = _parentCategory.value == null
-        val confirmation = deletionConfirmationIfNeeded(id, ownEventCount.value, subCategoryCount.value, isMeta)
+        val confirmation = deletionConfirmationIfNeeded(id, ownEventCount.value, subCategoryCount.value)
         if (confirmation == null) {
             viewModelScope.launch {
                 repository.deleteCategory(id)
@@ -264,11 +263,7 @@ class CategoryEditViewModel @Inject constructor(
     fun confirmDelete() {
         val pending = _pendingDeleteConfirmation.value ?: return
         viewModelScope.launch {
-            if (pending.isMetaCategory) {
-                repository.deleteMetaCategoryAndPromoteSubcategories(pending.categoryId)
-            } else {
-                repository.deleteCategory(pending.categoryId)
-            }
+            repository.deleteCategory(pending.categoryId)
             _pendingDeleteConfirmation.value = null
             _saveResult.value = SaveResult.Success
         }
