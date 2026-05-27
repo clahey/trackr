@@ -32,7 +32,7 @@ Because children are promoted (not deleted), the event count shown in the delete
 
 ### Category Edit Screen
 
-Used for both create and edit. Toolbar contains a **Delete** action (visible only when editing an existing category). For a MetaCategory, the toolbar also contains a **"Create subcategory"** action. For a SubCategory, the toolbar overflow contains **"Move to another group"** and **"Remove from group"**; "Move to another group" is always present because the group picker always offers a "Create new group" option (CAT-UI-051).
+Used for both create and edit. Toolbar contains a **Delete** action (visible only when editing an existing category). For a MetaCategory, the toolbar also contains a **"Create subcategory"** action.
 
 **Live preview card** — always visible on the edit screen. Shows a mock timeline row rendered with the current effective name, emoji, color, and value type. Updates reactively as any field changes.
 
@@ -113,7 +113,6 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
   - `Unsafe`: no migration is performed — all other pairs (e.g. Number→None); message: *"Existing events cannot be converted and will display incorrectly."*
 - `originalValueType` is set at load time to the **effective** valueType: for a MetaCategory it is `category.valueType`; for a SubCategory with a non-null override it is the override; for a SubCategory with null valueType (inheriting) it is `parent.valueType`. Null only for new categories, so `valueTypeWarning` is always null in create mode
 - `save()`: when effective `valueType != originalValueType` (edit mode only), calls `repository.saveCategoryAndMigrateEvents(category, originalType)` to persist the category and migrate events atomically (including inheriting SubCategory events); otherwise calls `repository.saveCategory(category)`
-- `removeFromGroup()`: sets any null (inheriting) field to the parent's current value, clears `parentId`; called from the "Remove from group" toolbar menu item; on save after `removeFromGroup()`, the category is written as a `MetaCategory`
 - New categories are assigned `sortOrder = (min sortOrder across all categories) - 1`; using a global minimum avoids collisions when categories are reparented or promoted
 - New MetaCategories pre-populate `color` on init via `repository.getAndIncrementNextCategoryColorIndex()`. New SubCategories open with all inheritable fields null (inheriting). `save()` always uses the current state values.
 
@@ -153,8 +152,6 @@ Categories (list)
 Category Edit
     ├── [toolbar: Create subcategory] → Category Edit (new SubCategory, parentId set)  (MetaCategory only)
     ├── [toolbar: Delete]        → confirmation → delete → back to list  (edit mode only)
-    ├── [overflow: Move to group]  → group picker → reparent  (SubCategory only)
-    ├── [overflow: Remove from group] → promote to MetaCategory → back to list  (SubCategory only)
     ├── [save]                   → back to list
     └── [cancel/back]            → back to list
 ```
@@ -193,8 +190,9 @@ Free-form single-character text field; the system emoji keyboard is used for inp
 ### Deferred
 
 1. **Preset color palette values** — specific colors TBD; defined in the UI layer, not the domain. Resolved when theme LLD is drafted.
-3. **`allowEmptyText` editor exposure** — field is present on the domain model; exposing it in the editor is a UI decision deferred past MVP.
-4. **Archiving vs. deletion** — soft-delete (archive) would preserve historical events without showing the category in the active list. Deferred to v2.
+2. **`allowEmptyText` editor exposure** — field is present on the domain model; exposing it in the editor is a UI decision deferred past MVP.
+3. **Archiving vs. deletion** — soft-delete (archive) would preserve historical events without showing the category in the active list. Deferred to v2.
+4. **"Move to another group" / "Remove from group" from the edit screen (CAT-UI-058, CAT-NAV-011)** — the group picker is already implemented on the list screen. The open question is what happens to unsaved form edits when the user reparents or promotes from within the edit screen. Options: (a) navigate back discarding unsaved changes (matches delete/removeFromGroup behavior but may surprise users); (b) save current form state atomically with the parent change; (c) prevent the action if there are unsaved changes. Deferred until the right UX is clear.
 
 ## References
 

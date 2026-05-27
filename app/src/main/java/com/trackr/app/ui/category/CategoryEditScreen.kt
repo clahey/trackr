@@ -23,11 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -64,8 +61,8 @@ import kotlinx.coroutines.launch
 // @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013, CAT-UI-017,
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057, CAT-UI-058,
-// CAT-UI-059, CAT-UI-060, CAT-NAV-005, CAT-NAV-010, CAT-NAV-011, DM-PROC-019, APP-NAV-004
+// CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057,
+// CAT-UI-059, CAT-UI-060, CAT-NAV-005, CAT-NAV-010, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CategoryEditScreen(
@@ -94,7 +91,6 @@ fun CategoryEditScreen(
 
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
-    var overflowMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(navigateBack) {
         if (navigateBack) onNavigateBack("Category not found.")
@@ -136,31 +132,7 @@ fun CategoryEditScreen(
                             Icon(Icons.Default.Add, contentDescription = "Create subcategory")
                         }
                     }
-                    // @spec CAT-UI-058
-                    if (isSubCategoryMode && isEditMode) {
-                        Box {
-                            IconButton(onClick = { overflowMenuExpanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                            }
-                            DropdownMenu(
-                                expanded = overflowMenuExpanded,
-                                onDismissRequest = { overflowMenuExpanded = false },
-                            ) {
-                                // @spec CAT-NAV-011
-                                DropdownMenuItem(
-                                    text = { Text("Remove from group") },
-                                    onClick = {
-                                        overflowMenuExpanded = false
-                                        viewModel.removeFromGroup()
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Move to another group") },
-                                    onClick = { overflowMenuExpanded = false },
-                                )
-                            }
-                        }
-                    }
+
                 },
             )
         }

@@ -69,7 +69,7 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-055**: While editing a SubCategory, the emoji field shall offer an inherit option implemented as a toggle; when inherit is active, the field shows the parent's emoji in a subdued style and is not editable; when "Custom" is active, the field is editable.
 - [x] **CAT-UI-056**: While editing a SubCategory, the color picker shall display an inherit swatch as the first item showing the parent's resolved color with a label; when `color` is null the inherit swatch shall be pre-selected; when `color` is non-null the inherit swatch shall be unselected and the current color (palette or out-of-palette swatch) shall be pre-selected; tapping the inherit swatch shall set `color` to null; the inherit swatch and the out-of-palette swatch (CAT-UI-015) may coexist when the SubCategory has an explicit out-of-palette color.
 - [x] **CAT-UI-057**: While editing a SubCategory, the value type picker shall include a "Same as [ParentName] ([TypeName])" option as an additional selectable row; selecting it sets valueType to null (inherit from parent).
-- [x] **CAT-UI-058**: While editing a SubCategory, the toolbar overflow menu shall contain "Remove from group" and "Move to another group".
+- [D] **CAT-UI-058**: While editing a SubCategory, the toolbar overflow menu shall contain "Remove from group" and "Move to another group".
 - [x] **CAT-UI-059**: The category edit screen shall display a live preview card showing a mock timeline row rendered with the current effective name, resolved emoji, resolved color, and resolved value type.
 - [x] **CAT-UI-060**: The live preview card shall update reactively as any field on the edit screen changes.
 
@@ -81,4 +81,4 @@ LLD: `docs/llds/category-management.md`
 - [ ] **CAT-NAV-004**: When the user taps back or cancel on the category edit screen without saving, the system shall navigate back to the category list without persisting any changes.
 - [x] **CAT-NAV-005**: When the user confirms deletion of a category from the edit screen toolbar, the system shall delete the category and navigate back to the category list.
 - [x] **CAT-NAV-010**: When the user taps "Create subcategory" on a MetaCategory edit screen, the system shall navigate to the category edit screen in create mode with the parentId set to the MetaCategory's id.
-- [x] **CAT-NAV-011**: When the user confirms "Remove from group" on a SubCategory edit screen, the system shall promote the SubCategory to a MetaCategory (per DM-PROC-019) and navigate back to the category list.
+- [D] **CAT-NAV-011**: When the user confirms "Remove from group" on a SubCategory edit screen, the system shall promote the SubCategory to a MetaCategory (per DM-PROC-019) and navigate back to the category list.

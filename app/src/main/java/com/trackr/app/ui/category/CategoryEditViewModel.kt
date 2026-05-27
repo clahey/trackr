@@ -28,7 +28,7 @@ enum class ValueTypeWarningTier { IrreversibleSafe, Partial, Unsafe }
 // @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013,
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// CAT-UI-054, CAT-NAV-005, DM-PROC-019, DM-PROC-021, APP-NAV-004
+// CAT-UI-054, CAT-NAV-005, DM-PROC-021, APP-NAV-004
 @HiltViewModel
 class CategoryEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -223,27 +223,6 @@ class CategoryEditViewModel @Inject constructor(
             repository.saveCategory(category)
         }
         _saveResult.value = SaveResult.Success
-    }
-
-    // @spec DM-PROC-019, CAT-NAV-011
-    fun removeFromGroup() {
-        val id = categoryId ?: return
-        viewModelScope.launch {
-            val cat = repository.getCategoryById(id).first() as? Category.SubCategory ?: return@launch
-            repository.saveCategory(
-                Category.MetaCategory(
-                    id = cat.id,
-                    name = cat.name,
-                    emoji = cat.resolvedEmoji,
-                    color = cat.resolvedColor,
-                    valueType = cat.resolvedValueType,
-                    unit = cat.unit,
-                    allowEmptyText = cat.allowEmptyText,
-                    sortOrder = cat.sortOrder,
-                )
-            )
-            _saveResult.value = SaveResult.Success
-        }
     }
 
     // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
