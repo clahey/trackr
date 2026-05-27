@@ -592,11 +592,9 @@ private fun QuickLogSheet(
 
             if (cat.resolvedValueType != ValueType.None) {
                 ValueInputField(
-                    value = value,
-                    onValueChange = { viewModel.value.value = it },
-                    valueType = cat.resolvedValueType,
+                    uiState = value,
+                    onStateChange = { viewModel.updateValue(it) },
                     autoFocus = true,
-                    defaultUnit = cat.unit,
                 )
                 if (saveResult is SaveResult.ValidationError) {
                     Text(

@@ -191,10 +191,8 @@ fun EventEditScreen(
             )
 
             ValueInputField(
-                value = value,
-                onValueChange = { viewModel.value.value = it },
-                valueType = category?.resolvedValueType,
-                defaultUnit = category?.unit,
+                uiState = value,
+                onStateChange = { viewModel.value.value = it },
             )
 
             OutlinedTextField(

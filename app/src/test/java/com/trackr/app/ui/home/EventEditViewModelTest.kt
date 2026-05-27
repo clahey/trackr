@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.trackr.app.FakeImageStore
 import com.trackr.app.FakeTrackrRepository
 import com.trackr.app.domain.Category
+import com.trackr.app.domain.ErrorKind
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
@@ -23,6 +24,7 @@ import org.junit.Before
 import org.junit.Test
 import java.time.Instant
 import com.trackr.app.domain.Event
+import com.trackr.app.ui.components.ValueUIState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventEditViewModelTest {
@@ -128,6 +130,35 @@ class EventEditViewModelTest {
         assertEquals("new note", saved?.notes)
     }
 
+    // @spec EL-UI-057
+    @Test fun `save blocked when Boolean value is unset`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Boolean))
+        repo.saveEvent(makeEvent("e1", "c1", value = null))
+        vm = makeVm("e1")
+        // loaded as Bool(null) via EL-UI-067
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+    }
+
+    // @spec EL-UI-057
+    @Test fun `save blocked when Number text is empty`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1", value = null))
+        vm = makeVm("e1")
+        // loaded as Number("", "") via EL-UI-067
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+    }
+
+    // @spec EL-UI-057
+    @Test fun `save succeeds when Scale value is loaded`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = EventValue.Scale(7)))
+        vm = makeVm("e1")
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.Success)
+    }
+
     // @spec EL-UI-044
     @Test fun `addImage appends path to imagePaths`() = runTest {
         repo.setCategories(makeCategory("c1"))
@@ -202,6 +233,50 @@ class EventEditViewModelTest {
         vm = makeVm("e1")
         val path = vm.createImageFile()
         assertTrue(imageStore.allStoredPaths().contains(path))
+    }
+
+    // @spec EL-UI-062
+    @Test fun `value initialized as matched UIState when stored value matches category type`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = EventValue.Scale(7)))
+        vm = makeVm("e1")
+        assertEquals(ValueUIState.Scale(7), vm.value.value)
+    }
+
+    // @spec EL-UI-062
+    @Test fun `value initialized as Mismatched when stored value type does not match category type`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = EventValue.BooleanValue(true)))
+        vm = makeVm("e1")
+        assertTrue(vm.value.value is ValueUIState.Mismatched)
+    }
+
+    // @spec EL-UI-062
+    @Test fun `value Mismatched carries the original stored EventValue`() = runTest {
+        val storedValue = EventValue.BooleanValue(true)
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = storedValue))
+        vm = makeVm("e1")
+        val mismatched = vm.value.value as ValueUIState.Mismatched
+        assertEquals(storedValue, mismatched.originalValue)
+    }
+
+    // @spec EL-UI-067
+    @Test fun `null stored value with non-None category type initializes to default editable state`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = null))
+        vm = makeVm("e1")
+        assertEquals(ValueUIState.Scale(5), vm.value.value)
+    }
+
+    // @spec EL-UI-043, EL-UI-062
+    @Test fun `ErrorValue produces Mismatched with null editableState`() = runTest {
+        val errorValue = EventValue.ErrorValue(ErrorKind.UNPARSABLE, "bad")
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = errorValue))
+        vm = makeVm("e1")
+        val mismatched = vm.value.value as ValueUIState.Mismatched
+        assertNull(mismatched.editableState)
     }
 
     // @spec EL-UI-044a

@@ -7,8 +7,12 @@ import com.trackr.app.data.ImageStore
 import com.trackr.app.data.TrackrRepository
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
-import com.trackr.app.domain.EventValue
+import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import com.trackr.app.ui.components.ValueUIState
+import com.trackr.app.ui.components.toEventValue
+import com.trackr.app.ui.components.toValueUIState
+import com.trackr.app.ui.components.validateValueForSave
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +22,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 
-// @spec EL-UI-040, EL-UI-042, EL-UI-043, EL-UI-044, EL-UI-062, EL-NAV-005, EL-NAV-006, EL-PROC-002, APP-NAV-003
+// @spec EL-UI-040, EL-UI-042, EL-UI-043, EL-UI-044, EL-UI-062, EL-UI-067, EL-NAV-005, EL-NAV-006, EL-PROC-002, APP-NAV-003
 @HiltViewModel
 class EventEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -29,7 +33,7 @@ class EventEditViewModel @Inject constructor(
     private val eventId: String = checkNotNull(savedStateHandle["eventId"])
 
     val timestamp = MutableStateFlow<Instant>(Instant.EPOCH)
-    val value = MutableStateFlow<EventValue?>(null)
+    val value = MutableStateFlow<ValueUIState>(ValueUIState.None)
     val notes = MutableStateFlow("")
     val imagePaths = MutableStateFlow<List<String>>(emptyList())
 
@@ -61,11 +65,13 @@ class EventEditViewModel @Inject constructor(
             originalEvent = event
             originalImagePaths = event.imagePaths.toSet()
             timestamp.value = event.timestamp
-            value.value = event.value
             notes.value = event.notes ?: ""
             imagePaths.value = event.imagePaths
 
-            _category.value = repository.getCategoryById(event.categoryId).first()
+            val cat = repository.getCategoryById(event.categoryId).first()
+            _category.value = cat
+            val valueType = cat?.resolvedValueType ?: ValueType.None
+            value.value = event.value.toValueUIState(valueType, cat?.unit)
         }
     }
 
@@ -79,10 +85,18 @@ class EventEditViewModel @Inject constructor(
 
     suspend fun save() {
         val event = originalEvent ?: return
+        val cat = _category.value
+        if (cat != null) {
+            val invalidField = validateValueForSave(value.value, cat)
+            if (invalidField != null) {
+                _saveResult.value = SaveResult.ValidationError(invalidField)
+                return
+            }
+        }
         repository.saveEvent(
             event.copy(
                 timestamp = timestamp.value,
-                value = value.value,
+                value = value.value.toEventValue(),
                 notes = notes.value.takeIf { it.isNotBlank() },
                 imagePaths = imagePaths.value,
             )

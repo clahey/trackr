@@ -6,6 +6,9 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import com.trackr.app.ui.components.ValueUIState
+import com.trackr.app.ui.components.defaultValueUIStateForType
+import kotlin.time.Duration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -15,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -116,6 +120,7 @@ class QuickLogViewModelTest {
         assertEquals("", vm.notes.value)
         assertNull(vm.imagePath.value)
         assertEquals(anchor, vm.timestamp.value)
+        assertEquals(ValueUIState.None, vm.value.value)
     }
 
     // @spec EL-PROC-001
@@ -128,27 +133,71 @@ class QuickLogViewModelTest {
         val cat = makeCategory("c1", valueType = ValueType.Text, allowEmptyText = false)
         repo.setCategories(cat)
         vm.selectCategory(cat)
-        vm.value.value = EventValue.TextValue("")
+        vm.value.value = ValueUIState.Text("")
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.ValidationError)
     }
 
     // @spec EL-UI-052b
-    @Test fun `save with no value for Number type produces validation error`() = runTest {
+    @Test fun `save with empty Number text produces validation error`() = runTest {
         val cat = makeCategory("c1", valueType = ValueType.Number)
         repo.setCategories(cat)
         vm.selectCategory(cat)
+        // default state after selectCategory is Number("", defaultUnit) — empty text blocks save
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.ValidationError)
     }
 
-    // @spec EL-UI-055b
-    @Test fun `save with no value for Duration type produces validation error`() = runTest {
+    // @spec EL-UI-051b
+    @Test fun `save with Boolean unset (null selection) produces validation error`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Boolean)
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        // default is Bool(null) — no selection
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+    }
+
+    // @spec EL-UI-051b
+    @Test fun `save with Boolean selected succeeds`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Boolean)
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        vm.value.value = ValueUIState.Bool(true)
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.Success)
+    }
+
+    // @spec EL-UI-059b
+    @Test fun `save with Exercise empty sets field produces validation error`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Exercise)
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        vm.value.value = ValueUIState.Exercise("", "15")
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+    }
+
+    // @spec EL-UI-059b
+    @Test fun `save with Exercise zero reps produces validation error`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Exercise)
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        vm.value.value = ValueUIState.Exercise("3", "0")
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+    }
+
+    // @spec EL-UI-055c
+    @Test fun `save with Duration all-empty fields saves as zero duration`() = runTest {
         val cat = makeCategory("c1", valueType = ValueType.Duration)
         repo.setCategories(cat)
         vm.selectCategory(cat)
+        vm.value.value = ValueUIState.Duration("", "", "")
         vm.save()
-        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+        assertTrue(vm.saveResult.value is SaveResult.Success)
+        val event = repo.getEvents().first().first()
+        assertEquals(EventValue.DurationValue(kotlin.time.Duration.ZERO), event.value)
     }
 
     // @spec EL-UI-073
@@ -185,36 +234,125 @@ class QuickLogViewModelTest {
     }
 
     // @spec EL-UI-068
-    @Test fun `selectCategory converts compatible value when switching category type`() = runTest {
+    @Test fun `selectCategory uses default when not dirty`() = runTest {
         val scaleCat = makeCategory("c1", valueType = ValueType.Scale)
-        val numCat = makeCategory("c2", valueType = ValueType.Number)
-        repo.setCategories(scaleCat, numCat)
+        val scaleCat2 = makeCategory("c2", valueType = ValueType.Scale)
+        repo.setCategories(scaleCat, scaleCat2)
         vm.selectCategory(scaleCat)
-        vm.value.value = EventValue.Scale(5)
-        vm.selectCategory(numCat)
-        assertEquals(EventValue.NumberValue(5.0, null), vm.value.value)
+        // not dirty — even same-type switch should use the new category's default
+        vm.selectCategory(scaleCat2)
+        assertEquals(ValueUIState.Scale(5), vm.value.value)
     }
 
     // @spec EL-UI-068
-    @Test fun `selectCategory clears value when conversion produces null`() = runTest {
-        val textCat = makeCategory("c1", valueType = ValueType.Text)
-        val noneCat = makeCategory("c2", valueType = ValueType.None)
-        repo.setCategories(textCat, noneCat)
-        vm.selectCategory(textCat)
-        vm.value.value = EventValue.TextValue("")
+    @Test fun `selectCategory uses default when no prior value`() = runTest {
+        val scaleCat = makeCategory("c2", valueType = ValueType.Scale)
+        repo.setCategories(scaleCat)
+        vm.selectCategory(scaleCat)
+        assertEquals(ValueUIState.Scale(5), vm.value.value)
+    }
+
+    // @spec EL-UI-068
+    @Test fun `selectCategory uses default when switching from None type without interaction`() = runTest {
+        val noneCat = makeCategory("c1", valueType = ValueType.None)
+        val numCat = makeCategory("c2", valueType = ValueType.Number, unit = "kg")
+        repo.setCategories(noneCat, numCat)
         vm.selectCategory(noneCat)
-        assertNull(vm.value.value)
+        vm.selectCategory(numCat)
+        assertEquals(ValueUIState.Number("", "kg"), vm.value.value)
     }
 
-    // @spec EL-UI-068
-    @Test fun `selectCategory preserves value unchanged when no conversion path exists`() = runTest {
+    // @spec EL-UI-068b
+    @Test fun `selectCategory preserves value verbatim when dirty and same type`() = runTest {
+        val numCat1 = makeCategory("c1", valueType = ValueType.Number, unit = "kg")
+        val numCat2 = makeCategory("c2", valueType = ValueType.Number, unit = "cm")
+        repo.setCategories(numCat1, numCat2)
+        vm.selectCategory(numCat1)
+        vm.updateValue(ValueUIState.Number("75", "kg"))
+        vm.selectCategory(numCat2)
+        // text and unit preserved verbatim; new category's unit ("cm") is not substituted
+        assertEquals(ValueUIState.Number("75", "kg"), vm.value.value)
+    }
+
+    // @spec EL-UI-068b
+    @Test fun `selectCategory shows Mismatched when dirty and types differ`() = runTest {
         val boolCat = makeCategory("c1", valueType = ValueType.Boolean)
         val scaleCat = makeCategory("c2", valueType = ValueType.Scale)
         repo.setCategories(boolCat, scaleCat)
         vm.selectCategory(boolCat)
-        vm.value.value = EventValue.BooleanValue(true)
+        vm.updateValue(ValueUIState.Bool(true))
         vm.selectCategory(scaleCat)
-        assertEquals(EventValue.BooleanValue(true), vm.value.value)
+        assertTrue(vm.value.value is ValueUIState.Mismatched)
+        assertEquals(
+            EventValue.BooleanValue(true),
+            (vm.value.value as ValueUIState.Mismatched).originalValue,
+        )
+    }
+
+    // @spec EL-UI-068b
+    @Test fun `selectCategory uses default when dirty but effective value is partial`() = runTest {
+        val boolCat = makeCategory("c1", valueType = ValueType.Boolean)
+        val scaleCat = makeCategory("c2", valueType = ValueType.Scale)
+        repo.setCategories(boolCat, scaleCat)
+        vm.selectCategory(boolCat)
+        vm.updateValue(ValueUIState.Bool(null)) // partial — no selection made
+        vm.selectCategory(scaleCat)
+        assertEquals(ValueUIState.Scale(5), vm.value.value)
+    }
+
+    // @spec EL-UI-068b
+    @Test fun `selectCategory unwraps Mismatched editableState for type check`() = runTest {
+        val boolCat = makeCategory("c1", valueType = ValueType.Boolean)
+        val scaleCat = makeCategory("c2", valueType = ValueType.Scale)
+        val boolCat2 = makeCategory("c3", valueType = ValueType.Boolean)
+        repo.setCategories(boolCat, scaleCat, boolCat2)
+        vm.selectCategory(boolCat)
+        vm.updateValue(ValueUIState.Bool(true))
+        vm.selectCategory(scaleCat) // type mismatch → Mismatched(editableState=Bool(true))
+        vm.selectCategory(boolCat2) // unwrap → Bool(true) matches Boolean → preserve
+        assertEquals(ValueUIState.Bool(true), vm.value.value)
+    }
+
+    // @spec EL-UI-068b
+    @Test fun `selectCategory recovers value from Mismatched originalValue after Discard pass-through`() = runTest {
+        val numCat = makeCategory("c1", valueType = ValueType.Number, unit = "kg")
+        val noneCat = makeCategory("c2", valueType = ValueType.None)
+        repo.setCategories(numCat, noneCat)
+        vm.selectCategory(numCat)
+        vm.updateValue(ValueUIState.Number("75", "kg"))
+        vm.selectCategory(noneCat) // Discard outcome → Mismatched with null editableState
+        vm.selectCategory(numCat)  // recover from originalValue → Number matches Number
+        assertTrue(vm.value.value is ValueUIState.Number)
+    }
+
+    // @spec EL-UI-068c
+    @Test fun `updateValue sets valueDirty`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Scale)
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        vm.updateValue(ValueUIState.Scale(7))
+        assertTrue(vm.valueDirty.value)
+    }
+
+    // @spec EL-UI-068c
+    @Test fun `valueDirty persists across category switches`() = runTest {
+        val scaleCat = makeCategory("c1", valueType = ValueType.Scale)
+        val numCat = makeCategory("c2", valueType = ValueType.Number)
+        repo.setCategories(scaleCat, numCat)
+        vm.selectCategory(scaleCat)
+        vm.updateValue(ValueUIState.Scale(7))
+        vm.selectCategory(numCat)
+        assertTrue(vm.valueDirty.value)
+    }
+
+    // @spec EL-UI-068c
+    @Test fun `reset clears valueDirty`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Scale)
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        vm.updateValue(ValueUIState.Scale(7))
+        vm.reset()
+        assertFalse(vm.valueDirty.value)
     }
 
     // @spec EL-UI-031a, EL-UI-031b

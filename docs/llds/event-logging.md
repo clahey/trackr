@@ -99,6 +99,65 @@ Save navigates back to timeline. Delete shows a confirmation dialog, then delete
 
 `Unknown` and `ErrorValue` are read-only in both Quick-Log (these categories/events won't normally appear in the picker or edit flow) and Event Edit. An event carrying `ErrorValue` can still have its notes, timestamp, and images edited.
 
+### ValueUIState
+
+The value editing exchange type between ViewModels and `ValueInputField`. Lives in `ui/components/ValueUIState.kt` alongside `ValueInputField`. ViewModels hold `MutableStateFlow<ValueUIState>`.
+
+```kotlin
+sealed class ValueUIState {
+    data object None : ValueUIState()
+    data class Number(val text: String, val unit: String) : ValueUIState()
+    data class Text(val text: String) : ValueUIState()
+    data class Scale(val value: Int) : ValueUIState()
+    data class Bool(val selected: Boolean?) : ValueUIState()
+    data class Duration(val hoursText: String, val minutesText: String, val secondsText: String) : ValueUIState()
+    data class Exercise(val setsText: String, val repsText: String) : ValueUIState()
+    data class ReadOnly(val displayText: String) : ValueUIState()
+    data class Mismatched(
+        val originalValue: EventValue,
+        val targetType: ValueType,          // stored so outcome can be recomputed as editableState changes
+        val editableState: ValueUIState?,   // null for ErrorValue / Discard outcomes
+    ) : ValueUIState() {
+        // computed so the banner label always reflects the current editable value
+        val outcome: ConversionOutcome get() {
+            val ev = editableState?.toEventValue()
+            return when {
+                ev != null -> convertOrDefault(ev, targetType)
+                editableState != null -> // partial/invalid input — offer default, not a conversion of originalValue
+                    defaultForType(targetType)?.let { ConversionOutcome.UsedDefault(it) } ?: ConversionOutcome.Discard
+                else -> convertOrDefault(originalValue, targetType)
+            }
+        }
+    }
+}
+```
+
+**Conversion helpers** in `ui/components/ValueUIState.kt`:
+
+- `EventValue.toValueUIState(): ValueUIState` — maps each concrete variant to its `ValueUIState` counterpart. `ErrorValue` and `Unknown` category path → `ReadOnly(formatValue(this))`.
+- `EventValue?.toValueUIState(valueType: ValueType, defaultUnit: String? = null): ValueUIState` — entry point used by ViewModels on load. If `this` is null, returns `defaultValueUIStateForType(valueType, defaultUnit)` — for `None` type this is `ValueUIState.None`; for any other type it shows the default empty input so the user can enter a value. If `matchesValueType(this, valueType)`, returns `toValueUIState()`. Otherwise builds `Mismatched(originalValue=this, targetType=valueType, editableState=editableStateFor(this, valueType))`.
+- `editableStateFor(value: EventValue, valueType: ValueType): ValueUIState?` — returns `null` when `value` is `ErrorValue` or when `convertOrDefault` yields `Discard`; otherwise `value.toValueUIState()`.
+- `ValueUIState.toEventValue(): EventValue?` — converts UI state to an `EventValue` for persistence. Returns `null` for invalid or partial input (e.g., empty or non-numeric Number text). For `Mismatched`, returns `editableState?.toEventValue() ?: originalValue` (preserves the original uneditable value when `editableState` is null).
+- `defaultValueUIStateForType(type: ValueType, defaultUnit: String?): ValueUIState` — fresh default state: `None`→`None`; `Number`→`Number("", defaultUnit??"")` ; `Text`→`Text("")`; `Scale`→`Scale(5)`; `Boolean`→`Bool(null)` (both buttons unpressed; saving blocked until a selection is made); `Duration`→`Duration("", "", "0")` (hours and minutes empty, seconds "0", ensuring at least one non-empty field); `Exercise`→`Exercise("3","15")`; `Unknown`→`ReadOnly("")`.
+- `durationToUIState(hours: Long, minutes: Int, seconds: Int): Duration` — computes display strings: `hoursText = if (hours > 0) hours.toString() else ""`; `minutesText = if (hours > 0 || minutes > 0) minutes.toString() else ""`; `secondsText = seconds.toString()` (always shown, even as `"0"`). Leading-zero components are elided as empty; once a non-zero component is encountered all smaller components are displayed (including as `"0"`). Used by `EventValue.DurationValue.toValueUIState()`.
+- `ValueUIState.matchesType(type: ValueType): Boolean` — returns true when the `ValueUIState` variant is consistent with `type` (e.g., `Scale` matches `ValueType.Scale`; `None` matches `None` and `Unknown`). Parallel to `matchesValueType` for `EventValue`. Used by `selectCategory` to detect same-type switches without going through `toEventValue()`.
+- `validateValueForSave(value: ValueUIState, category: Category): String?` — shared save-validation helper used by both ViewModels. Returns the failing field name (`"value"`) or null if valid. Two checks in order: (1) if `value.toEventValue()` is null and `value` is not `ValueUIState.None`, the input is invalid or partial → return `"value"`; (2) if `category.resolvedValueType` is `Text` and `!category.allowEmptyText` and `value.toEventValue()` is an empty `TextValue` → return `"value"`. All other states are valid (including `None` with null result, `Duration` with all-empty fields yielding zero, etc.).
+
+**`ValueInputField` signature:**
+```kotlin
+@Composable
+fun ValueInputField(
+    uiState: ValueUIState,
+    onStateChange: (ValueUIState) -> Unit,
+    autoFocus: Boolean = false,
+)
+```
+`defaultUnit` and `valueType` parameters are eliminated. Unit is carried in `ValueUIState.Number.unit` (seeded by the ViewModel at state creation). The widget dispatches on the concrete `ValueUIState` variant, not on a separate `valueType`. Partial and intermediate text (e.g., a trailing decimal point, empty Number field, empty Duration component) is stored verbatim in the state — the widget never silently replaces user input.
+
+- **Number:** an empty or non-parseable text field produces `null` from `toEventValue()`; validation blocks save (EL-UI-052b unchanged).
+- **Bool(null):** renders both buttons unpressed; `toEventValue()` returns `null`; validation blocks save until a selection is made.
+- **Duration:** an empty component field is treated as `0` by `toEventValue()`; only the `seconds` field is guaranteed non-empty in default state.
+
 ### ValueType change
 
 When a category's `valueType` is changed, `TrackrRepository.saveCategoryAndMigrateEvents` migrates historical events in a single transaction using `convertEventValue`. The conversion is best-effort: values that have a defined conversion path (e.g., `Scale` → `Number`, parseable `Text` → `Scale`) are converted; values with no path are left unchanged in the database, creating a mismatch between the event's stored value type and the category's current type.
@@ -107,30 +166,26 @@ Mismatches can also arise when the app reads data from a newer app version — a
 
 ### Value type mismatch
 
-A **value action banner** is shown inside `ValueInputField` whenever the `value` and `valueType` parameters do not satisfy `matchesValueType` — i.e., the stored value cannot be meaningfully used as-is for the category's current type. This covers three cases:
+Mismatch detection occurs at the ViewModel layer (not inside `ValueInputField`). When an event is loaded, `EventEditViewModel` calls `event.value.toValueUIState(category.resolvedValueType)`, which produces `ValueUIState.Mismatched` whenever `matchesValueType` returns false.
 
-1. **Type mismatch** — the stored `EventValue` is a concrete type that does not match the category's `valueType` (e.g., `TextValue("hello")` on an Exercise category). Happens when migration leaves some events unconverted, or when the user switches category in the quick-log sheet after entering a value.
-2. **`ErrorValue`** — the stored value could not be decoded at all. Read-only per EL-UI-043; the banner offers a "replace with default" action.
-3. **`Unknown` category type** — the category's type is unrecognized by this app version; no input is possible.
+**`matchesValueType(value: EventValue?, type: ValueType): Boolean`** — domain-layer helper. Returns `true` only when the value's runtime type is the expected variant for `type`, or when an `ErrorValue` with `inferredType` matches an `Unknown` category's raw string (coherent future-type pair — both from the same unrecognized type). Returns `false` for: `ErrorValue` without a matching `Unknown` type, `Unknown` category type without a matching `ErrorValue`, `None` type with non-null value, or a concrete value of the wrong type. `null` on `None` type returns `true`.
 
-**Detection:** `matchesValueType(value: EventValue?, type: ValueType): Boolean` — domain-layer helper. Returns `true` only when the value's runtime type is the expected variant for `type`, or when an `ErrorValue` with `inferredType` matches an `Unknown` category's raw string (coherent future-type pair — both from the same unrecognized type). Returns `false` for: `ErrorValue` without a matching `Unknown` type, `Unknown` category type without a matching `ErrorValue`, `None` type with non-null value, or a concrete value of the wrong type. `null` on `None` type returns `true`.
-
-**Conversion-or-default:** `convertOrDefault(value: EventValue, targetType: ValueType): ConversionOutcome` — domain layer. Returns a sealed class with three cases:
+**`convertOrDefault(value: EventValue, targetType: ValueType): ConversionOutcome`** — domain layer. Returns a sealed class with three cases:
 - `ConversionOutcome.Converted(value: EventValue)` — `convertEventValue` produced a value of the right type (genuine conversion from the stored data).
 - `ConversionOutcome.UsedDefault(value: EventValue)` — conversion failed, no path exists, or the value is `ErrorValue`; `defaultForType(targetType)` is used instead.
 - `ConversionOutcome.Discard` — target type is `None` or `Unknown`; the right action is to clear the event value.
 
 **Timeline display:** events with `!matchesValueType(event.value, category.valueType)` display the raw stored value via the existing `formatValue` followed by a warning icon. No DB write on view.
 
-**Value action banner (inside `ValueInputField`):** shown whenever `value` is non-null and `!matchesValueType(value, valueType)`. Contains:
+**Value action banner (inside `ValueInputField`):** shown when `uiState is ValueUIState.Mismatched`. Contains:
 - A short description: *"Stored value doesn't match the category type."*
-- An action button whose label depends on `convertOrDefault(value, valueType)`, using `describeValue(v: EventValue): String` for the value descriptions (a UI-layer function that produces verbose human-readable text — e.g., `"2 sets × 5 reps"` for `ExerciseValue(2, 5)`, `"7/10"` for `Scale(7)`, `"Yes"` for `BooleanValue(true)`, `"3.5 kg"` for `NumberValue(3.5, "kg")`):
+- An action button whose label depends on `outcome`, using `describeValue(v: EventValue): String` for the value descriptions (a UI-layer function that produces verbose human-readable text — e.g., `"2 sets × 5 reps"` for `ExerciseValue(2, 5)`, `"7/10"` for `Scale(7)`, `"Yes"` for `BooleanValue(true)`, `"3.5 kg"` for `NumberValue(3.5, "kg")`):
   - `Converted(v)`: **"Convert to [describeValue(v)]"**
   - `UsedDefault(v)`: **"Replace with default: [describeValue(v)]"**
   - `Discard`: **"Discard value"**
-  - In all cases, tapping clears the banner and calls `onValueChange`: for `Converted(v)` or `UsedDefault(v)`, with `v`; for `Discard`, with null.
-- The banner is informational — the Save button remains enabled while the banner is visible. If the user saves without resolving the banner, the mismatched value is persisted unchanged.
-- While the banner is shown, `ValueInputField` renders the input for the **value's own type** (not the target `valueType`), so the user can refine the existing value (e.g., edit a TextValue to "Yes" before accepting a Boolean conversion) before tapping the action button. For `ErrorValue` and for `Discard` outcomes (None or Unknown target), no editable input is shown; the banner action is the only resolution path.
+  - Tapping calls `onStateChange`: for `Converted(v)` or `UsedDefault(v)`, with `v.toValueUIState()`; for `Discard`, with `ValueUIState.None`.
+- The banner is informational — the Save button remains enabled while the banner is visible. If the user saves without resolving the banner, `toEventValue()` on the `Mismatched` state persists the edited (or original) value unchanged with respect to type conversion.
+- While the banner is shown, `ValueInputField` renders the `editableState` sub-field so the user can refine the existing value (e.g., edit a TextValue to "Yes" before accepting a Boolean conversion) before tapping the action button. For `ErrorValue` and for `Discard` outcomes (None or Unknown target), `editableState` is null and no editable input is shown; the banner action is the only resolution path. When the user edits the sub-field, `ValueInputField` wraps the callback: `onStateChange(mismatched.copy(editableState = newSub))` — the `Mismatched` wrapper is preserved so the banner remains visible while the sub-value is being refined.
 
 ## ViewModels
 
@@ -170,21 +225,31 @@ sealed class DayEntry {
 - `categories: StateFlow<List<Category>>` — from `repository.getCategories()`
 - `selectedCategory: StateFlow<Category?>` — set when user picks in step 1
 - `expandedMetaCategoryId: MutableStateFlow<String?>` — which MetaCategory is expanded in the step 1 grid; null = none expanded
-- Form state: `timestamp`, `value`, `notes`, `imagePath` (single, nullable)
+- Form state: `timestamp`, `value: MutableStateFlow<ValueUIState>`, `notes`, `imagePath` (single, nullable)
 - `timestamp` defaults to `Instant.now()` at sheet open; user-editable
-- `selectCategory(category)`: sets `selectedCategory`; if `value` is non-null, applies `convertEventValue(value, category.resolvedValueType)` — if the result is null (None target or no conversion path), `value` is cleared; if the result is non-null, `value` is updated to the converted form. Any remaining mismatch after conversion is surfaced by `ValueInputField`'s banner.
-- `save()`: validates, generates a UUID for the new event, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, emits `SaveResult`
-- `reset()`: called when sheet is dismissed (with or without saving); clears all form state including `saveResult` back to `Idle`, and deletes any captured-but-unsaved image file
+- `value` is initialized to `ValueUIState.None`; updated to the type-appropriate default when a category is selected (see `selectCategory` below)
+- `valueDirty: MutableStateFlow<Boolean>` — tracks whether the user has interacted with the value input during this sheet session. Set to `false` on init and `reset()`; set to `true` when the UI calls `updateValue()`. Never reset on `selectCategory` — edits persist across back-and-forth category navigation within one session.
+- `updateValue(state: ValueUIState)`: sets `value.value = state` and `valueDirty.value = true`. The UI calls this instead of writing to `value` directly, so dirty tracking is centralised.
+- `selectCategory(category)`: sets `selectedCategory`. Then:
+  1. If `!valueDirty` → `defaultValueUIStateForType(targetType, category.unit)` (user hasn't typed anything this session).
+  2. Unwrap `Mismatched`: if `editableState` is non-null use it as `effectiveState`; if `editableState` is null, call `originalValue.toValueUIState()` to reconstruct an effective state from the stored EventValue (preserves the value across a Discard pass-through, though intermediate text precision may normalize, e.g. "75" → "75.0").
+  3. If `effectiveState` is `None` → `defaultValueUIStateForType(targetType, category.unit)`.
+  4. If `effectiveState.matchesType(targetType)` → use `effectiveState` verbatim (preserves in-progress text without snap-back). For `Number`, variant match is sufficient — unit field is not compared.
+  5. Otherwise: `ev = effectiveState.toEventValue()`. If null (partial/invalid input such as `Bool(null)`) → `defaultValueUIStateForType`. If non-null → `Mismatched(originalValue=ev, targetType=targetType, editableState=editableStateFor(ev, targetType))`.
+  `ValueUIState.matchesType(ValueType): Boolean` — parallel to `matchesValueType`; `ReadOnly` and `Mismatched` return false for all types.
+- `save()`: calls `validateValueForSave(value.value, category)`; if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, generates a UUID, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, emits `SaveResult.Success`.
+- `reset()`: called when sheet is dismissed (with or without saving); clears all form state — including `value` back to `ValueUIState.None`, `valueDirty` back to `false`, and `saveResult` back to `Idle` — and deletes any captured-but-unsaved image file
 - **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1. If a MetaCategory is deleted while the user has expanded it in step 1, the expansion collapses.
 
 ### EventEditViewModel
 
 - Loads event by ID via `repository.getEventById()`; also loads its category via `repository.getCategoryById()` for value type context and to populate `category: StateFlow<Category?>`
-- Full form state mirroring `Event` fields
-- `save()`: diffs image paths, calls `repository.saveEvent()`
+- Full form state mirroring `Event` fields; `value: MutableStateFlow<ValueUIState>`
+- On load: initializes `value` by calling `event.value.toValueUIState(category.resolvedValueType)`, which produces `ValueUIState.Mismatched` when the stored value does not match the category type.
+- `save()`: calls `validateValueForSave(value.value, category)` (category may be null if not yet loaded — treat as no validation required); if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, diffs image paths, calls `repository.saveEvent()`, emits `SaveResult.Success`.
 - `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()`
 - **Stale event guard:** if `getEventById` returns null on init, emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`; the UI layer invokes `onNavigateBack(errorMessage)` with a non-null message, which the caller (timeline) displays as a snackbar.
-- Mismatch detection and the value action banner are owned by `ValueInputField`; `EventEditViewModel` does not compute `conversionOutcome` or expose `applyConversion()`, and does not expose `isValueEditable`
+- Mismatch detection is owned by `EventEditViewModel` (embedded in `ValueUIState.Mismatched` on load); `ValueInputField` renders the banner and calls `onStateChange` to resolve it. The ViewModel does not expose a separate `conversionOutcome` or `applyConversion()` method.
 
 ## Image Handling
 
@@ -241,17 +306,28 @@ Home (timeline)
 | Scale widget | Horizontal slider with integer snap | Segmented row (10 buttons) | Slider conveys the continuous 1–10 range visually; segmented row adds tap-target complexity for 10 values |
 | Boolean widget | Two-button row (Yes / No) | Toggle switch | Toggle is ambiguous about which state is "on"; two-button row is explicit and symmetric |
 | Duration widget | Three separate H / M / S numeric fields | Single seconds field; HH:MM:SS text entry | Three fields allow independent editing of each component; single seconds field is unintuitive for durations > 60s |
+| Value ↔ ViewModel exchange type | `ValueUIState` sealed class (pure UI text/state) | `EventValue?` directly; `EventValue?` + separate UI flags | `EventValue?` forces early parse on every keystroke — partial input (e.g., "3.") must be discarded or snapped, causing snap-back bugs; a pure UI state type lets partial text survive in the ViewModel until save |
+| `ValueUIState` location | `ui/components/ValueUIState.kt` alongside `ValueInputField` | Domain layer; separate `ui/model/` package | The type is a UI concern — it carries text fields and selection state; placing it next to its sole renderer avoids a long-distance dependency |
+| Mismatch detection layer | ViewModel on load (via `toValueUIState(valueType)`) | `ValueInputField` computes inline from `value + valueType` args | ViewModel-layer detection eliminates the `valueType` param from `ValueInputField`, lets the VM own the full value lifecycle, and removes the risk of the widget and ViewModel diverging on mismatch state |
+| `Mismatched.toEventValue()` on save-without-resolve | Returns `editableState?.toEventValue() ?: originalValue` | Discard and use type default; block save | Saving without resolving the banner is a valid user choice (defer the decision); returning the edited sub-state or the original value preserves data rather than silently overwriting it |
 
 ## Open Questions & Future Decisions
 
-### Deferred
+### Pending work
+
+1. **Unit in `ValueType.Number`** — currently `Category.unit: String?` is a separate field alongside `valueType`, and `EventValue.NumberValue(value, unit)` carries the unit redundantly on each stored event. Refactor: fold unit into the type as `ValueType.Number(unit: String?)`, remove `Category.unit`, and drop the unit field from `EventValue.NumberValue` (or keep it only for legacy stored values). Medium-size refactor touching the data model, storage, and UI layers.
+2. **`toEventValue()` null ambiguity** — the method returns `null` for two distinct reasons: (a) `ValueUIState.None` (category type is None, no value is appropriate); (b) invalid/partial input (e.g., `Bool(null)`, unparseable Number text). Current callers always have the category type in scope and disambiguate correctly, so this is harmless now. Worthwhile medium-size refactor: introduce `EventValue.None` (making `Event.value: EventValue` non-nullable) so callers get a typed signal instead of relying on ambient context — expected to clarify the code broadly throughout the stack.
+
+### Open questions
+
+1. **Empty timeline state** — what the home screen shows when there are no events yet. Copy/illustration TBD.
+
+### Deferred until after MVP
 
 1. **Duration input improvements** — current H / M / S fields are functional but could be improved: stopwatch capture, natural-language input ("1h 30m"), or single-number + unit picker are candidates.
 2. **Boolean custom labels** — v1 uses "Yes" / "No" labels on the two-button row. Future: allow categories to specify custom label pairs (e.g., "Taken" / "Skipped" for medication, "Good" / "Bad" for mood).
 3. **Timeline date range filtering** — the repository supports `start`/`end` bounds; no UI for it in v1. Could be added as a filter/search later.
 4. **Multi-category filter** — v1 supports single-category filter only. Multi-select deferred.
-5. **Editing a `None`-type event's value** — currently no input shown. If a category later changes `valueType` away from None, historical None events show no value; edit screen should probably show the new input type for those. Edge case deferred.
-6. **Empty timeline state** — what the home screen shows when there are no events yet. Copy/illustration TBD.
 
 ## References
 
