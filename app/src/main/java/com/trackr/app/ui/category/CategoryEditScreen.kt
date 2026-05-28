@@ -128,7 +128,7 @@ fun CategoryEditScreen(
                     // @spec CAT-UI-053, CAT-NAV-010
                     if (isMetaCategoryEditMode) {
                         IconButton(onClick = {
-                            viewModel.editingCategoryId?.let { onNavigateToCreateSubCategory(it) }
+                            viewModel.categoryId?.let { onNavigateToCreateSubCategory(it) }
                         }) {
                             Icon(Icons.Default.Add, contentDescription = "Create subcategory")
                         }
