@@ -50,7 +50,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-020
     @Test fun `save with empty name produces validation error`() = runTest {
         vm.name.value = ""
-        vm.emojiState.value = "🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃")
         vm.save()
         val result = vm.saveResult.value
         assertTrue(result is SaveResult.ValidationError)
@@ -60,7 +60,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-020
     @Test fun `save with whitespace-only name produces validation error`() = runTest {
         vm.name.value = "   "
-        vm.emojiState.value = "🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃")
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.ValidationError)
     }
@@ -68,7 +68,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-021
     @Test fun `save with empty emoji produces validation error`() = runTest {
         vm.name.value = "Running"
-        vm.emojiState.value = ""
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "")
         vm.save()
         val result = vm.saveResult.value
         assertTrue(result is SaveResult.ValidationError)
@@ -78,7 +78,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-022
     @Test fun `save with multi-grapheme emoji produces validation error`() = runTest {
         vm.name.value = "Running"
-        vm.emojiState.value = "🏃🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃🏃")
         vm.save()
         val result = vm.saveResult.value
         assertTrue(result is SaveResult.ValidationError)
@@ -90,7 +90,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-040
     @Test fun `new category gets a UUID on save`() = runTest {
         vm.name.value = "Running"
-        vm.emojiState.value = "🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃")
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.Success)
         val savedCategory = getSavedCategory()
@@ -101,7 +101,7 @@ class CategoryEditViewModelTest {
     @Test fun `new category gets sortOrder currentMin minus 1`() = runTest {
         repo.saveCategory(makeCategory("existing", sortOrder = 5))
         vm.name.value = "Running"
-        vm.emojiState.value = "🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃")
         vm.save()
         assertEquals(4, getSavedCategoryByName("Running").sortOrder)
     }
@@ -109,7 +109,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-042
     @Test fun `new category gets allowEmptyText true`() = runTest {
         vm.name.value = "Running"
-        vm.emojiState.value = "🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃")
         vm.save()
         assertTrue(getSavedCategory().allowEmptyText)
     }
@@ -122,16 +122,16 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-043
     @Test fun `new category default color is saved`() = runTest {
         vm.name.value = "Running"
-        vm.emojiState.value = "🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃")
         vm.save()
         assertEquals(0xFFE53935L, getSavedCategory().color)
     }
 
     // @spec CAT-UI-043
     @Test fun `second new category gets next palette color`() = runTest {
-        vm.name.value = "Running"; vm.emojiState.value = "🏃"; vm.save()
+        vm.name.value = "Running"; vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃"); vm.save()
         vm = CategoryEditViewModel(repo, SavedStateHandle())
-        vm.name.value = "Sleep"; vm.emojiState.value = "💤"; vm.save()
+        vm.name.value = "Sleep"; vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "💤"); vm.save()
         assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color)
         assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)
     }
@@ -140,7 +140,7 @@ class CategoryEditViewModelTest {
     @Test fun `new category saves picker-selected color when user overrides default`() = runTest {
         vm.colorState.value = 0xFF1E88E5L // Blue
         vm.name.value = "Running"
-        vm.emojiState.value = "🏃"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🏃")
         vm.save()
         assertEquals(0xFF1E88E5L, getSavedCategory().color)
     }
@@ -151,7 +151,7 @@ class CategoryEditViewModelTest {
         vm = editVm("c1")
         vm.colorState.value = 0xFF43A047L // Green
         vm.name.value = "c1"
-        vm.emojiState.value = "📌"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
         vm.save()
         assertEquals(0xFF43A047L, getSavedCategoryById("c1").color)
     }
@@ -573,6 +573,100 @@ class CategoryEditViewModelTest {
         assertEquals(EventValue.NumberValue(3.5, "kg"), eventValue("c1"))
     }
 
+    // ---------- Emoji UIState ----------
+
+    // @spec CAT-UI-062
+    @Test fun `loading SubCategory with null emoji initializes INHERIT with parent emoji as customValue`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        val state = vm.emojiUIState.value
+        assertEquals(EmojiMode.INHERIT, state.mode)
+        assertEquals("📌", state.customValue)
+    }
+
+    // @spec CAT-UI-062
+    @Test fun `creating SubCategory initializes INHERIT with parent emoji as customValue`() = runTest {
+        val parent = makeCategory("parent")
+        repo.saveCategory(parent)
+        vm = createSubVm("parent")
+        val state = vm.emojiUIState.value
+        assertEquals(EmojiMode.INHERIT, state.mode)
+        assertEquals("📌", state.customValue)
+    }
+
+    // @spec CAT-UI-055
+    @Test fun `saving SubCategory in INHERIT mode saves null emoji to domain model`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        vm.name.value = "child"
+        vm.save()
+        val saved = repo.getCategoryById("child").first() as Category.SubCategory
+        assertNull(saved.emoji)
+    }
+
+    // @spec CAT-UI-055
+    @Test fun `saving SubCategory in CUSTOM mode saves customValue as emoji`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🎯")
+        vm.name.value = "child"
+        vm.save()
+        val saved = repo.getCategoryById("child").first() as Category.SubCategory
+        assertEquals("🎯", saved.emoji)
+    }
+
+    // @spec CAT-UI-021
+    @Test fun `saving SubCategory in INHERIT mode skips emoji validation`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        vm.name.value = "child"
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.Success)
+    }
+
+    // @spec CAT-UI-021
+    @Test fun `saving SubCategory in CUSTOM mode with empty emoji produces validation error`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "")
+        vm.name.value = "child"
+        vm.save()
+        val result = vm.saveResult.value
+        assertTrue(result is SaveResult.ValidationError)
+        assertEquals("emoji", (result as SaveResult.ValidationError).field)
+    }
+
+    // @spec CAT-UI-061
+    @Test fun `custom emoji preserved when user switches to inherit and back then saves`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "🎯")
+        vm.emojiUIState.value = vm.emojiUIState.value.copy(mode = EmojiMode.INHERIT)
+        vm.emojiUIState.value = vm.emojiUIState.value.copy(mode = EmojiMode.CUSTOM)
+        vm.name.value = "child"
+        vm.save()
+        val saved = repo.getCategoryById("child").first() as Category.SubCategory
+        assertEquals("🎯", saved.emoji)
+    }
+
     // ---------- Stale category guard ----------
 
     // @spec CAT-UI-017
@@ -698,6 +792,9 @@ class CategoryEditViewModelTest {
 
     private fun editVm(categoryId: String) =
         CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to categoryId)))
+
+    private fun createSubVm(parentId: String) =
+        CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to parentId)))
 
     private suspend fun eventValue(categoryId: String): EventValue? =
         repo.getEventsByCategory(categoryId).first().first().value

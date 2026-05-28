@@ -66,12 +66,14 @@ LLD: `docs/llds/category-management.md`
 
 - [x] **CAT-UI-053**: While editing a MetaCategory, the category edit screen shall display a "Create subcategory" action.
 - [x] **CAT-UI-054**: When the user initiates subcategory creation, the system shall open the category edit screen in create mode with the parentId set to the MetaCategory's id and all inheritable fields (emoji, color, valueType) initialized as null.
-- [x] **CAT-UI-055**: While editing a SubCategory, the emoji field shall offer an inherit option implemented as a toggle; when inherit is active, the field shows the parent's emoji in a subdued style and is not editable; when "Custom" is active, the field is editable.
+- [x] **CAT-UI-055**: While editing a SubCategory, the emoji field shall display an "Inherit" checkbox to the left of the text field; when checked, the field is non-editable and shows the parent's emoji; when unchecked, the field is editable and shows the stored custom value.
 - [x] **CAT-UI-056**: While editing a SubCategory, the color picker shall display an inherit swatch as the first item showing the parent's resolved color with a label; when `color` is null the inherit swatch shall be pre-selected; when `color` is non-null the inherit swatch shall be unselected and the current color (palette or out-of-palette swatch) shall be pre-selected; tapping the inherit swatch shall set `color` to null; the inherit swatch and the out-of-palette swatch (CAT-UI-015) may coexist when the SubCategory has an explicit out-of-palette color.
 - [x] **CAT-UI-057**: While editing a SubCategory, the value type picker shall include a "Same as [ParentName] ([TypeName])" option as an additional selectable row; selecting it sets valueType to null (inherit from parent).
 - [D] **CAT-UI-058**: While editing a SubCategory, the toolbar overflow menu shall contain "Remove from group" and "Move to another group".
 - [x] **CAT-UI-059**: The category edit screen shall display a live preview card showing a mock timeline row rendered with the current effective name, resolved emoji, resolved color, and resolved value type.
 - [x] **CAT-UI-060**: The live preview card shall update reactively as any field on the edit screen changes.
+- [x] **CAT-UI-061**: When the user switches the emoji field to Inherit mode, the previously entered custom value shall be preserved in the UI state and restored when the user switches back to Custom mode.
+- [x] **CAT-UI-062**: When the emoji field is opened in Inherit mode (SubCategory create, or loading a SubCategory with `emoji = null`), `customValue` shall be pre-populated with the parent's emoji so that switching to Custom pre-fills the field.
 
 ## Navigation
 

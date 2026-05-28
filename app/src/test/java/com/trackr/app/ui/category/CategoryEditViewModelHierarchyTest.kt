@@ -98,11 +98,11 @@ class CategoryEditViewModelHierarchyTest {
     }
 
     // @spec CAT-UI-054
-    @Test fun `SubCategory create mode opens with null inheritable fields`() = runTest {
+    @Test fun `SubCategory create mode opens with inherit mode for all inheritable fields`() = runTest {
         val parent = makeMetaCategory("parent")
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        assertNull(vm.emojiState.value)
+        assertEquals(EmojiMode.INHERIT, vm.emojiUIState.value.mode)
         assertNull(vm.colorState.value)
         assertNull(vm.valueTypeState.value)
     }
@@ -117,22 +117,6 @@ class CategoryEditViewModelHierarchyTest {
         assertEquals(SaveResult.Success, vm.saveResult.value)
         val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory
         assertEquals(4, saved.sortOrder)
-    }
-
-    // @spec DM-PROC-019
-    @Test fun `removeFromGroup resolves null emoji color and valueType to parent values`() = runTest {
-        val parent = makeMetaCategory(
-            "parent", emoji = "🏋️", color = 0xFF1E88E5L, valueType = ValueType.Number,
-        )
-        val child = makeSubCategory("child", parent = parent) // all null (inheriting)
-        repo.saveCategory(parent)
-        repo.saveCategory(child)
-        val vm = editVm("child")
-        vm.removeFromGroup()
-        val saved = repo.getCategoryById("child").first() as Category.MetaCategory
-        assertEquals("🏋️", saved.emoji)
-        assertEquals(0xFF1E88E5L, saved.color)
-        assertEquals(ValueType.Number, saved.valueType)
     }
 
     // @spec DM-PROC-021

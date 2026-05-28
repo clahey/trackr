@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -35,7 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,7 +64,7 @@ import kotlinx.coroutines.launch
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
 // CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057,
-// CAT-UI-059, CAT-UI-060, CAT-NAV-005, CAT-NAV-010, APP-NAV-004
+// CAT-UI-059, CAT-UI-060, CAT-UI-061, CAT-NAV-005, CAT-NAV-010, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CategoryEditScreen(
@@ -71,7 +73,7 @@ fun CategoryEditScreen(
     viewModel: CategoryEditViewModel = hiltViewModel(),
 ) {
     val name by viewModel.name.collectAsState()
-    val emojiState by viewModel.emojiState.collectAsState()
+    val emojiUIState by viewModel.emojiUIState.collectAsState()
     val colorState by viewModel.colorState.collectAsState()
     val effectiveEmoji by viewModel.effectiveEmoji.collectAsState()
     val effectiveColor by viewModel.effectiveColor.collectAsState()
@@ -80,7 +82,6 @@ fun CategoryEditScreen(
     val saveResult by viewModel.saveResult.collectAsState()
     val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
     val navigateBack by viewModel.navigateBack.collectAsState()
-    val isEmojiInherited by viewModel.isEmojiInherited.collectAsState()
     val isColorInherited by viewModel.isColorInherited.collectAsState()
     val isValueTypeInherited by viewModel.isValueTypeInherited.collectAsState()
     val parentCategory by viewModel.parentCategory.collectAsState()
@@ -162,27 +163,13 @@ fun CategoryEditScreen(
                         (saveResult as SaveResult.ValidationError).field == "name",
             )
 
-            // @spec CAT-UI-055
-            if (isSubCategoryMode) {
-                EmojiFieldWithInherit(
-                    emojiState = emojiState,
-                    effectiveEmoji = effectiveEmoji,
-                    isInherited = isEmojiInherited,
-                    isError = saveResult is SaveResult.ValidationError &&
-                            (saveResult as SaveResult.ValidationError).field == "emoji",
-                    onValueChange = { viewModel.emojiState.value = it },
-                    onInherit = { viewModel.emojiState.value = null },
-                )
-            } else {
-                OutlinedTextField(
-                    value = emojiState ?: "",
-                    onValueChange = { viewModel.emojiState.value = it },
-                    label = { Text("Emoji") },
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = saveResult is SaveResult.ValidationError &&
-                            (saveResult as SaveResult.ValidationError).field == "emoji",
-                )
-            }
+            EmojiField(
+                emojiUIState = emojiUIState,
+                parentEmoji = parentCategory?.emoji,
+                isError = saveResult is SaveResult.ValidationError &&
+                        (saveResult as SaveResult.ValidationError).field == "emoji",
+                onUIStateChange = { viewModel.emojiUIState.value = it },
+            )
 
             Text("Color", style = MaterialTheme.typography.labelMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -318,41 +305,44 @@ private fun PreviewCard(
     }
 }
 
+// @spec CAT-UI-055, CAT-UI-061
 @Composable
-private fun EmojiFieldWithInherit(
-    emojiState: String?,
-    effectiveEmoji: String,
-    isInherited: Boolean,
+private fun EmojiField(
+    emojiUIState: EmojiUIState,
+    parentEmoji: String?,
     isError: Boolean,
-    onValueChange: (String?) -> Unit,
-    onInherit: () -> Unit,
+    onUIStateChange: (EmojiUIState) -> Unit,
 ) {
+    val isInherited = parentEmoji != null && emojiUIState.mode == EmojiMode.INHERIT
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (isInherited) {
-            OutlinedTextField(
-                value = effectiveEmoji,
-                onValueChange = {},
-                label = { Text("Emoji") },
-                modifier = Modifier.weight(1f),
-                readOnly = true,
-                enabled = false,
-                isError = isError,
-            )
-            TextButton(onClick = { onValueChange("") }) { Text("Custom") }
-        } else {
-            OutlinedTextField(
-                value = emojiState ?: "",
-                onValueChange = { onValueChange(it) },
-                label = { Text("Emoji") },
-                modifier = Modifier.weight(1f),
-                isError = isError,
-            )
-            TextButton(onClick = onInherit) { Text("Inherit") }
+        if (parentEmoji != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                Checkbox(
+                    checked = isInherited,
+                    onCheckedChange = { checked ->
+                        onUIStateChange(emojiUIState.copy(
+                            mode = if (checked) EmojiMode.INHERIT else EmojiMode.CUSTOM,
+                        ))
+                    },
+                )
+                Text("Inherit")
+            }
         }
+        OutlinedTextField(
+            value = if (isInherited) parentEmoji ?: "" else emojiUIState.customValue,
+            onValueChange = { onUIStateChange(emojiUIState.copy(mode = EmojiMode.CUSTOM, customValue = it)) },
+            label = { Text("Emoji") },
+            modifier = Modifier.weight(1f),
+            enabled = !isInherited,
+            isError = isError,
+        )
     }
 }
 
