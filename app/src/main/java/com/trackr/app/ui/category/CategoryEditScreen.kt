@@ -87,9 +87,6 @@ fun CategoryEditScreen(
     val parentCategory by viewModel.parentCategory.collectAsState()
     val isEditMode = viewModel.isEditMode
 
-    val isSubCategoryMode = parentCategory != null
-    val isMetaCategoryEditMode = isEditMode && !isSubCategoryMode
-
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -126,7 +123,7 @@ fun CategoryEditScreen(
                         }
                     }
                     // @spec CAT-UI-053, CAT-NAV-010
-                    if (isMetaCategoryEditMode) {
+                    if (isEditMode && parentCategory == null) {
                         IconButton(onClick = {
                             viewModel.categoryId?.let { onNavigateToCreateSubCategory(it) }
                         }) {
@@ -174,7 +171,7 @@ fun CategoryEditScreen(
             Text("Color", style = MaterialTheme.typography.labelMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // @spec CAT-UI-056
-                if (isSubCategoryMode) {
+                if (parentCategory != null) {
                     val parentColor = parentCategory!!.color
                     Box(
                         contentAlignment = Alignment.Center,
@@ -224,7 +221,7 @@ fun CategoryEditScreen(
             ValueTypeSelector(
                 selected = effectiveValueType,
                 isValueTypeInherited = isValueTypeInherited,
-                parentCategory = if (isSubCategoryMode) parentCategory else null,
+                parentCategory = parentCategory,
                 onSelect = { viewModel.valueTypeState.value = it },
                 onSelectInherit = { viewModel.valueTypeState.value = null },
             )
