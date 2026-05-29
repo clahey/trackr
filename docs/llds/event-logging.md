@@ -12,10 +12,12 @@ The segment owns three screens (timeline, quick-log sheet, event edit) and their
 
 The primary screen. Displays all events grouped by calendar day of `timestamp` (user's local timezone), most recent day first, most recent event first within each day.
 
-Each event row is an elevated card (visually distinct from the screen background). Layout:
+Each event row is rendered by the shared `EventRow` composable (`ui/components/EventRow.kt`). Layout:
 - **Left**: 48dp filled circle using the category color; category emoji centered inside with WCAG foreground color (see `docs/llds/theme.md § Circle avatar`)
 - **Center**: category name (subtitle), value summary (formatted per `ValueType`), and notes (if any) stacked vertically
 - **Right**: time of day (from `timestamp`)
+
+`EventRow` is extracted to `ui/components/` so it can be reused by the Category Edit screen's live preview (see `docs/llds/category-management.md § Category Edit Screen`). Its `onClick` parameter is nullable (`(() -> Unit)?`); when null the card renders as non-interactive (no ripple, no click affordance).
 
 Supports:
 - **Log new event** — FAB opens the Quick-Log Sheet

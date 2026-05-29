@@ -5,7 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackr.app.data.TrackrRepository
 import com.trackr.app.domain.Category
+import com.trackr.app.domain.Event
+import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import kotlin.time.Duration.Companion.seconds
 import com.trackr.app.ui.SaveResult
 import com.trackr.app.ui.theme.DEFAULT_CATEGORY_COLOR
 import com.trackr.app.ui.theme.categoryColorForIndex
@@ -72,6 +77,46 @@ class CategoryEditViewModel @Inject constructor(
 
     val isValueTypeInherited: StateFlow<Boolean> = valueTypeState.map { it == null }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    // @spec CAT-UI-059
+    val previewEventValue: StateFlow<EventValue?> = combine(effectiveValueType, unit) { vt, u ->
+        when (vt) {
+            ValueType.None -> null
+            ValueType.Number -> EventValue.NumberValue(42.0, u.takeIf { it.isNotBlank() })
+            ValueType.Scale -> EventValue.Scale(7)
+            ValueType.Boolean -> EventValue.BooleanValue(true)
+            ValueType.Text -> EventValue.TextValue("Sample")
+            ValueType.Duration -> EventValue.DurationValue(90.seconds)
+            ValueType.Exercise -> EventValue.ExerciseValue(3, 15)
+            is ValueType.Unknown -> null
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val previewTimestamp = ZonedDateTime.now(ZoneId.systemDefault())
+        .withHour(12).withMinute(0).withSecond(0).withNano(0).toInstant()
+
+    val previewCategory: StateFlow<Category.MetaCategory> = combine(
+        name, effectiveEmoji, effectiveColor, effectiveValueType, unit,
+    ) { n, emoji, color, vt, u ->
+        Category.MetaCategory(
+            id = "", name = n.ifEmpty { "Category name" }, emoji = emoji.ifEmpty { " " },
+            color = color, valueType = vt, unit = u.takeIf { it.isNotBlank() },
+            allowEmptyText = true, sortOrder = 0,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, Category.MetaCategory(
+        id = "", name = "Category name", emoji = " ", color = DEFAULT_CATEGORY_COLOR,
+        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = 0,
+    ))
+
+    val previewEvent: StateFlow<Event> = previewEventValue.map { value ->
+        Event(
+            id = "", categoryId = "", timestamp = previewTimestamp,
+            value = value, notes = "Notes", imagePaths = emptyList(), createdAt = previewTimestamp,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, Event(
+        id = "", categoryId = "", timestamp = previewTimestamp,
+        value = null, notes = "Notes", imagePaths = emptyList(), createdAt = previewTimestamp,
+    ))
 
     private val _navigateBack = MutableStateFlow(false)
     val navigateBack: StateFlow<Boolean> = _navigateBack.asStateFlow()

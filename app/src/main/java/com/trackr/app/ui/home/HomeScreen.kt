@@ -71,6 +71,7 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import com.trackr.app.ui.components.EventRow
 import com.trackr.app.ui.components.ValueInputField
 import com.trackr.app.ui.components.formatValue
 import com.trackr.app.ui.theme.foregroundColorForBackground
@@ -334,74 +335,6 @@ private fun SwipeableEventRow(
     }
 }
 
-// @spec EL-UI-002, EL-UI-004, EL-UI-005, EL-UI-061, THEME-UI-011
-@Composable
-private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, hasMismatch: Boolean, onClick: () -> Unit) {
-    ElevatedCard(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // @spec EL-UI-005, THEME-UI-011
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = category?.let { Color(it.resolvedColor) } ?: MaterialTheme.colorScheme.primaryContainer,
-                        shape = CircleShape,
-                    ),
-            ) {
-                Text(
-                    text = category?.resolvedEmoji ?: "",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = category?.let { Color(foregroundColorForBackground(it.resolvedColor)) }
-                        ?: MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = category?.name ?: "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                event.value?.let {
-                    // @spec EL-UI-061
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(formatValue(it), style = MaterialTheme.typography.bodyMedium)
-                        if (hasMismatch) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = "Value type mismatch",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(16.dp).padding(start = 4.dp),
-                            )
-                        }
-                    }
-                }
-                event.notes?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Text(
-                text = event.timestamp.atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("HH:mm")),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
 @Composable
 private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {

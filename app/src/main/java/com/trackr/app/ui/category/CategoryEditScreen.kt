@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import com.trackr.app.ui.components.EventRow
 import com.trackr.app.ui.theme.categoryColorPalette
 import com.trackr.app.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.launch
@@ -75,7 +75,6 @@ fun CategoryEditScreen(
     val name by viewModel.name.collectAsState()
     val emojiUIState by viewModel.emojiUIState.collectAsState()
     val colorState by viewModel.colorState.collectAsState()
-    val effectiveEmoji by viewModel.effectiveEmoji.collectAsState()
     val effectiveColor by viewModel.effectiveColor.collectAsState()
     val effectiveValueType by viewModel.effectiveValueType.collectAsState()
     val unit by viewModel.unit.collectAsState()
@@ -85,6 +84,8 @@ fun CategoryEditScreen(
     val isColorInherited by viewModel.isColorInherited.collectAsState()
     val isValueTypeInherited by viewModel.isValueTypeInherited.collectAsState()
     val parentCategory by viewModel.parentCategory.collectAsState()
+    val previewCategory by viewModel.previewCategory.collectAsState()
+    val previewEvent by viewModel.previewEvent.collectAsState()
     val isEditMode = viewModel.isEditMode
 
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
@@ -144,12 +145,7 @@ fun CategoryEditScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // @spec CAT-UI-059, CAT-UI-060
-            PreviewCard(
-                emoji = effectiveEmoji,
-                color = effectiveColor,
-                name = name,
-                valueType = effectiveValueType,
-            )
+            EventRow(event = previewEvent, category = previewCategory, hasMismatch = false, onClick = null)
 
             OutlinedTextField(
                 value = name,
@@ -257,46 +253,6 @@ fun CategoryEditScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Save")
-            }
-        }
-    }
-}
-
-@Composable
-private fun PreviewCard(
-    emoji: String,
-    color: Long,
-    name: String,
-    valueType: ValueType,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(color)),
-            ) {
-                Text(
-                    text = emoji.ifEmpty { "?" },
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = name.ifEmpty { "Category name" },
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = valueTypeLabel(valueType),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }

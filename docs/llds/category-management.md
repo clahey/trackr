@@ -34,7 +34,19 @@ Because children are promoted (not deleted), the event count shown in the delete
 
 Used for both create and edit. Toolbar contains a **Delete** action (visible only when editing an existing category). For a MetaCategory, the toolbar also contains a **"Create subcategory"** action.
 
-**Live preview card** — always visible on the edit screen. Shows a mock timeline row rendered with the current effective name, emoji, color, and value type. Updates reactively as any field changes.
+**Live preview card** — always visible on the edit screen. Renders the shared `EventRow` composable (from `ui/components/EventRow.kt`) with a synthetic `Category` built from current VM state and a placeholder `Event` whose fields are: `notes = "Notes"`, `onClick = {}`, `hasMismatch = false`, and a type-appropriate sample value:
+
+| Effective value type | Placeholder event value |
+|---|---|
+| None | `null` |
+| Number | `NumberValue(42.0, unit)` where `unit` is the current unit field value (null if blank) |
+| Scale | `ScaleValue(7)` |
+| Boolean | `BooleanValue(true)` |
+| Text | `TextValue("Sample")` |
+| Duration | `DurationValue(90s)` |
+| Exercise | `ExerciseValue(sets=3, reps=15)` |
+
+`onClick = null` (non-interactive). Timestamp fixed at noon local time so the time-of-day column always reads "12:00". Updates reactively as any field changes.
 
 **Fields:**
 

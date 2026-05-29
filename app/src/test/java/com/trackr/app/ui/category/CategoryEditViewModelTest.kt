@@ -667,6 +667,58 @@ class CategoryEditViewModelTest {
         assertEquals("🎯", saved.emoji)
     }
 
+    // ---------- Preview event value ----------
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for None is null`() = runTest {
+        vm.valueTypeState.value = ValueType.None
+        assertNull(vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Number with blank unit produces NumberValue(42, null)`() = runTest {
+        vm.valueTypeState.value = ValueType.Number
+        vm.unit.value = ""
+        assertEquals(EventValue.NumberValue(42.0, null), vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Number with unit produces NumberValue(42, unit)`() = runTest {
+        vm.valueTypeState.value = ValueType.Number
+        vm.unit.value = "kg"
+        assertEquals(EventValue.NumberValue(42.0, "kg"), vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Scale produces ScaleValue(7)`() = runTest {
+        vm.valueTypeState.value = ValueType.Scale
+        assertEquals(EventValue.Scale(7), vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Boolean produces BooleanValue(true)`() = runTest {
+        vm.valueTypeState.value = ValueType.Boolean
+        assertEquals(EventValue.BooleanValue(true), vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Text produces TextValue("Sample")`() = runTest {
+        vm.valueTypeState.value = ValueType.Text
+        assertEquals(EventValue.TextValue("Sample"), vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Duration produces DurationValue(90s)`() = runTest {
+        vm.valueTypeState.value = ValueType.Duration
+        assertEquals(EventValue.DurationValue(90.seconds), vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Exercise produces ExerciseValue(3, 15)`() = runTest {
+        vm.valueTypeState.value = ValueType.Exercise
+        assertEquals(EventValue.ExerciseValue(3, 15), vm.previewEventValue.value)
+    }
+
     // ---------- Stale category guard ----------
 
     // @spec CAT-UI-017
