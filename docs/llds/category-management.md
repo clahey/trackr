@@ -204,6 +204,8 @@ Free-form single-character text field; the system emoji keyboard is used for inp
 1. **Preset color palette values** — specific colors TBD; defined in the UI layer, not the domain. Resolved when theme LLD is drafted.
 2. **`allowEmptyText` editor exposure** — field is present on the domain model; exposing it in the editor is a UI decision deferred past MVP.
 3. **Archiving vs. deletion** — soft-delete (archive) would preserve historical events without showing the category in the active list. Deferred to v2.
+5. **Inherit swatch iconography in the color picker** — the current implementation uses a "↑" character inside the parent-color circle to indicate inherit. This is not clearly recognizable as an inherit action. Alternatives: a chain-link icon, a label below the swatch ("Inherit" or the parent's name), or a distinct border treatment instead of a character. Deferred until a clearer visual treatment is identified.
+
 4. **"Move to another group" / "Remove from group" from the edit screen (CAT-UI-058, CAT-NAV-011)** — the group picker is already implemented on the list screen. The open question is what happens to unsaved form edits when the user reparents or promotes from within the edit screen. Options: (a) navigate back discarding unsaved changes (matches delete/removeFromGroup behavior but may surprise users); (b) save current form state atomically with the parent change; (c) prevent the action if there are unsaved changes. Deferred until the right UX is clear.
 
 ## References
