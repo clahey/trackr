@@ -676,17 +676,17 @@ class CategoryEditViewModelTest {
     }
 
     // @spec CAT-UI-059
-    @Test fun `previewEventValue for Number with blank unit produces NumberValue(42, null)`() = runTest {
+    @Test fun `previewEventValue for Number with blank unit produces NumberValue(0, null)`() = runTest {
         vm.valueTypeState.value = ValueType.Number
-        vm.unit.value = ""
-        assertEquals(EventValue.NumberValue(42.0, null), vm.previewEventValue.value)
+        vm.numberDefaultUnit.value = ""
+        assertEquals(EventValue.NumberValue(0.0, null), vm.previewEventValue.value)
     }
 
     // @spec CAT-UI-059
-    @Test fun `previewEventValue for Number with unit produces NumberValue(42, unit)`() = runTest {
+    @Test fun `previewEventValue for Number with unit produces NumberValue(0, unit)`() = runTest {
         vm.valueTypeState.value = ValueType.Number
-        vm.unit.value = "kg"
-        assertEquals(EventValue.NumberValue(42.0, "kg"), vm.previewEventValue.value)
+        vm.numberDefaultUnit.value = "kg"
+        assertEquals(EventValue.NumberValue(0.0, "kg"), vm.previewEventValue.value)
     }
 
     // @spec CAT-UI-059
@@ -840,6 +840,113 @@ class CategoryEditViewModelTest {
         assertTrue(repo.getCategories().first().any { it.id == "parent" })
     }
 
+    // ---------- Default Value ----------
+
+    // @spec CAT-UI-011
+    @Test fun `loading Number category seeds numberDefaultUnit from stored unit`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "kg")))
+        vm = editVm("c1")
+        assertEquals("kg", vm.numberDefaultUnit.value)
+    }
+
+    // @spec CAT-UI-011
+    @Test fun `loading Number category with null defaultValue seeds blank unit`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
+        vm = editVm("c1")
+        assertEquals("", vm.numberDefaultUnit.value)
+    }
+
+    // @spec CAT-UI-063
+    @Test fun `saving Number category stores NumberValue with unit`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
+        vm = editVm("c1")
+        vm.numberDefaultUnit.value = "kg"
+        vm.name.value = "c1"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
+        vm.save()
+        assertEquals(EventValue.NumberValue(0.0, "kg"), getSavedCategoryById("c1").defaultValue)
+    }
+
+    // @spec CAT-UI-063
+    @Test fun `saving Number category preserves existing non-zero numeric value`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(42.0, "kg")))
+        vm = editVm("c1")
+        vm.numberDefaultUnit.value = "lbs"
+        vm.name.value = "c1"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
+        vm.save()
+        assertEquals(EventValue.NumberValue(42.0, "lbs"), getSavedCategoryById("c1").defaultValue)
+    }
+
+    // @spec CAT-UI-063
+    @Test fun `saving Number category with blank unit stores NumberValue with null unit`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
+        vm = editVm("c1")
+        vm.numberDefaultUnit.value = ""
+        vm.name.value = "c1"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
+        vm.save()
+        assertEquals(EventValue.NumberValue(0.0, null), getSavedCategoryById("c1").defaultValue)
+    }
+
+    // @spec CAT-UI-011a
+    @Test fun `loading Exercise category seeds exerciseSets and Reps from stored defaultValue`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise,
+            defaultValue = EventValue.ExerciseValue(5, 10)))
+        vm = editVm("c1")
+        assertEquals("5", vm.exerciseDefaultSets.value)
+        assertEquals("10", vm.exerciseDefaultReps.value)
+    }
+
+    // @spec CAT-UI-011a
+    @Test fun `loading Exercise category with null defaultValue seeds 3 and 15`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise, defaultValue = null))
+        vm = editVm("c1")
+        assertEquals("3", vm.exerciseDefaultSets.value)
+        assertEquals("15", vm.exerciseDefaultReps.value)
+    }
+
+    // @spec CAT-UI-064
+    @Test fun `saving Exercise category stores ExerciseValue from sets and reps fields`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise, defaultValue = null))
+        vm = editVm("c1")
+        vm.exerciseDefaultSets.value = "5"
+        vm.exerciseDefaultReps.value = "10"
+        vm.name.value = "c1"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
+        vm.save()
+        assertEquals(EventValue.ExerciseValue(5, 10), getSavedCategoryById("c1").defaultValue)
+    }
+
+    // @spec CAT-UI-065
+    @Test fun `saving Scale category leaves defaultValue unchanged`() = runTest {
+        val existing = EventValue.Scale(7)
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Scale, defaultValue = existing))
+        vm = editVm("c1")
+        vm.name.value = "c1"
+        vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
+        vm.save()
+        assertEquals(existing, getSavedCategoryById("c1").defaultValue)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Number uses resolvedDefaultValue when non-null`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(42.0, "kg")))
+        vm = editVm("c1")
+        assertEquals(EventValue.NumberValue(42.0, "kg"), vm.previewEventValue.value)
+    }
+
+    // @spec CAT-UI-059
+    @Test fun `previewEventValue for Number with null defaultValue uses unit field`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
+        vm = editVm("c1")
+        vm.numberDefaultUnit.value = "kg"
+        assertEquals(EventValue.NumberValue(0.0, "kg"), vm.previewEventValue.value)
+    }
+
     // ---------- Helpers ----------
 
     private fun editVm(categoryId: String) =
@@ -865,14 +972,15 @@ class CategoryEditViewModelTest {
         sortOrder: Int = 0,
         valueType: ValueType = ValueType.None,
         color: Long = 0xFFE53935L,
+        defaultValue: EventValue? = null,
     ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = color,
-        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+        valueType = valueType, defaultValue = defaultValue, allowEmptyText = true, sortOrder = sortOrder,
     )
 
     private fun makeSubCategory(id: String, parent: Category.MetaCategory) = Category.SubCategory(
         id = id, name = id, emoji = null, color = null, valueType = null,
-        unit = null, allowEmptyText = true, sortOrder = 0, parent = parent,
+        defaultValue = null, allowEmptyText = true, sortOrder = 0, parent = parent,
     )
 
     private fun makeEvent(

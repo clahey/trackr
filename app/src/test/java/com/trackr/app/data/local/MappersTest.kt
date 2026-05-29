@@ -12,7 +12,7 @@ class MappersTest {
     @Test fun `toDomainList surfaces orphaned SubCategory as MetaCategory`() {
         val orphan = CategoryEntity(
             id = "child", name = "Child", emoji = null, color = null, valueType = null,
-            unit = null, allowEmptyText = true, sortOrder = 1, parentId = "missing-parent",
+            defaultValue = null, allowEmptyText = true, sortOrder = 1, parentId = "missing-parent",
         )
         val result = listOf(orphan).toDomainList()
         assertEquals(1, result.size)
@@ -24,7 +24,7 @@ class MappersTest {
     @Test fun `toDomainList uses null-field fallbacks when surfacing orphaned SubCategory`() {
         val orphan = CategoryEntity(
             id = "child", name = "Child", emoji = null, color = null, valueType = null,
-            unit = null, allowEmptyText = true, sortOrder = 1, parentId = "missing-parent",
+            defaultValue = null, allowEmptyText = true, sortOrder = 1, parentId = "missing-parent",
         )
         val result = listOf(orphan).toDomainList()
         val meta = result[0] as Category.MetaCategory
@@ -37,7 +37,7 @@ class MappersTest {
     @Test fun `toDomainList uses entity emoji when orphaned SubCategory has explicit emoji`() {
         val orphan = CategoryEntity(
             id = "child", name = "Child", emoji = "🎯", color = 0xFF123456L, valueType = "boolean",
-            unit = null, allowEmptyText = true, sortOrder = 1, parentId = "missing-parent",
+            defaultValue = null, allowEmptyText = true, sortOrder = 1, parentId = "missing-parent",
         )
         val result = listOf(orphan).toDomainList()
         val meta = result[0] as Category.MetaCategory
@@ -50,11 +50,11 @@ class MappersTest {
     @Test fun `toDomainList correctly links SubCategory to its parent`() {
         val parentEntity = CategoryEntity(
             id = "parent", name = "Parent", emoji = "📌", color = 0xFFE53935L, valueType = "none",
-            unit = null, allowEmptyText = true, sortOrder = 0, parentId = null,
+            defaultValue = null, allowEmptyText = true, sortOrder = 0, parentId = null,
         )
         val childEntity = CategoryEntity(
             id = "child", name = "Child", emoji = null, color = null, valueType = null,
-            unit = null, allowEmptyText = true, sortOrder = 1, parentId = "parent",
+            defaultValue = null, allowEmptyText = true, sortOrder = 1, parentId = "parent",
         )
         val result = listOf(parentEntity, childEntity).toDomainList()
         assertEquals(2, result.size)

@@ -160,7 +160,7 @@ class CategoryListViewModelHierarchyTest {
 
     private fun makeMetaCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+        valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = sortOrder,
     )
 
     private fun makeSubCategory(
@@ -169,7 +169,7 @@ class CategoryListViewModelHierarchyTest {
         sortOrder: Int = 0,
     ) = Category.SubCategory(
         id = id, name = id, emoji = null, color = null, valueType = null,
-        unit = null, allowEmptyText = true, sortOrder = sortOrder, parent = parent,
+        defaultValue = null, allowEmptyText = true, sortOrder = sortOrder, parent = parent,
     )
 
     private fun makeEvent(id: String, categoryId: String) = com.trackr.app.domain.Event(

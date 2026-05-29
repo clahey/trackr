@@ -44,10 +44,10 @@ class QuickLogViewModelTest {
         id: String,
         valueType: ValueType = ValueType.None,
         allowEmptyText: Boolean = true,
-        unit: String? = null,
+        defaultValue: EventValue? = null,
     ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = valueType, unit = unit, allowEmptyText = allowEmptyText, sortOrder = 0,
+        valueType = valueType, defaultValue = defaultValue, allowEmptyText = allowEmptyText, sortOrder = 0,
     )
 
     @Before fun setUp() {
@@ -255,17 +255,20 @@ class QuickLogViewModelTest {
     // @spec EL-UI-068
     @Test fun `selectCategory uses default when switching from None type without interaction`() = runTest {
         val noneCat = makeCategory("c1", valueType = ValueType.None)
-        val numCat = makeCategory("c2", valueType = ValueType.Number, unit = "kg")
+        val numCat = makeCategory("c2", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "kg"))
         repo.setCategories(noneCat, numCat)
         vm.selectCategory(noneCat)
         vm.selectCategory(numCat)
-        assertEquals(ValueUIState.Number("", "kg"), vm.value.value)
+        assertEquals(ValueUIState.Number("0.0", "kg"), vm.value.value)
     }
 
     // @spec EL-UI-068b
     @Test fun `selectCategory preserves value verbatim when dirty and same type`() = runTest {
-        val numCat1 = makeCategory("c1", valueType = ValueType.Number, unit = "kg")
-        val numCat2 = makeCategory("c2", valueType = ValueType.Number, unit = "cm")
+        val numCat1 = makeCategory("c1", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "kg"))
+        val numCat2 = makeCategory("c2", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "cm"))
         repo.setCategories(numCat1, numCat2)
         vm.selectCategory(numCat1)
         vm.updateValue(ValueUIState.Number("75", "kg"))
@@ -315,7 +318,8 @@ class QuickLogViewModelTest {
 
     // @spec EL-UI-068b
     @Test fun `selectCategory recovers value from Mismatched originalValue after Discard pass-through`() = runTest {
-        val numCat = makeCategory("c1", valueType = ValueType.Number, unit = "kg")
+        val numCat = makeCategory("c1", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "kg"))
         val noneCat = makeCategory("c2", valueType = ValueType.None)
         repo.setCategories(numCat, noneCat)
         vm.selectCategory(numCat)
@@ -402,5 +406,31 @@ class QuickLogViewModelTest {
         vm.removeImage()
         assertTrue(imageStore.wasDeleted(path))
         assertNull(vm.imagePath.value)
+    }
+
+    // @spec EL-UI-078
+    @Test fun `selectCategory seeds value from resolvedDefaultValue when type matches`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(42.0, "kg"))
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        assertEquals(ValueUIState.Number("42.0", "kg"), vm.value.value)
+    }
+
+    // @spec EL-UI-078
+    @Test fun `selectCategory falls back to type default when resolvedDefaultValue type mismatches valueType`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Scale,
+            defaultValue = EventValue.NumberValue(0.0, "kg"))
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        assertEquals(ValueUIState.Scale(5), vm.value.value)
+    }
+
+    // @spec EL-UI-078
+    @Test fun `selectCategory falls back to type default when resolvedDefaultValue is null`() = runTest {
+        val cat = makeCategory("c1", valueType = ValueType.Exercise, defaultValue = null)
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        assertEquals(ValueUIState.Exercise("3", "15"), vm.value.value)
     }
 }

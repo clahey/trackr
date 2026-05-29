@@ -11,7 +11,7 @@ class CategoryTest {
         emoji = "🏃",
         color = 0xFFE53935L,
         valueType = ValueType.Number,
-        unit = null,
+        defaultValue = null,
         allowEmptyText = true,
         sortOrder = 0,
     )
@@ -77,7 +77,7 @@ class CategoryTest {
         emoji = emoji,
         color = color,
         valueType = valueType,
-        unit = null,
+        defaultValue = null,
         allowEmptyText = true,
         sortOrder = 1,
         parent = parent,

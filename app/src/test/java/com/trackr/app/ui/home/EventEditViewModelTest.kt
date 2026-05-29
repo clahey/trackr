@@ -43,7 +43,7 @@ class EventEditViewModelTest {
         valueType: ValueType = ValueType.Scale,
     ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = 0,
+        valueType = valueType, defaultValue = null, allowEmptyText = true, sortOrder = 0,
     )
 
     private fun makeEvent(

@@ -17,7 +17,8 @@ LLD: `docs/llds/category-management.md`
 
 - [ ] **CAT-UI-010**: The category edit screen shall display input fields for name, emoji, color, and value type.
 - [x] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
-- [ ] **CAT-UI-011**: While value type is Number, the category edit screen shall display a unit input field; for all other value types the unit field shall be hidden.
+- [ ] **CAT-UI-011**: While effective value type is Number, the category edit screen shall display a "Unit (optional)" text field; for all other value types this field shall be hidden. The field is seeded from the category's stored `defaultValue` (as `NumberValue.unit`) on load.
+- [ ] **CAT-UI-011a**: While effective value type is Exercise, the category edit screen shall display two integer input fields labeled "Default sets" and "Default reps"; both must be ≥ 1 to save. The fields are seeded from the category's stored `defaultValue` (as `ExerciseValue.sets`/`.reps`) on load, falling back to 3 and 15 if `defaultValue` is null.
 - [x] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
 - [x] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
 - [x] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
@@ -53,6 +54,13 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-041**: When saving a new category, the system shall assign it a `sortOrder` of `(min sortOrder across all categories) - 1`.
 - [x] **CAT-UI-042**: When saving a new category, the system shall set `allowEmptyText` to `true`.
 - [x] **CAT-UI-043**: When the category edit screen loads in create mode for a new MetaCategory, the system shall pre-select a default color by calling `getAndIncrementNextCategoryColorIndex(palette.size)` (LS-BE-081) and using `palette[index]` as the initial value of the color picker; the counter cycles within `[0, palette.size)` and is unaffected by category deletions. The user may override this by selecting any palette color before saving. When creating a new SubCategory, the color field opens in the inherit state (null) and the counter is not advanced.
+
+## Category Edit — Default Value
+
+- [ ] **CAT-UI-063**: When saving a Number category, the system shall store `defaultValue = NumberValue(existingValue ?: 0.0, unit)` where `existingValue` is the numeric component of any previously stored `defaultValue` and `unit` is null when the unit field is blank; the numeric component is never altered by the editor.
+- [ ] **CAT-UI-064**: When saving an Exercise category, the system shall store `defaultValue = ExerciseValue(sets, reps)` using the current values of the default sets and reps fields.
+- [ ] **CAT-UI-065**: When saving a category whose effective value type is neither Number nor Exercise, the system shall leave `defaultValue` unchanged; it shall not be cleared or overwritten.
+- [ ] **CAT-UI-066**: When the category edit screen opens in SubCategory create mode, the system shall pre-populate the default value fields from the parent's `resolvedDefaultValue` only if its type matches the SubCategory's effective value type; if the types do not match or `resolvedDefaultValue` is null, the fields shall be pre-populated with the type default (3 and 15 for Exercise; blank for Number). The stored `defaultValue` shall be saved as null (inherit) regardless of effective value type when the user has not edited any default value field; CAT-UI-063 and CAT-UI-064 apply only when the user has edited a field (`defaultValueDirty = true`) or when saving in edit mode.
 
 ## Category Hierarchy
 

@@ -53,7 +53,7 @@ Entities mirror domain models with Room annotations. They are package-private to
 | `emoji` | `String` | single emoji |
 | `color` | `Long` | ARGB packed |
 | `valueType` | `String` | `ValueType` serialized via `ValueTypeConverter` |
-| `unit` | `String?` | meaningful only when valueType = Number |
+| `defaultValue` | `String?` | `EventValue?` as JSON via `EventValueConverter`; null for most types; always non-null for Number and Exercise |
 | `allowEmptyText` | `Boolean` | meaningful only when valueType = Text |
 | `sortOrder` | `Int` | ascending; lower = higher in list; indexed |
 
@@ -173,11 +173,21 @@ Jetpack DataStore Preferences stores simple app-wide state that doesn't belong i
 
 ## Room Database
 
-Two entities (`CategoryEntity`, `EventEntity`), version 2, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
+Two entities (`CategoryEntity`, `EventEntity`), version 3, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
 
 ## Migration Strategy
 
-Version 1; no prior version. Future migrations added via `addMigrations()` on the builder.
+### Version 1 → 2
+No prior version at v1.
+
+### Version 2 → 3
+Removes `unit` column and adds `default_value` column on `categories`. SQLite does not support `DROP COLUMN` on older Android versions, so the migration recreates the table:
+
+1. Create `categories_new` with the new schema (no `unit`, with `default_value TEXT`).
+2. Copy all rows: for each row where `valueType = 'number'` and `unit IS NOT NULL`, encode `default_value` as `{"type":"number","value":0.0,"unit":"<unit>"}` (using the same JSON format as `EventValueConverter`); all other rows get `default_value = NULL`.
+3. Drop `categories`.
+4. Rename `categories_new` to `categories`.
+5. Recreate any indexes dropped by the table recreation.
 
 ## Decisions & Alternatives
 

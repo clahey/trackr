@@ -71,7 +71,7 @@ class EventEditViewModel @Inject constructor(
             val cat = repository.getCategoryById(event.categoryId).first()
             _category.value = cat
             val valueType = cat?.resolvedValueType ?: ValueType.None
-            value.value = event.value.toValueUIState(valueType, cat?.unit)
+            value.value = event.value.toValueUIState(valueType)
         }
     }
 

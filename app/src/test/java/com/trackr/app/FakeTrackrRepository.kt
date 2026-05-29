@@ -27,7 +27,7 @@ class FakeTrackrRepository : TrackrRepository {
                     emoji = cat.emoji ?: cat.parent.emoji,
                     color = cat.color ?: cat.parent.color,
                     valueType = cat.valueType ?: cat.parent.valueType,
-                    unit = cat.unit, allowEmptyText = cat.allowEmptyText, sortOrder = cat.sortOrder,
+                    defaultValue = cat.defaultValue, allowEmptyText = cat.allowEmptyText, sortOrder = cat.sortOrder,
                 )
             } else cat
         }
@@ -96,7 +96,7 @@ class FakeTrackrRepository : TrackrRepository {
                         emoji = sub.resolvedEmoji,
                         color = sub.resolvedColor,
                         valueType = sub.resolvedValueType,
-                        unit = sub.unit,
+                        defaultValue = sub.defaultValue,
                         allowEmptyText = sub.allowEmptyText,
                         sortOrder = sub.sortOrder,
                     )

@@ -1,15 +1,18 @@
 package com.trackr.app.domain
 
+import com.trackr.app.domain.EventValue
+
 // @spec DM-DATA-025, DM-DATA-026, DM-DATA-027, DM-PROC-018
 sealed class Category {
     abstract val id: String
     abstract val name: String
-    abstract val unit: String?
+    abstract val defaultValue: EventValue?
     abstract val allowEmptyText: Boolean
     abstract val sortOrder: Int
     abstract val resolvedEmoji: String
     abstract val resolvedColor: Long
     abstract val resolvedValueType: ValueType
+    abstract val resolvedDefaultValue: EventValue?
 
     data class MetaCategory(
         override val id: String,
@@ -17,13 +20,14 @@ sealed class Category {
         val emoji: String,
         val color: Long,
         val valueType: ValueType,
-        override val unit: String?,
+        override val defaultValue: EventValue?,
         override val allowEmptyText: Boolean,
         override val sortOrder: Int,
     ) : Category() {
         override val resolvedEmoji get() = emoji
         override val resolvedColor get() = color
         override val resolvedValueType get() = valueType
+        override val resolvedDefaultValue get() = defaultValue
     }
 
     data class SubCategory(
@@ -32,7 +36,7 @@ sealed class Category {
         val emoji: String?,
         val color: Long?,
         val valueType: ValueType?,
-        override val unit: String?,
+        override val defaultValue: EventValue?,
         override val allowEmptyText: Boolean,
         override val sortOrder: Int,
         val parent: MetaCategory,
@@ -40,5 +44,6 @@ sealed class Category {
         override val resolvedEmoji get() = emoji ?: parent.emoji
         override val resolvedColor get() = color ?: parent.color
         override val resolvedValueType get() = valueType ?: parent.valueType
+        override val resolvedDefaultValue get() = defaultValue ?: parent.defaultValue
     }
 }

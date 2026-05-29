@@ -147,6 +147,70 @@ class CategoryEditViewModelHierarchyTest {
         assertEquals(EventValue.TextValue("hello"), childEvent.value) // not migrated
     }
 
+    // ---------- SubCategory default value ----------
+
+    // @spec CAT-UI-066
+    @Test fun `SubCategory create mode pre-populates numberDefaultUnit from parent defaultValue`() = runTest {
+        val parent = makeMetaCategory("parent", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "kg"))
+        repo.saveCategory(parent)
+        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        assertEquals("kg", vm.numberDefaultUnit.value)
+    }
+
+    // @spec CAT-UI-066
+    @Test fun `SubCategory create mode uses blank unit when parent defaultValue is null`() = runTest {
+        val parent = makeMetaCategory("parent", valueType = ValueType.Number, defaultValue = null)
+        repo.saveCategory(parent)
+        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        assertEquals("", vm.numberDefaultUnit.value)
+    }
+
+    // @spec CAT-UI-066
+    @Test fun `SubCategory create mode saves null defaultValue when unit not edited`() = runTest {
+        val parent = makeMetaCategory("parent", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "kg"))
+        repo.saveCategory(parent)
+        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        vm.name.value = "child"
+        vm.save()
+        val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory
+        assertNull(saved.defaultValue)
+    }
+
+    // @spec CAT-UI-066
+    @Test fun `SubCategory create mode saves NumberValue when unit field edited`() = runTest {
+        val parent = makeMetaCategory("parent", valueType = ValueType.Number, defaultValue = null)
+        repo.saveCategory(parent)
+        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        vm.numberDefaultUnit.value = "lbs"
+        vm.name.value = "child"
+        vm.save()
+        val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory
+        assertEquals(EventValue.NumberValue(0.0, "lbs"), saved.defaultValue)
+    }
+
+    // @spec CAT-UI-066
+    @Test fun `SubCategory create mode uses type default when parent defaultValue type mismatches effective valueType`() = runTest {
+        val parent = makeMetaCategory("parent", valueType = ValueType.Number,
+            defaultValue = EventValue.NumberValue(0.0, "kg"))
+        repo.saveCategory(parent)
+        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        vm.valueTypeState.value = ValueType.Exercise
+        assertEquals("3", vm.exerciseDefaultSets.value)
+        assertEquals("15", vm.exerciseDefaultReps.value)
+    }
+
+    // @spec CAT-UI-066
+    @Test fun `SubCategory create mode pre-populates exercise defaults from parent ExerciseValue`() = runTest {
+        val parent = makeMetaCategory("parent", valueType = ValueType.Exercise,
+            defaultValue = EventValue.ExerciseValue(5, 10))
+        repo.saveCategory(parent)
+        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        assertEquals("5", vm.exerciseDefaultSets.value)
+        assertEquals("10", vm.exerciseDefaultReps.value)
+    }
+
     // ---------- Helpers ----------
 
     private fun editVm(categoryId: String) =
@@ -158,9 +222,10 @@ class CategoryEditViewModelHierarchyTest {
         emoji: String = "📌",
         color: Long = 0xFFE53935L,
         valueType: ValueType = ValueType.None,
+        defaultValue: EventValue? = null,
     ) = Category.MetaCategory(
         id = id, name = id, emoji = emoji, color = color,
-        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+        valueType = valueType, defaultValue = defaultValue, allowEmptyText = true, sortOrder = sortOrder,
     )
 
     private fun makeSubCategory(
@@ -170,7 +235,7 @@ class CategoryEditViewModelHierarchyTest {
         valueType: ValueType? = null,
     ) = Category.SubCategory(
         id = id, name = id, emoji = null, color = null, valueType = valueType,
-        unit = null, allowEmptyText = true, sortOrder = sortOrder, parent = parent,
+        defaultValue = null, allowEmptyText = true, sortOrder = sortOrder, parent = parent,
     )
 
     private fun makeEvent(id: String, categoryId: String, value: EventValue? = null) = Event(

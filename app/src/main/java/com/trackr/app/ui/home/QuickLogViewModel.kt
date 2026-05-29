@@ -7,6 +7,7 @@ import com.trackr.app.data.TrackrRepository
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
+import com.trackr.app.domain.matchesValueType
 import com.trackr.app.ui.SaveResult
 import com.trackr.app.ui.components.ValueUIState
 import com.trackr.app.ui.components.defaultValueUIStateForType
@@ -72,11 +73,11 @@ class QuickLogViewModel @Inject constructor(
         valueDirty.value = true
     }
 
-    // @spec EL-UI-068, EL-UI-068b, EL-UI-068c
+    // @spec EL-UI-068, EL-UI-068b, EL-UI-068c, EL-UI-078
     fun selectCategory(category: Category) {
         val targetType = category.resolvedValueType
         if (!valueDirty.value) {
-            value.value = defaultValueUIStateForType(targetType, category.unit)
+            value.value = seedValue(category)
         } else {
             val current = value.value
             val effectiveState = when {
@@ -85,11 +86,11 @@ class QuickLogViewModel @Inject constructor(
                 else -> current
             }
             value.value = when {
-                effectiveState is ValueUIState.None -> defaultValueUIStateForType(targetType, category.unit)
+                effectiveState is ValueUIState.None -> seedValue(category)
                 effectiveState.matchesType(targetType) -> effectiveState
                 else -> {
                     val ev = effectiveState.toEventValue()
-                    if (ev == null) defaultValueUIStateForType(targetType, category.unit)
+                    if (ev == null) seedValue(category)
                     else ValueUIState.Mismatched(
                         originalValue = ev,
                         targetType = targetType,
@@ -100,6 +101,14 @@ class QuickLogViewModel @Inject constructor(
         }
         selectedCategory.value = category
         expandedMetaCategoryId.value = null
+    }
+
+    // @spec EL-UI-078
+    private fun seedValue(category: Category): ValueUIState {
+        val dv = category.resolvedDefaultValue
+        val type = category.resolvedValueType
+        return if (dv != null && matchesValueType(dv, type)) dv.toValueUIState()
+        else defaultValueUIStateForType(type)
     }
 
     fun expandMetaCategory(id: String?) {

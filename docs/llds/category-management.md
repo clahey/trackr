@@ -56,9 +56,13 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 | Emoji | Single-character text field (system emoji keyboard) | Always | SubCategory only: "Inherit" checkbox to the left of the text field. When checked (inheriting), the field is non-editable and shows the parent's emoji. When unchecked (custom), the field is editable. Custom value is preserved in `EmojiUIState` across mode switches. |
 | Color | Preset color palette picker; out-of-palette swatch if current color is not in palette | Always | Extra circle in the palette row showing the parent's color with a small label; selecting it sets `color = null` (inherit) |
 | Value type | Segmented picker / dropdown | Always | Extra "Same as [ParentName] ([TypeName])" row in the picker (e.g., "Same as Running (Exercise)"); selecting it sets `valueType = null` (inherit) |
-| Unit | Text field | effective `valueType == Number` | N/A |
+| Default value | Type-dependent sub-fields (see below) | effective `valueType == Number` or `Exercise` | N/A (not shown for other inherited types) |
 
 For a **MetaCategory**, none of the "inherit" options are shown (there is no parent). For a **SubCategory**, each inheritable field shows its inherit option. The inherit option for each field is shown first / in a visually distinct position so it is clearly a different kind of choice.
+
+**Default value fields** (shown only when the effective `valueType` is `Number` or `Exercise`):
+- **Number**: a single "Unit (optional)" text field. The stored `defaultValue` is always `NumberValue(0.0, unit)` where `unit` is null when the field is blank. The number component is fixed at 0 — the user edits the unit only.
+- **Exercise**: two integer fields labeled "Default sets" and "Default reps", initialized to 3 and 15. Both must be ≥ 1 to save. The stored `defaultValue` is `ExerciseValue(sets, reps)`.
 
 `allowEmptyText` is not exposed in the MVP editor; always written as `true` for new categories.
 
@@ -112,6 +116,10 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
 - **Stale category guard:** if `getCategoryById` returns null on init (edit mode only), sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The category list screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
 - `parent: StateFlow<Category.MetaCategory?>` — loaded when `parentId` is non-null; drives the inherit/override UI and effective value resolution
 - **Per-field form state for inheritable fields** (SubCategory mode only): `emojiUIState: MutableStateFlow<EmojiUIState>`, `colorState: MutableStateFlow<Long?>`, `valueTypeState: MutableStateFlow<ValueType?>`. `EmojiUIState(mode: EmojiMode, customValue: String)` where `mode` ∈ {INHERIT, CUSTOM}; `customValue` is always preserved across mode switches so switching back to Custom restores the previous entry. `colorState` and `valueTypeState` remain null = inherit. For MetaCategory, `emojiUIState` is always CUSTOM.
+- **Default value form state**: `numberDefaultUnit: MutableStateFlow<String>` (used when effective `valueType == Number`); `exerciseDefaultSets: MutableStateFlow<String>` and `exerciseDefaultReps: MutableStateFlow<String>` (used when effective `valueType == Exercise`), initialized to "3" and "15".
+  - **On load (edit mode)**: `numberDefaultUnit` is seeded from `(storedDefaultValue as? NumberValue)?.unit ?: ""`; `exerciseDefaultSets`/`Reps` from `(storedDefaultValue as? ExerciseValue)?.sets/reps` or the "3"/"15" fallback.
+  - **On load (SubCategory create mode)**: pre-populate `numberDefaultUnit` and `exerciseDefaultSets`/`Reps` from the parent's `resolvedDefaultValue` (same pattern as `emojiUIState.customValue`); the stored `defaultValue` starts as null (inherit). A `defaultValueDirty: Boolean` flag (false on open) tracks whether the user has edited any default field; it is set to true on any edit.
+  - **On save**: for Number and Exercise, compose and save the default value only if `defaultValueDirty` is true (or if in edit mode, where there is no inherited state to preserve). In SubCategory create mode with `defaultValueDirty == false`, save `defaultValue = null` (inherit). For Number (when saving), compose `NumberValue(existingStoredDefault?.value ?: 0.0, newUnit)` — the existing numeric value is preserved; only the unit is updated. For Exercise, compose `ExerciseValue(sets, reps)`. For all other types, leave `defaultValue` completely unchanged (do not overwrite it with null, even if the category editor does not show default fields). This ensures that unexpected or future-typed defaults are preserved.
 - **Effective values** (derived `StateFlow`s): `effectiveEmoji: StateFlow<String?>`, `effectiveColor: StateFlow<Long?>`, `effectiveValueType: StateFlow<ValueType?>` — each combines the corresponding state field with `parent` to resolve null to the parent's value; used by the live preview and validation
 - `isEmojiInherited`, `isColorInherited`, `isValueTypeInherited` — `StateFlow<Boolean>` derived from whether the corresponding state is null; drive the inherit-option selection state in the UI
 - `save()`: validates all fields using effective values; for a MetaCategory, validates that emoji/color/valueType are non-null (always true since there's no parent); for a SubCategory, the effective values are guaranteed non-null via parent fallback; constructs the appropriate `Category` sealed class variant
@@ -127,6 +135,7 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
 - `save()`: when effective `valueType != originalValueType` (edit mode only), calls `repository.saveCategoryAndMigrateEvents(category, originalType)` to persist the category and migrate events atomically (including inheriting SubCategory events); otherwise calls `repository.saveCategory(category)`
 - New categories are assigned `sortOrder = (min sortOrder across all categories) - 1`; using a global minimum avoids collisions when categories are reparented or promoted
 - New MetaCategories pre-populate `color` on init via `repository.getAndIncrementNextCategoryColorIndex()`. New SubCategories open with all inheritable fields null (inheriting). `save()` always uses the current state values.
+- The live preview uses `resolvedDefaultValue` when non-null as the `previewEventValue`; when null, falls back to the hardcoded type sample (e.g., `Scale(7)`, `BooleanValue(true)`). This makes the preview reflect the actual defaults for Number and Exercise categories.
 
 ### Value Type Migration
 

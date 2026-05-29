@@ -14,7 +14,8 @@ private fun CategoryEntity.toMetaCategory() = Category.MetaCategory(
     emoji = emoji ?: "",
     color = color ?: DEFAULT_CATEGORY_COLOR,
     valueType = valueType?.let { ValueTypeConverter.decode(it) } ?: ValueType.None,
-    unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
+    defaultValue = EventValueConverter.decode(defaultValue),
+    allowEmptyText = allowEmptyText, sortOrder = sortOrder,
 )
 
 fun List<CategoryEntity>.toDomainList(): List<Category> {
@@ -35,7 +36,7 @@ fun List<CategoryEntity>.toDomainList(): List<Category> {
                     emoji = entity.emoji,
                     color = entity.color,
                     valueType = entity.valueType?.let { ValueTypeConverter.decode(it) },
-                    unit = entity.unit,
+                    defaultValue = EventValueConverter.decode(entity.defaultValue),
                     allowEmptyText = entity.allowEmptyText,
                     sortOrder = entity.sortOrder,
                     parent = parent,
@@ -53,7 +54,8 @@ fun CategoryWithParent.toDomain(): Category {
             id = category.id, name = category.name,
             emoji = category.emoji, color = category.color,
             valueType = category.valueType?.let { ValueTypeConverter.decode(it) },
-            unit = category.unit, allowEmptyText = category.allowEmptyText,
+            defaultValue = EventValueConverter.decode(category.defaultValue),
+            allowEmptyText = category.allowEmptyText,
             sortOrder = category.sortOrder, parent = parentMeta,
         )
     } else {
@@ -65,13 +67,15 @@ fun Category.toEntity(): CategoryEntity = when (this) {
     is Category.MetaCategory -> CategoryEntity(
         id = id, name = name, emoji = emoji, color = color,
         valueType = ValueTypeConverter.encode(valueType),
-        unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
+        defaultValue = EventValueConverter.encode(defaultValue),
+        allowEmptyText = allowEmptyText, sortOrder = sortOrder,
         parentId = null,
     )
     is Category.SubCategory -> CategoryEntity(
         id = id, name = name, emoji = emoji, color = color,
         valueType = valueType?.let { ValueTypeConverter.encode(it) },
-        unit = unit, allowEmptyText = allowEmptyText, sortOrder = sortOrder,
+        defaultValue = EventValueConverter.encode(defaultValue),
+        allowEmptyText = allowEmptyText, sortOrder = sortOrder,
         parentId = parent.id,
     )
 }

@@ -36,14 +36,14 @@ class HomeViewModelTest {
 
     private fun makeMeta(id: String, name: String = id) = Category.MetaCategory(
         id = id, name = name, emoji = "📌", color = 0xFFE53935L,
-        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = 0,
+        valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = 0,
     )
 
     private fun makeCategory(id: String, name: String = id) = makeMeta(id, name)
 
     private fun makeSub(id: String, parent: Category.MetaCategory) = Category.SubCategory(
         id = id, name = id, emoji = null, color = null, valueType = null,
-        unit = null, allowEmptyText = true, sortOrder = 0, parent = parent,
+        defaultValue = null, allowEmptyText = true, sortOrder = 0, parent = parent,
     )
 
     private fun makeEvent(
@@ -351,7 +351,7 @@ class HomeViewModelTest {
     @Test fun `DayEntry Entry hasMismatch is true when event value does not match category type`() = runTest {
         val cat = Category.MetaCategory(
             id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
-            valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
+            valueType = ValueType.Scale, defaultValue = null, allowEmptyText = true, sortOrder = 0,
         )
         repo.setCategories(cat)
         val event = Event(
@@ -370,7 +370,7 @@ class HomeViewModelTest {
     @Test fun `DayEntry Entry hasMismatch is false when value matches category type`() = runTest {
         val cat = Category.MetaCategory(
             id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
-            valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
+            valueType = ValueType.Scale, defaultValue = null, allowEmptyText = true, sortOrder = 0,
         )
         repo.setCategories(cat)
         val event = Event(
@@ -389,7 +389,7 @@ class HomeViewModelTest {
     @Test fun `DayEntry Entry hasMismatch is false when ErrorValue inferredType matches Unknown category`() = runTest {
         val cat = Category.MetaCategory(
             id = "c1", name = "Future Cat", emoji = "📌", color = 0xFFE53935L,
-            valueType = ValueType.Unknown("future_type"), unit = null, allowEmptyText = true, sortOrder = 0,
+            valueType = ValueType.Unknown("future_type"), defaultValue = null, allowEmptyText = true, sortOrder = 0,
         )
         repo.setCategories(cat)
         val event = Event(

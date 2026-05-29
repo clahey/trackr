@@ -182,7 +182,7 @@ class CategoryListViewModelGroupTest {
         valueType: ValueType = ValueType.None,
     ) = Category.MetaCategory(
         id = id, name = id, emoji = emoji, color = color,
-        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+        valueType = valueType, defaultValue = null, allowEmptyText = true, sortOrder = sortOrder,
     )
 
     private fun makeSubCategory(
@@ -193,6 +193,6 @@ class CategoryListViewModelGroupTest {
         valueType: ValueType? = null,
     ) = Category.SubCategory(
         id = id, name = id, emoji = emoji, color = color, valueType = valueType,
-        unit = null, allowEmptyText = true, sortOrder = 0, parent = parent,
+        defaultValue = null, allowEmptyText = true, sortOrder = 0, parent = parent,
     )
 }

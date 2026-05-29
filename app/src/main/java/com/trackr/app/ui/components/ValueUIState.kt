@@ -74,8 +74,8 @@ fun durationToUIState(hours: Long, minutes: Int, seconds: Int): ValueUIState.Dur
 }
 
 // @spec EL-UI-062, EL-UI-067
-fun EventValue?.toValueUIState(valueType: ValueType, defaultUnit: String? = null): ValueUIState {
-    if (this == null) return defaultValueUIStateForType(valueType, defaultUnit)
+fun EventValue?.toValueUIState(valueType: ValueType): ValueUIState {
+    if (this == null) return defaultValueUIStateForType(valueType)
     if (matchesValueType(this, valueType)) return toValueUIState()
     return ValueUIState.Mismatched(
         originalValue = this,
@@ -118,11 +118,11 @@ fun ValueUIState.toEventValue(): EventValue? {
 }
 
 // @spec EL-UI-051b, EL-UI-052, EL-UI-055d, EL-UI-059
-fun defaultValueUIStateForType(type: ValueType, defaultUnit: String?): ValueUIState = when (type) {
+fun defaultValueUIStateForType(type: ValueType): ValueUIState = when (type) {
     ValueType.None, is ValueType.Unknown -> ValueUIState.None
     ValueType.Scale -> ValueUIState.Scale(5)
     ValueType.Boolean -> ValueUIState.Bool(null)
-    ValueType.Number -> ValueUIState.Number("", defaultUnit ?: "")
+    ValueType.Number -> ValueUIState.Number("", "")
     ValueType.Text -> ValueUIState.Text("")
     ValueType.Duration -> ValueUIState.Duration("", "", "0")
     ValueType.Exercise -> ValueUIState.Exercise("3", "15")

@@ -8,6 +8,7 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
+import com.trackr.app.domain.matchesValueType
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.seconds
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -55,7 +57,11 @@ class CategoryEditViewModel @Inject constructor(
     val colorState = MutableStateFlow<Long?>(null)
     val valueTypeState = MutableStateFlow<ValueType?>(null)
 
-    val unit = MutableStateFlow("")
+    val numberDefaultUnit = MutableStateFlow("")
+    val exerciseDefaultSets = MutableStateFlow("3")
+    val exerciseDefaultReps = MutableStateFlow("15")
+    private var defaultValueDirty = false
+    private var storedDefaultValue: EventValue? = null
 
     private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
     val parentCategory: StateFlow<Category.MetaCategory?> = _parentCategory.asStateFlow()
@@ -79,16 +85,26 @@ class CategoryEditViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     // @spec CAT-UI-059
-    val previewEventValue: StateFlow<EventValue?> = combine(effectiveValueType, unit) { vt, u ->
-        when (vt) {
+    val previewEventValue: StateFlow<EventValue?> = combine(
+        effectiveValueType, numberDefaultUnit, exerciseDefaultSets, exerciseDefaultReps,
+    ) { vt, unit, sets, reps ->
+        val liveDefault = when (vt) {
+            ValueType.Number -> EventValue.NumberValue(
+                storedDefaultValue?.let { (it as? EventValue.NumberValue)?.value } ?: 0.0,
+                unit.takeIf { it.isNotBlank() },
+            )
+            ValueType.Exercise -> EventValue.ExerciseValue(
+                sets.toIntOrNull() ?: 3, reps.toIntOrNull() ?: 15,
+            )
+            else -> storedDefaultValue?.takeIf { matchesValueType(it, vt) }
+        }
+        liveDefault ?: when (vt) {
             ValueType.None -> null
-            ValueType.Number -> EventValue.NumberValue(42.0, u.takeIf { it.isNotBlank() })
             ValueType.Scale -> EventValue.Scale(7)
             ValueType.Boolean -> EventValue.BooleanValue(true)
             ValueType.Text -> EventValue.TextValue("Sample")
             ValueType.Duration -> EventValue.DurationValue(90.seconds)
-            ValueType.Exercise -> EventValue.ExerciseValue(3, 15)
-            is ValueType.Unknown -> null
+            else -> null
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -96,16 +112,16 @@ class CategoryEditViewModel @Inject constructor(
         .withHour(12).withMinute(0).withSecond(0).withNano(0).toInstant()
 
     val previewCategory: StateFlow<Category.MetaCategory> = combine(
-        name, effectiveEmoji, effectiveColor, effectiveValueType, unit,
-    ) { n, emoji, color, vt, u ->
+        name, effectiveEmoji, effectiveColor, effectiveValueType, previewEventValue,
+    ) { n, emoji, color, vt, dv ->
         Category.MetaCategory(
             id = "", name = n.ifEmpty { "Category name" }, emoji = emoji.ifEmpty { " " },
-            color = color, valueType = vt, unit = u.takeIf { it.isNotBlank() },
+            color = color, valueType = vt, defaultValue = dv,
             allowEmptyText = true, sortOrder = 0,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, Category.MetaCategory(
         id = "", name = "Category name", emoji = " ", color = DEFAULT_CATEGORY_COLOR,
-        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = 0,
+        valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = 0,
     ))
 
     val previewEvent: StateFlow<Event> = previewEventValue.map { value ->
@@ -150,7 +166,8 @@ class CategoryEditViewModel @Inject constructor(
                     val cat = repository.getCategoryById(categoryId).first()
                     if (cat == null) { _navigateBack.value = true; return@launch }
                     name.value = cat.name
-                    unit.value = cat.unit ?: ""
+                    storedDefaultValue = cat.defaultValue
+                    seedDefaultValueFields(cat.defaultValue, cat.resolvedValueType)
                     when (cat) {
                         is Category.MetaCategory -> {
                             emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, cat.emoji)
@@ -197,6 +214,14 @@ class CategoryEditViewModel @Inject constructor(
                         _parentCategory.value = parent
                         // @spec CAT-UI-062
                         emojiUIState.value = EmojiUIState(EmojiMode.INHERIT, parent.emoji)
+                        // @spec CAT-UI-066 — pre-populate from parent's resolved default; don't mark dirty
+                        seedDefaultValueFields(parent.resolvedDefaultValue, parent.resolvedValueType)
+                        // @spec CAT-UI-066 — drop(1) skips the initial emission of seeded values
+                        viewModelScope.launch {
+                            combine(numberDefaultUnit, exerciseDefaultSets, exerciseDefaultReps) { _, _, _ -> }
+                                .drop(1)
+                                .collect { defaultValueDirty = true }
+                        }
                     } else {
                         _navigateBack.value = true
                     }
@@ -235,6 +260,22 @@ class CategoryEditViewModel @Inject constructor(
         val sortOrder = categoryId?.let { repository.getCategoryById(it).first()?.sortOrder }
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)
 
+        // @spec CAT-UI-063, CAT-UI-064, CAT-UI-065, CAT-UI-066
+        val effectiveVt = effectiveValueType.value
+        val defaultValueToSave: EventValue? = when {
+            parent != null && !defaultValueDirty -> null  // inherit; CAT-UI-066
+            effectiveVt == ValueType.Number -> EventValue.NumberValue(
+                (storedDefaultValue as? EventValue.NumberValue)?.value ?: 0.0,
+                numberDefaultUnit.value.takeIf { it.isNotBlank() },
+            )
+            effectiveVt == ValueType.Exercise -> {
+                val sets = exerciseDefaultSets.value.toIntOrNull() ?: 3
+                val reps = exerciseDefaultReps.value.toIntOrNull() ?: 15
+                EventValue.ExerciseValue(sets, reps)
+            }
+            else -> storedDefaultValue  // CAT-UI-065: leave unchanged
+        }
+
         val category: Category = if (parent != null) {
             // @spec CAT-UI-041
             Category.SubCategory(
@@ -243,7 +284,7 @@ class CategoryEditViewModel @Inject constructor(
                 emoji = emojiToSave,
                 color = colorState.value,
                 valueType = valueTypeState.value,
-                unit = unit.value.takeIf { it.isNotBlank() },
+                defaultValue = defaultValueToSave,
                 allowEmptyText = true,
                 sortOrder = sortOrder,
                 parent = parent,
@@ -255,7 +296,7 @@ class CategoryEditViewModel @Inject constructor(
                 emoji = emojiToSave ?: "",
                 color = colorState.value ?: DEFAULT_CATEGORY_COLOR,
                 valueType = valueTypeState.value ?: ValueType.None,
-                unit = unit.value.takeIf { it.isNotBlank() },
+                defaultValue = defaultValueToSave,
                 allowEmptyText = true,
                 sortOrder = sortOrder,
             )
@@ -316,6 +357,20 @@ class CategoryEditViewModel @Inject constructor(
         ) -> ValueTypeWarningTier.Partial
         // All other pairs: no migration
         else -> ValueTypeWarningTier.Unsafe
+    }
+
+    // @spec CAT-UI-011, CAT-UI-011a, CAT-UI-066
+    private fun seedDefaultValueFields(dv: EventValue?, effectiveType: ValueType) {
+        when {
+            effectiveType == ValueType.Number -> {
+                numberDefaultUnit.value = (dv as? EventValue.NumberValue)?.unit ?: ""
+            }
+            effectiveType == ValueType.Exercise -> {
+                val ev = dv as? EventValue.ExerciseValue
+                exerciseDefaultSets.value = ev?.sets?.toString() ?: "3"
+                exerciseDefaultReps.value = ev?.reps?.toString() ?: "15"
+            }
+        }
     }
 
     private fun String.graphemeClusterCount(): Int {

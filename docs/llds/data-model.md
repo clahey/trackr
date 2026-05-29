@@ -163,12 +163,13 @@ These are plain Kotlin domain types with no framework dependencies.
 sealed class Category {
     abstract val id: String
     abstract val name: String
-    abstract val unit: String?
+    abstract val defaultValue: EventValue?
     abstract val allowEmptyText: Boolean
     abstract val sortOrder: Int
     abstract val resolvedEmoji: String
     abstract val resolvedColor: Long
     abstract val resolvedValueType: ValueType
+    abstract val resolvedDefaultValue: EventValue?
 
     data class MetaCategory(
         override val id: String,
@@ -176,13 +177,14 @@ sealed class Category {
         val emoji: String,               // always non-null
         val color: Long,                 // ARGB packed as Long; always non-null
         val valueType: ValueType,        // always non-null
-        override val unit: String?,      // only meaningful when effective valueType == NUMBER
+        override val defaultValue: EventValue?,
         override val allowEmptyText: Boolean,
         override val sortOrder: Int,     // ascending within the top-level list
     ) : Category() {
         override val resolvedEmoji get() = emoji
         override val resolvedColor get() = color
         override val resolvedValueType get() = valueType
+        override val resolvedDefaultValue get() = defaultValue
     }
 
     data class SubCategory(
@@ -191,7 +193,7 @@ sealed class Category {
         val emoji: String?,              // null = inherit from parent
         val color: Long?,               // null = inherit from parent
         val valueType: ValueType?,       // null = inherit from parent
-        override val unit: String?,
+        override val defaultValue: EventValue?,  // null = inherit from parent
         override val allowEmptyText: Boolean,
         override val sortOrder: Int,     // ascending within the parent's subcategory list
         val parent: MetaCategory,        // always non-null; populated at repository layer
@@ -199,6 +201,7 @@ sealed class Category {
         override val resolvedEmoji get() = emoji ?: parent.emoji
         override val resolvedColor get() = color ?: parent.color
         override val resolvedValueType get() = valueType ?: parent.valueType
+        override val resolvedDefaultValue get() = defaultValue ?: parent.defaultValue
     }
 }
 ```
@@ -246,17 +249,19 @@ When two events share the same `timestamp`, the canonical sort order is `created
 
 `Category.allowEmptyText` controls whether empty strings may be submitted for `TEXT`-type events. This is a domain field read by the event logging UI — the UI gates submission on it, but the domain model itself does not reject `TextValue("")`. The MVP category editor does not expose this setting; all UI-created categories are initialized with `allowEmptyText = true`.
 
-### Unit: category default vs. event snapshot
+### Default value: category default vs. event snapshot
 
-`Category.unit` is the default unit presented to the user when logging a new event. At log time, `NumberValue.unit` is populated from `Category.unit` — each event stores its own copy. This means historical events retain the unit that was in effect when they were logged, even if the category's unit is later changed. `Category.unit` and `NumberValue.unit` may therefore diverge for historical records; this is correct behavior, not an inconsistency.
+`Category.defaultValue` is the default `EventValue` presented to the user when logging a new event for this category. At log time, the default seeds the initial `ValueUIState` — each event then stores its own copy of the value, which the user may edit before saving. Historical events retain the value that was entered at log time; changing `Category.defaultValue` does not retroactively update existing events.
 
-When `valueType != NUMBER`, `Category.unit` is ignored. It is not an error for it to be non-null.
+`defaultValue` should be consistent with `resolvedValueType` (e.g., a `NumberValue` for a Number category). If they diverge (e.g., due to a valueType change), callers treat `defaultValue` as null. The category editor always constructs `defaultValue` from the current form state based on the active `valueType`, so divergence can only arise from direct DB writes or future migrations.
+
+For **Number** categories, `defaultValue` is always a `NumberValue(0.0, unit)` where `unit` is the user-supplied unit string (null if blank). For **Exercise** categories, `defaultValue` is always an `ExerciseValue(sets, reps)`. For all other types, `defaultValue` is null unless explicitly set by a future feature.
 
 ### Category hierarchy: inheritance and constraints
 
 The two-level hierarchy is enforced entirely at the repository and UI layers; the domain types themselves carry no runtime checks.
 
-**Inheritance:** a `SubCategory` field is inherited when its value is null. The resolved value is always the non-null fallback from the parent (guaranteed non-null by the `MetaCategory` type). `unit` and `allowEmptyText` are not inheritable — they are always set explicitly on both MetaCategory and SubCategory.
+**Inheritance:** a `SubCategory` field is inherited when its value is null. The resolved value is always the non-null fallback from the parent (guaranteed non-null by the `MetaCategory` type). `defaultValue` is inheritable — `SubCategory.defaultValue = null` means inherit the parent's `defaultValue`. `allowEmptyText` is not inheritable — it is always set explicitly on both MetaCategory and SubCategory.
 
 **Reparenting an existing category into a group:** all current explicit field values are kept as overrides regardless of whether they match the new parent's values. The caller is responsible for providing the correct field values; the repository performs no automatic field-merging on reparent.
 

@@ -117,8 +117,8 @@ class ValueUIStateTest {
     }
 
     // @spec EL-UI-067
-    @Test fun `null value with Number type toValueUIState with type returns default Number state`() {
-        assertEquals(ValueUIState.Number("", "kg"), null.toValueUIState(ValueType.Number, "kg"))
+    @Test fun `null value with Number type toValueUIState with type returns empty Number state`() {
+        assertEquals(ValueUIState.Number("", ""), null.toValueUIState(ValueType.Number))
     }
 
     // @spec EL-UI-067
@@ -349,44 +349,27 @@ class ValueUIStateTest {
 
     // @spec EL-UI-051b
     @Test fun `defaultValueUIStateForType Boolean returns Bool null`() {
-        assertEquals(ValueUIState.Bool(null), defaultValueUIStateForType(ValueType.Boolean, null))
+        assertEquals(ValueUIState.Bool(null), defaultValueUIStateForType(ValueType.Boolean))
     }
 
     // @spec EL-UI-052
-    @Test fun `defaultValueUIStateForType Number seeds defaultUnit`() {
-        assertEquals(
-            ValueUIState.Number("", "kg"),
-            defaultValueUIStateForType(ValueType.Number, "kg"),
-        )
-    }
-
-    // @spec EL-UI-052
-    @Test fun `defaultValueUIStateForType Number with null unit uses empty string`() {
-        assertEquals(
-            ValueUIState.Number("", ""),
-            defaultValueUIStateForType(ValueType.Number, null),
-        )
+    @Test fun `defaultValueUIStateForType Number returns empty text and unit`() {
+        assertEquals(ValueUIState.Number("", ""), defaultValueUIStateForType(ValueType.Number))
     }
 
     // @spec EL-UI-055d
     @Test fun `defaultValueUIStateForType Duration returns empty-empty-zero`() {
-        assertEquals(
-            ValueUIState.Duration("", "", "0"),
-            defaultValueUIStateForType(ValueType.Duration, null),
-        )
+        assertEquals(ValueUIState.Duration("", "", "0"), defaultValueUIStateForType(ValueType.Duration))
     }
 
     // @spec EL-UI-059
     @Test fun `defaultValueUIStateForType Exercise returns 3 and 15`() {
-        assertEquals(
-            ValueUIState.Exercise("3", "15"),
-            defaultValueUIStateForType(ValueType.Exercise, null),
-        )
+        assertEquals(ValueUIState.Exercise("3", "15"), defaultValueUIStateForType(ValueType.Exercise))
     }
 
     // @spec EL-UI-050
     @Test fun `defaultValueUIStateForType Scale returns Scale 5`() {
-        assertEquals(ValueUIState.Scale(5), defaultValueUIStateForType(ValueType.Scale, null))
+        assertEquals(ValueUIState.Scale(5), defaultValueUIStateForType(ValueType.Scale))
     }
 
     // ─── ValueUIState.matchesType ──────────────────────────────────────────
@@ -439,7 +422,7 @@ class ValueUIStateTest {
     private fun makeCategory(valueType: ValueType, allowEmptyText: Boolean = true) =
         Category.MetaCategory(
             id = "c1", name = "c1", emoji = "📌", color = 0L,
-            valueType = valueType, unit = null, allowEmptyText = allowEmptyText, sortOrder = 0,
+            valueType = valueType, defaultValue = null, allowEmptyText = allowEmptyText, sortOrder = 0,
         )
 
     // @spec EL-UI-057

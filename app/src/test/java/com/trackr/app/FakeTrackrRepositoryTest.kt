@@ -145,12 +145,12 @@ class FakeTrackrRepositoryTest {
 
     private fun makeCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+        valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = sortOrder,
     )
 
     private fun makeSubCategory(id: String, parent: Category.MetaCategory, sortOrder: Int = 0) =
         Category.SubCategory(
             id = id, name = id, emoji = null, color = null, valueType = null,
-            unit = null, allowEmptyText = true, sortOrder = sortOrder, parent = parent,
+            defaultValue = null, allowEmptyText = true, sortOrder = sortOrder, parent = parent,
         )
 }

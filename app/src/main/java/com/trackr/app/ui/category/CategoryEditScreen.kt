@@ -77,7 +77,9 @@ fun CategoryEditScreen(
     val colorState by viewModel.colorState.collectAsState()
     val effectiveColor by viewModel.effectiveColor.collectAsState()
     val effectiveValueType by viewModel.effectiveValueType.collectAsState()
-    val unit by viewModel.unit.collectAsState()
+    val numberDefaultUnit by viewModel.numberDefaultUnit.collectAsState()
+    val exerciseDefaultSets by viewModel.exerciseDefaultSets.collectAsState()
+    val exerciseDefaultReps by viewModel.exerciseDefaultReps.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
     val navigateBack by viewModel.navigateBack.collectAsState()
@@ -237,13 +239,34 @@ fun CategoryEditScreen(
                 )
             }
 
+            // @spec CAT-UI-011
             if (effectiveValueType == ValueType.Number) {
                 OutlinedTextField(
-                    value = unit,
-                    onValueChange = { viewModel.unit.value = it },
+                    value = numberDefaultUnit,
+                    onValueChange = { viewModel.numberDefaultUnit.value = it },
                     label = { Text("Unit (optional)") },
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+            // @spec CAT-UI-011a
+            if (effectiveValueType == ValueType.Exercise) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = exerciseDefaultSets,
+                        onValueChange = { viewModel.exerciseDefaultSets.value = it },
+                        label = { Text("Default sets") },
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = exerciseDefaultReps,
+                        onValueChange = { viewModel.exerciseDefaultReps.value = it },
+                        label = { Text("Default reps") },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))

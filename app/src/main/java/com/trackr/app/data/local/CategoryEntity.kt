@@ -11,7 +11,7 @@ data class CategoryEntity(
     val emoji: String?,
     val color: Long?,
     val valueType: String?,
-    val unit: String?,
+    val defaultValue: String?,
     val allowEmptyText: Boolean,
     @ColumnInfo(index = true) val sortOrder: Int,
     @ColumnInfo(index = true) val parentId: String? = null,

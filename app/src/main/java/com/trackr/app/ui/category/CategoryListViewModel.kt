@@ -126,7 +126,7 @@ class CategoryListViewModel @Inject constructor(
                 emoji = cat.resolvedEmoji,
                 color = categoryColorForIndex(colorIndex),
                 valueType = ValueType.None,
-                unit = null,
+                defaultValue = null,
                 allowEmptyText = true,
                 sortOrder = minSortOrder - 1,
             )
@@ -147,7 +147,7 @@ class CategoryListViewModel @Inject constructor(
                     emoji = cat.resolvedEmoji,
                     color = cat.resolvedColor,
                     valueType = cat.resolvedValueType,
-                    unit = cat.unit,
+                    defaultValue = cat.defaultValue,
                     allowEmptyText = cat.allowEmptyText,
                     sortOrder = cat.sortOrder,
                 )
@@ -163,7 +163,7 @@ class CategoryListViewModel @Inject constructor(
             is Category.MetaCategory -> Category.SubCategory(
                 id = cat.id, name = cat.name,
                 emoji = cat.emoji, color = cat.color, valueType = cat.valueType,
-                unit = cat.unit, allowEmptyText = cat.allowEmptyText, sortOrder = cat.sortOrder,
+                defaultValue = cat.defaultValue, allowEmptyText = cat.allowEmptyText, sortOrder = cat.sortOrder,
                 parent = newParent,
             )
             is Category.SubCategory -> cat.copy(parent = newParent)

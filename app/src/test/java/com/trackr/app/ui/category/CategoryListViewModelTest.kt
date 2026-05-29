@@ -88,7 +88,7 @@ class CategoryListViewModelTest {
 
     private fun makeCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = sortOrder,
+        valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = sortOrder,
     )
 
     private fun makeEvent(id: String, categoryId: String) = com.trackr.app.domain.Event(
