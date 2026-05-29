@@ -46,6 +46,7 @@ LLD: `docs/llds/event-logging.md`
 - [ ] **EL-UI-032**: The timestamp field in the quick-log sheet shall default to the time the sheet was opened, and shall be tappable to allow the user to edit the date and time.
 - [ ] **EL-UI-033**: For a None-type category, step 2 shall omit the value input field, making the flow completable in three taps (FAB → category → save).
 - [x] **EL-UI-034**: When the category selected in the quick-log sheet is deleted externally while the sheet is open at step 2, the system shall reset to step 1.
+- [ ] **EL-UI-077**: When the user saves a new event via the quick-log sheet, the system shall dismiss the sheet and scroll the timeline to make the newly saved event visible.
 
 ## Event Edit Screen
 
