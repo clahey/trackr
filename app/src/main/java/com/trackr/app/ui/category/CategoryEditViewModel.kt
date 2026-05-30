@@ -146,10 +146,19 @@ class CategoryEditViewModel @Inject constructor(
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
 
-    private val _valueTypeWarning = MutableStateFlow<ValueTypeWarningTier?>(null)
-    val valueTypeWarning: StateFlow<ValueTypeWarningTier?> = _valueTypeWarning.asStateFlow()
-
     private val _originalValueType = MutableStateFlow<ValueType?>(null)
+
+    // @spec CAT-UI-030
+    val valueTypeWarning: StateFlow<ValueTypeWarningTier?> = if (categoryId != null) {
+        combine(
+            effectiveValueType,
+            _originalValueType,
+            repository.getEventCountForCategory(categoryId, includeSubCategoriesWithNullType = true),
+        ) { type, orig, count ->
+            if (orig == null || type == orig || count == 0) null
+            else warningTierFor(orig, type)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    } else MutableStateFlow(null)
 
     // Live event counts in edit mode; zero in create mode.
     val ownEventCount: StateFlow<Int> = if (categoryId != null) {
@@ -190,22 +199,6 @@ class CategoryEditViewModel @Inject constructor(
                         }
                     }
                     _originalValueType.value = cat.resolvedValueType
-
-                    val includeInheriting = cat is Category.MetaCategory
-                    viewModelScope.launch {
-                        // @spec CAT-UI-030
-                        combine(
-                            effectiveValueType,
-                            _originalValueType,
-                            repository.getEventCountForCategory(
-                                categoryId,
-                                includeSubCategoriesWithNullType = includeInheriting,
-                            ),
-                        ) { type, orig, count ->
-                            if (orig == null || type == orig || count == 0) null
-                            else warningTierFor(orig, type)
-                        }.collect { _valueTypeWarning.value = it }
-                    }
                 }
             }
 
