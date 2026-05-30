@@ -18,6 +18,15 @@ private fun CategoryEntity.toMetaCategory() = Category.MetaCategory(
     allowEmptyText = allowEmptyText, sortOrder = sortOrder,
 )
 
+private fun CategoryEntity.toSubCategory(parent: Category.MetaCategory) = Category.SubCategory(
+    id = id, name = name,
+    emoji = emoji, color = color,
+    valueType = valueType?.let { ValueTypeConverter.decode(it) },
+    defaultValue = EventValueConverter.decode(defaultValue),
+    allowEmptyText = allowEmptyText, sortOrder = sortOrder,
+    parent = parent,
+)
+
 fun List<CategoryEntity>.toDomainList(): List<Category> {
     val metaMap = mutableMapOf<String, Category.MetaCategory>()
     forEach { entity -> if (entity.parentId == null) metaMap[entity.id] = entity.toMetaCategory() }
@@ -30,17 +39,7 @@ fun List<CategoryEntity>.toDomainList(): List<Category> {
             if (parent == null) {
                 entity.toMetaCategory()
             } else {
-                Category.SubCategory(
-                    id = entity.id,
-                    name = entity.name,
-                    emoji = entity.emoji,
-                    color = entity.color,
-                    valueType = entity.valueType?.let { ValueTypeConverter.decode(it) },
-                    defaultValue = EventValueConverter.decode(entity.defaultValue),
-                    allowEmptyText = entity.allowEmptyText,
-                    sortOrder = entity.sortOrder,
-                    parent = parent,
-                )
+                entity.toSubCategory(parent)
             }
         }
     }
@@ -50,14 +49,7 @@ fun List<CategoryEntity>.toDomainList(): List<Category> {
 fun CategoryWithParent.toDomain(): Category {
     val parentMeta = parent?.toMetaCategory()
     return if (parentMeta != null) {
-        Category.SubCategory(
-            id = category.id, name = category.name,
-            emoji = category.emoji, color = category.color,
-            valueType = category.valueType?.let { ValueTypeConverter.decode(it) },
-            defaultValue = EventValueConverter.decode(category.defaultValue),
-            allowEmptyText = category.allowEmptyText,
-            sortOrder = category.sortOrder, parent = parentMeta,
-        )
+        category.toSubCategory(parentMeta)
     } else {
         category.toMetaCategory()
     }
