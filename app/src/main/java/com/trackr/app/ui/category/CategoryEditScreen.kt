@@ -341,12 +341,10 @@ private fun ValueTypeSelector(
         ValueType.Exercise,
     )
     var expanded by remember { mutableStateOf(false) }
+    val inheritLabel = parentCategory?.let { "Same as ${it.name} (${valueTypeLabel(it.valueType)})" }
 
-    val displayLabel = if (parentCategory != null && isValueTypeInherited) {
-        "Same as ${parentCategory.name} (${valueTypeLabel(parentCategory.valueType)})"
-    } else {
-        valueTypeLabel(selected)
-    }
+    val displayLabel = if (inheritLabel != null && isValueTypeInherited) inheritLabel
+    else valueTypeLabel(selected)
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
@@ -358,9 +356,9 @@ private fun ValueTypeSelector(
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (parentCategory != null) {
+            if (inheritLabel != null) {
                 DropdownMenuItem(
-                    text = { Text("Same as ${parentCategory.name} (${valueTypeLabel(parentCategory.valueType)})") },
+                    text = { Text(inheritLabel) },
                     onClick = { onSelectInherit(); expanded = false },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )
