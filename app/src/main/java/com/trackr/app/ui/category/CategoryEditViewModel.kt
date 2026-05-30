@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -61,6 +60,10 @@ class CategoryEditViewModel @Inject constructor(
     val exerciseDefaultSets = MutableStateFlow("3")
     val exerciseDefaultReps = MutableStateFlow("15")
     private var defaultValueDirty = false
+
+    fun updateNumberDefaultUnit(value: String) { numberDefaultUnit.value = value; defaultValueDirty = true }
+    fun updateExerciseDefaultSets(value: String) { exerciseDefaultSets.value = value; defaultValueDirty = true }
+    fun updateExerciseDefaultReps(value: String) { exerciseDefaultReps.value = value; defaultValueDirty = true }
     private var storedDefaultValue: EventValue? = null
 
     private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
@@ -216,12 +219,6 @@ class CategoryEditViewModel @Inject constructor(
                         emojiUIState.value = EmojiUIState(EmojiMode.INHERIT, parent.emoji)
                         // @spec CAT-UI-066 — pre-populate from parent's resolved default; don't mark dirty
                         seedDefaultValueFields(parent.resolvedDefaultValue, parent.resolvedValueType)
-                        // @spec CAT-UI-066 — drop(1) skips the initial emission of seeded values
-                        viewModelScope.launch {
-                            combine(numberDefaultUnit, exerciseDefaultSets, exerciseDefaultReps) { _, _, _ -> }
-                                .drop(1)
-                                .collect { defaultValueDirty = true }
-                        }
                     } else {
                         _navigateBack.value = true
                     }

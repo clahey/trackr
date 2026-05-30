@@ -243,7 +243,7 @@ fun CategoryEditScreen(
             if (effectiveValueType == ValueType.Number) {
                 OutlinedTextField(
                     value = numberDefaultUnit,
-                    onValueChange = { viewModel.numberDefaultUnit.value = it },
+                    onValueChange = { viewModel.updateNumberDefaultUnit(it) },
                     label = { Text("Unit (optional)") },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -256,13 +256,13 @@ fun CategoryEditScreen(
                 ) {
                     OutlinedTextField(
                         value = exerciseDefaultSets,
-                        onValueChange = { viewModel.exerciseDefaultSets.value = it },
+                        onValueChange = { viewModel.updateExerciseDefaultSets(it) },
                         label = { Text("Default sets") },
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
                         value = exerciseDefaultReps,
-                        onValueChange = { viewModel.exerciseDefaultReps.value = it },
+                        onValueChange = { viewModel.updateExerciseDefaultReps(it) },
                         label = { Text("Default reps") },
                         modifier = Modifier.weight(1f),
                     )
