@@ -158,6 +158,7 @@ class FakeTrackrRepository : TrackrRepository {
         events.update { list -> list.filter { it.id != event.id } + event }
     }
     override suspend fun deleteEvent(id: String) { events.update { it.filter { e -> e.id != id } } }
+    override suspend fun deleteEventFiles(imagePaths: List<String>) { }
 
     override suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int {
         val current = nextColorIndex

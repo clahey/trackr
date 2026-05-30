@@ -131,8 +131,10 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
 
     fun swipeDelete(event: Event) {
         deleteSnapshot = currentEvents.map { it.id }.toSet()
+        val prev = _pendingDelete.value
         _pendingDelete.value = null
         viewModelScope.launch {
+            if (prev != null) repository.deleteEventFiles(prev.imagePaths)
             repository.deleteEvent(event.id)
             _pendingDelete.value = event
         }
@@ -147,7 +149,11 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
     }
 
     fun clearPendingDelete() {
+        val prev = _pendingDelete.value
         _pendingDelete.value = null
+        if (prev != null) {
+            viewModelScope.launch { repository.deleteEventFiles(prev.imagePaths) }
+        }
     }
 
     private fun buildDayGroups(events: List<Event>, pending: Event?, categories: List<Category>): List<DayGroup> {

@@ -29,11 +29,11 @@ Individuals tracking personal health and lifestyle data who want:
 
 ## Non-Goals
 
-- Cloud sync or multi-device in v1 (architecture is open to it; not implementing it)
+- Cloud sync or multi-device in v1 (near-term: Android Auto Backup as a baseline; full sync is post-v1)
 - Charts, trends, or analytics in v1
-- Sharing or exporting in v1
+- Cross-user sharing in v1 (intended post-v1 feature; shapes the backend direction below)
 - iOS support (Android-only)
-- Social or community features
+- Social or community features in v1
 
 ## System Design
 
@@ -79,6 +79,30 @@ graph TD
 **Subcategory inheritance via nullable fields.** Subcategories store `null` for color, emoji, and valueType to mean "inherit from parent." Top-level categories always carry explicit values. Effective values are resolved by the UI layer, not the repository, so all stored events reference the raw category without denormalization.
 
 *Alternatives considered:* denormalize at write time (copy parent values) — breaks when the parent is later edited; separate override-flag columns — extra schema complexity without observability benefit over nullable fields.
+
+## Future Backend Strategy
+
+The `TrackrRepository` interface is the sole seam for a future backend swap — ViewModels and UI are insulated from the storage layer.
+
+### Near term: Android Auto Backup
+
+Enable Android's built-in Auto Backup (configured in `AndroidManifest.xml`). The system backs up the Room database and `filesDir/images` to the user's Google account automatically, with no additional server infrastructure. Restores on reinstall or new device. This is the v1 data-safety baseline — low effort, zero operational burden.
+
+### Post-v1: AppSync + DynamoDB + Lambda (AWS)
+
+The intended full-sync and sharing backend. Chosen because the team is already in the AWS ecosystem.
+
+- **AppSync** — managed GraphQL endpoint; matches the `TrackrRepository` interface's future GraphQL-backed implementation
+- **Lambda resolvers** — server-side business logic layer; owns security and sharing rules (clients never have direct DB access)
+- **DynamoDB** — primary data store; single-table design with GSIs for sharing access patterns (e.g., "user A shared category X with user B")
+- **S3** — image storage; Lambda resolvers generate pre-signed URLs for upload/download
+- **Cognito** — user auth and identity
+
+**Implementation approach:** `LocalTrackrRepository` (Room) remains the offline-first local cache; a new `RemoteTrackrRepository` or sync layer talks to AppSync. Background sync keeps the two in agreement. Conflict resolution: last-write-wins on `updatedAt` timestamp (revisit if collaborative editing is needed).
+
+**Sharing model:** sharing relationships are stored in DynamoDB; Lambda resolvers enforce read/write access per relationship. Enables a future web frontend against the same AppSync endpoint.
+
+**Alternatives considered:** Firebase (Firestore + Cloud Functions) — managed but higher Google lock-in and Firestore's document model is less natural for the relational sharing graph. Supabase (Postgres + Edge Functions) — better relational fit, open source, but unfamiliar AWS tooling is not available. Custom server — maximum control but adds hosting and operational burden.
 
 ## Success Metrics
 

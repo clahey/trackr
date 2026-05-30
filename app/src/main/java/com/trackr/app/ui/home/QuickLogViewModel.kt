@@ -134,6 +134,7 @@ class QuickLogViewModel @Inject constructor(
             createdAt = Instant.now(clock),
         )
         repository.saveEvent(event)
+        imagePath.value = null
         _saveResult.value = SaveResult.Success
     }
 

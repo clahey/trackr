@@ -61,9 +61,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import coil.compose.AsyncImage
+import java.io.File
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -549,8 +555,16 @@ private fun QuickLogSheet(
             if (imagePath == null) {
                 TextButton(onClick = { showImageSourceDialog = true }) { Text("Add image") }
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Photo added ✓", modifier = Modifier.weight(1f))
+                AsyncImage(
+                    model = File(imagePath).toUri(),
+                    contentDescription = "Attached photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(onClick = { viewModel.removeImage() }) { Text("Remove") }
                     TextButton(onClick = { showImageSourceDialog = true }) { Text("Replace") }
                 }

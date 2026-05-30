@@ -24,6 +24,7 @@ interface TrackrRepository {
     fun getEventById(id: String): Flow<Event?>
     suspend fun saveEvent(event: Event)
     suspend fun deleteEvent(id: String)
+    suspend fun deleteEventFiles(imagePaths: List<String>)
 
     suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int
 

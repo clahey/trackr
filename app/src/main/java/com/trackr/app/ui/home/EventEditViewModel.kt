@@ -79,7 +79,9 @@ class EventEditViewModel @Inject constructor(
     fun cancelDelete() { _pendingDelete.value = false }
 
     suspend fun confirmDelete() {
+        val paths = originalEvent?.imagePaths ?: emptyList()
         repository.deleteEvent(eventId)
+        repository.deleteEventFiles(paths)
         _deleteComplete.value = true
     }
 

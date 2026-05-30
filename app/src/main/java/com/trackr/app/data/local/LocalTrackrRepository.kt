@@ -143,8 +143,10 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     // @spec LS-BE-030
     override suspend fun deleteEvent(id: String) {
-        val imagePaths = eventDao.getByIdOnce(id)?.imagePaths() ?: emptyList()
         eventDao.deleteById(id)
+    }
+
+    override suspend fun deleteEventFiles(imagePaths: List<String>) {
         imagePaths.forEach { imageStore.delete(it) }
     }
 
