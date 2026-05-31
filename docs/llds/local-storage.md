@@ -139,7 +139,7 @@ Extension functions in the `local` package. `CategoryEntity.toDomain()`, `Catego
 
 Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `ImageStore`.
 
-**Deletion order (DB first, files after):** DB deletion is atomic via Room; file deletion follows. If the process dies between the two, orphaned files are recovered at next startup. The reverse order (files first) risks unrecoverable data loss if the DB write fails.
+**Deletion order (DB first, files after):** `deleteEvent(id)` removes only the DB row; `deleteEventFiles(imagePaths)` handles file cleanup and is called separately. This split lets callers defer file deletion — `HomeViewModel` defers it to `clearPendingDelete()` so undo can restore an event with its images intact; `EventEditViewModel` calls both immediately. If the process dies between the two calls, orphaned files are recovered at next startup via LS-BE-040. The reverse order (files first) risks unrecoverable data loss if the DB write fails.
 
 **`saveEvent` image diffing:** reads the old entity before upserting, computes removed paths (`old - new`), upserts, then deletes removed files. Upsert-before-delete ensures a failed upsert leaves storage intact; orphaned files from a crash after upsert are recovered at startup.
 

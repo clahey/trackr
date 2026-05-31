@@ -67,7 +67,7 @@ When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has S
 - Optional: single photo (camera or gallery picker)
 - Optional: notes text field
 - Timestamp: defaults to now; tappable to edit (date + time picker)
-- **Save** button — writes event, dismisses sheet, and scrolls the timeline to make the newly saved event visible (EL-UI-077)
+- **Save** button — writes event and dismisses sheet; scrolling the timeline to the newly saved event is deferred (EL-UI-077)
 
 For `ValueType.None` categories, step 2 has no value input — save is immediately accessible, achieving the three-tap goal (FAB → category → save).
 

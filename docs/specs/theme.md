@@ -6,11 +6,11 @@ LLD: `docs/llds/theme.md`
 
 ## App Theming
 
-- [ ] **THEME-UI-001**: On devices running Android 12 (API 31) or higher, the system shall apply dynamic color theming derived from the user's system wallpaper color scheme.
-- [ ] **THEME-UI-002**: On devices running Android below API 31, the system shall apply a static light or dark color scheme seeded from the brand color `0xFF37618E`.
-- [ ] **THEME-UI-003**: The system shall switch between light and dark color schemes based on the device's system dark mode setting; no in-app dark mode toggle shall be provided in v1.
-- [ ] **THEME-UI-004**: The system shall use the default Material 3 type scale throughout; no custom fonts shall be applied in v1.
-- [ ] **THEME-UI-005**: The system shall use the default Material 3 shape scale throughout; no custom corner radius overrides shall be applied in v1.
+- [x] **THEME-UI-001**: On devices running Android 12 (API 31) or higher, the system shall apply dynamic color theming derived from the user's system wallpaper color scheme.
+- [x] **THEME-UI-002**: On devices running Android below API 31, the system shall apply a static light or dark color scheme seeded from the brand color `0xFF37618E`.
+- [x] **THEME-UI-003**: The system shall switch between light and dark color schemes based on the device's system dark mode setting; no in-app dark mode toggle shall be provided in v1.
+- [x] **THEME-UI-004**: The system shall use the default Material 3 type scale throughout; no custom fonts shall be applied in v1.
+- [x] **THEME-UI-005**: The system shall use the default Material 3 shape scale throughout; no custom corner radius overrides shall be applied in v1.
 
 ## Category Color System
 

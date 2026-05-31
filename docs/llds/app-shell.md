@@ -57,11 +57,14 @@ object Routes {
     const val TIMELINE       = "timeline"
     const val CATEGORY_LIST  = "categoryList"
     const val EVENT_EDIT     = "eventEdit/{eventId}"
-    const val CATEGORY_EDIT  = "categoryEdit?categoryId={categoryId}"
+    const val CATEGORY_EDIT  = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
 
     fun eventEdit(eventId: String)     = "eventEdit/$eventId"
-    fun categoryEdit(categoryId: String?) =
-        if (categoryId != null) "categoryEdit?categoryId=$categoryId" else "categoryEdit"
+    fun categoryEdit(categoryId: String?, parentId: String? = null) = buildString {
+        append("categoryEdit")
+        if (categoryId != null) append("?categoryId=$categoryId")
+        if (parentId != null) append(if (categoryId != null) "&" else "?").also { append("parentId=$parentId") }
+    }
 }
 ```
 
@@ -79,7 +82,7 @@ AppNavHost (startDestination = timeline)
 ├── categoryList
 │       ├── [FAB]            → categoryEdit (no arg)
 │       └── [tap row]        → categoryEdit/{categoryId}
-└── categoryEdit?categoryId={categoryId}
+└── categoryEdit?categoryId={categoryId}&parentId={parentId}
         ├── [save]           → popBackStack
         ├── [delete]         → popBackStack
         └── [back]           → popBackStack

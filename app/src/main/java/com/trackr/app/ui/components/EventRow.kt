@@ -33,7 +33,7 @@ import com.trackr.app.ui.theme.foregroundColorForBackground
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-// @spec EL-UI-002, EL-UI-004, EL-UI-005, EL-UI-061, THEME-UI-011
+// @spec EL-UI-002, EL-UI-004, EL-UI-005, EL-UI-061, EL-UI-079, THEME-UI-011
 @Composable
 fun EventRow(event: Event, category: Category?, hasMismatch: Boolean, onClick: (() -> Unit)?) {
     val modifier = Modifier

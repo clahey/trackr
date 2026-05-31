@@ -67,7 +67,7 @@ LLD: `docs/llds/category-management.md`
 ### Category List — Color and Group Operations
 
 - [ ] **CAT-UI-050**: Each category row in the category list shall display the resolved category color as a visual indicator (e.g., colored swatch or avatar).
-- [x] **CAT-UI-051**: The group picker (used for "Add to group" and "Move to another group") shall list all MetaCategories eligible to become the new parent (excluding the category's current parent in the "Move" case) and shall always include a "Create new group" option that creates a new MetaCategory and immediately sets it as the parent.
+- [x] **CAT-UI-051**: The group picker (used for "Add to group" and "Move to another group") shall list all MetaCategories eligible to become the new parent (excluding the category's current parent in the "Move" case) and shall always include a "Create new group" option; tapping it shall open a name-entry dialog with a blank text field; the user enters the group name and confirms to create the MetaCategory and immediately set it as the parent.
 - [x] **CAT-UI-052**: When the user selects "Add to group" or "Move to another group" for a category, the system shall preserve all of the category's current explicit field values as overrides (per DM-PROC-020).
 
 ### Category Edit — Subcategory Creation and Inheritance

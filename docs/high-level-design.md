@@ -66,7 +66,7 @@ graph TD
 
 *Alternatives considered:* raw string interpreted at UI layer (leaks storage concerns into UI); separate tables per value type (over-normalized for this scale).
 
-**Material You theming with brand-color fallback.** On Android 12+ the app uses dynamic color (adapts to the user's wallpaper). On older devices it falls back to a Material 3 tonal palette seeded from the brand color (TBD — tracked as a to-do). Dark mode is supported from the start via the standard `isSystemInDarkTheme()` switch. Default Material 3 typography and shapes throughout.
+**Material You theming with brand-color fallback.** On Android 12+ the app uses dynamic color (adapts to the user's wallpaper). On older devices it falls back to a Material 3 tonal palette seeded from the brand color `0xFF37618E`. Dark mode is supported from the start via the standard `isSystemInDarkTheme()` switch. Default Material 3 typography and shapes throughout.
 
 *Alternatives considered:* fixed palette only (ignores user's system preference); fully custom theme (unjustified work at this scale).
 
@@ -79,6 +79,14 @@ graph TD
 **Subcategory inheritance via nullable fields.** Subcategories store `null` for color, emoji, and valueType to mean "inherit from parent." Top-level categories always carry explicit values. Effective values are resolved by the UI layer, not the repository, so all stored events reference the raw category without denormalization.
 
 *Alternatives considered:* denormalize at write time (copy parent values) — breaks when the parent is later edited; separate override-flag columns — extra schema complexity without observability benefit over nullable fields.
+
+**Image capture via FileProvider, no `CAMERA` permission.** Photos are captured by delegating to the system camera app via `FileProvider`; the app writes a target file to `filesDir/images` and exposes it via a `FileProvider` URI. Multiple images per event are supported on the full edit screen; the quick-log sheet captures at most one. Image paths are stored as a JSON array in the events table. File lifecycle (creation, deletion, orphan recovery) is the repository's responsibility, not the UI's.
+
+*Alternatives considered:* in-app CameraX — richer UX but requires `CAMERA` permission and significant additional code; image BLOBs in SQLite — impractically large rows; external storage — broken by scoped storage restrictions on API 29+.
+
+**Orphan recovery at startup.** Because DB row deletion and image file deletion are separate operations, a process kill between them can leave orphaned files. `onStartup()` scans `filesDir/images` and deletes any file not referenced by a current event row in the database, recovering storage without data loss. Stale category references (events whose category was deleted mid-session) surface gracefully as orphaned events with a missing header rather than crashing.
+
+*Alternatives considered:* strict transactional cleanup across DB + filesystem (impossible without two-phase commit); ignore orphans (accumulates wasted device storage).
 
 ## Future Backend Strategy
 

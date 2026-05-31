@@ -28,6 +28,7 @@ LLD: `docs/llds/local-storage.md`
 - [x] **LS-BE-030**: When deleting an event, the system shall delete the database row before deleting any associated image files, so that a crash between the two steps leaves recoverable orphaned files rather than a valid DB row with missing files.
 - [x] **LS-BE-031**: When deleting a category, the system shall collect image paths from all child events, delete the category row (which cascades to child event rows atomically via Room), then delete the collected image files.
 - [x] **LS-BE-032**: When `saveEvent` is called with a modified image list, the system shall read the previous image paths, upsert the event, then delete any paths that were removed — ensuring that a failed upsert leaves storage intact.
+- [x] **LS-BE-033**: `deleteEventFiles` shall accept a list of absolute image path strings and delete each via `ImageStore.delete`; it shall be a separate function from `deleteEvent` so that callers may defer file cleanup (e.g., to support undo) without retaining a live DB row.
 
 ## Startup Orphan Recovery
 

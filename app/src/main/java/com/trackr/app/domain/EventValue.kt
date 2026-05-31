@@ -51,6 +51,7 @@ sealed class EventValue {
     ) : EventValue()
 }
 
+// @spec LS-BE-052
 object DurationAsSecondsSerializer : KSerializer<Duration> {
     override val descriptor = PrimitiveSerialDescriptor("Duration", PrimitiveKind.LONG)
     override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeLong(value.inWholeSeconds)
