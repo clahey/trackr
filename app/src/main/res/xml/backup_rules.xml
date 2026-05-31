@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- @spec LS-BE-090, LS-BE-091, LS-BE-092 -->
+<full-backup-content>
+    <include domain="database" path="trackr.db" />
+    <include domain="file" path="images" />
+    <include domain="file" path="datastore" />
+</full-backup-content>

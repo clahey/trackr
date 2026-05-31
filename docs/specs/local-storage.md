@@ -54,6 +54,12 @@ LLD: `docs/llds/local-storage.md`
 - [x] **LS-BE-061**: `ImageStore.delete` shall delete the file at the given absolute path; if the file does not exist the call shall be a no-op.
 - [x] **LS-BE-062**: `ImageStore.allStoredPaths` shall return the absolute paths of all files currently in the image storage directory.
 
+## Auto Backup
+
+- [x] **LS-BE-090**: The manifest shall declare `android:allowBackup="true"` and reference both `android:dataExtractionRules` (API 31+) and `android:fullBackupContent` (API 23–30) backup rule files.
+- [x] **LS-BE-091**: The backup rules shall include the Room database (`domain="database" path="trackr.db"`), image files (`domain="file" path="images"`), and DataStore preferences (`domain="file" path="datastore"`); no other app data is included.
+- [x] **LS-BE-092**: Both the API 31+ `data_extraction_rules.xml` and the pre-31 `backup_rules.xml` shall declare identical include sets so that backup behavior is consistent across API levels.
+
 ## Schema Integrity
 
 - [x] **LS-BE-070**: The Room database shall have destructive migration disabled; any schema change must be accompanied by an explicit migration.

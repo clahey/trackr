@@ -189,6 +189,30 @@ Removes `unit` column and adds `default_value` column on `categories`. SQLite do
 4. Rename `categories_new` to `categories`.
 5. Recreate any indexes dropped by the table recreation.
 
+## Android Auto Backup
+
+Auto Backup (API 23+) backs up app data to the user's Google account automatically when the device is idle, charging, and on Wi-Fi. Restores on reinstall or new device. This is the v1 data-safety baseline; no server infrastructure is required.
+
+**Backed-up data:**
+
+| Domain | Path | Contents |
+|---|---|---|
+| `database` | `trackr.db` | Room database (categories + events) |
+| `file` | `images` | Photo attachments (`filesDir/images/`) |
+| `file` | `datastore` | DataStore Preferences (`filesDir/datastore/`) |
+
+Room WAL files (`trackr.db-wal`, `trackr.db-shm`) are included automatically when the database domain is specified.
+
+**Backup rule files:**
+- `res/xml/data_extraction_rules.xml` — API 31+ (Cloud Backup + Device-to-Device transfer, referenced via `android:dataExtractionRules`)
+- `res/xml/backup_rules.xml` — API 23–30 (referenced via `android:fullBackupContent`)
+
+Both files declare the same include set. Only the three entries above are backed up; everything else in `filesDir` is excluded by the whitelist-only rules.
+
+**25 MB limit:** Auto Backup caps at 25 MB per app. Heavy photo usage could approach this; if exceeded, Google backs up a subset. Post-v1 cloud sync (AppSync/S3) will supersede this constraint.
+
+**Restore + orphan scan:** since Auto Backup runs while the app is not in use (idle + charging + Wi-Fi), the DB and images are captured in a consistent state. The `onStartup()` orphan scan after restore is a no-op in the normal case. Room handles WAL checkpoint on first open if needed.
+
 ## Decisions & Alternatives
 
 | Decision | Chosen | Alternatives Considered | Rationale |

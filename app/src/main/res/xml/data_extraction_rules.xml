@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- @spec LS-BE-090, LS-BE-091, LS-BE-092 -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="trackr.db" />
+        <include domain="file" path="images" />
+        <include domain="file" path="datastore" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="trackr.db" />
+        <include domain="file" path="images" />
+        <include domain="file" path="datastore" />
+    </device-transfer>
+</data-extraction-rules>
