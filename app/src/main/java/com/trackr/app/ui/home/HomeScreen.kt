@@ -21,16 +21,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.OutlinedButton
@@ -86,7 +87,6 @@ import com.trackr.app.ui.SaveResult
 import com.trackr.app.ui.components.EventRow
 import com.trackr.app.ui.components.ValueInputField
 import com.trackr.app.ui.components.formatValue
-import com.trackr.app.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -383,6 +383,31 @@ private fun DayHeader(date: LocalDate) {
 }
 
 // @spec EL-UI-013, EL-UI-030, EL-UI-031a, EL-UI-031b, EL-UI-032, EL-UI-034, EL-UI-052b,
+@Composable
+private fun CategoryGrid(content: LazyGridScope.() -> Unit) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.height(300.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun CategoryTile(emoji: String?, name: String, color: Long, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(3.dp, Color(color)),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (emoji != null) Text(emoji, style = MaterialTheme.typography.headlineSmall)
+            Text(name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
 // EL-UI-054, EL-UI-055b, EL-UI-072, EL-UI-073, EL-UI-074, EL-NAV-002, EL-PROC-001
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -454,69 +479,61 @@ private fun QuickLogSheet(
     if (selectedCategory == null) {
         // Step 1 — Category picker
         val metaCategories = categories.filterIsInstance<Category.MetaCategory>()
+        val expandedMeta = metaCategories.find { it.id == expandedMetaCategoryId }
+        val expandedSubCats = expandedMeta?.let { meta ->
+            categories.filterIsInstance<Category.SubCategory>().filter { it.parent.id == meta.id }
+        }
+
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Choose a category", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(12.dp))
-            // @spec EL-UI-072, EL-UI-073, EL-UI-074
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.height(300.dp),
-            ) {
-                metaCategories.forEach { meta ->
-                    val subCats = categories.filterIsInstance<Category.SubCategory>()
-                        .filter { it.parent.id == meta.id }
-                    val isExpanded = expandedMetaCategoryId == meta.id && subCats.isNotEmpty()
-                    if (isExpanded) {
-                        item(span = { GridItemSpan(maxLineSpan) }, key = "meta-${meta.id}") {
-                            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Text(
-                                        "${meta.resolvedEmoji} ${meta.name}",
-                                        style = MaterialTheme.typography.titleSmall,
-                                    )
-                                    Button(
-                                        onClick = { viewModel.selectCategory(meta) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color(meta.resolvedColor),
-                                            contentColor = Color(foregroundColorForBackground(meta.resolvedColor)),
-                                        ),
-                                    ) { Text("Log to ${meta.name} directly") }
-                                    subCats.forEach { sub ->
-                                        TextButton(
-                                            onClick = { viewModel.selectCategory(sub) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                        ) { Text("${sub.resolvedEmoji} ${sub.name}") }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        item(key = "meta-${meta.id}") {
-                            OutlinedButton(
-                                onClick = {
-                                    if (subCats.isNotEmpty()) viewModel.expandMetaCategory(meta.id)
-                                    else viewModel.selectCategory(meta)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                border = BorderStroke(3.dp, Color(meta.resolvedColor)),
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(meta.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)
-                                    Text(
-                                        meta.name,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                        }
+            if (expandedMeta != null && expandedSubCats != null) {
+                // Drill-down: subcategory picker for the selected MetaCategory
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { viewModel.expandMetaCategory(null) }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                    Text(
+                        "${expandedMeta.resolvedEmoji} ${expandedMeta.name}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                // @spec EL-UI-072, EL-UI-073, EL-UI-074
+                CategoryGrid {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        CategoryTile(
+                            emoji = null,
+                            name = "Log to ${expandedMeta.name} directly",
+                            color = expandedMeta.resolvedColor,
+                            onClick = { viewModel.selectCategory(expandedMeta) },
+                        )
+                    }
+                    items(expandedSubCats, key = { it.id }) { sub ->
+                        CategoryTile(
+                            emoji = sub.resolvedEmoji ?: expandedMeta.resolvedEmoji,
+                            name = sub.name,
+                            color = sub.resolvedColor,
+                            onClick = { viewModel.selectCategory(sub) },
+                        )
+                    }
+                }
+            } else {
+                // Top-level MetaCategory grid
+                Text("Choose a category", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(12.dp))
+                // @spec EL-UI-072, EL-UI-073, EL-UI-074
+                CategoryGrid {
+                    items(metaCategories, key = { it.id }) { meta ->
+                        val subCats = categories.filterIsInstance<Category.SubCategory>()
+                            .filter { it.parent.id == meta.id }
+                        CategoryTile(
+                            emoji = meta.resolvedEmoji,
+                            name = meta.name,
+                            color = meta.resolvedColor,
+                            onClick = {
+                                if (subCats.isNotEmpty()) viewModel.expandMetaCategory(meta.id)
+                                else viewModel.selectCategory(meta)
+                            },
+                        )
                     }
                 }
             }

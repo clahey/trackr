@@ -58,9 +58,9 @@ When `ActiveFilter.TopLevel` is active, the FAB quick-log sheet opens in an expa
 A bottom sheet opened from the timeline FAB. Two-step flow to minimize taps:
 
 **Step 1 — Category picker**
-Grid of MetaCategory items (resolved emoji + name; resolved color as background tint or badge). Tapping a MetaCategory with no SubCategories advances directly to step 2. Tapping a MetaCategory with SubCategories **expands inline**: subcategory cells appear below or adjacent to the tapped cell; the MetaCategory itself is included as the first option (labeled "Log to [Name] directly" or similar) so users can still log directly to the parent. Tapping any expanded option advances to step 2 for that category.
+Grid of MetaCategory items (resolved emoji + name; colored border using the category's resolved color). Tapping a MetaCategory with no SubCategories advances directly to step 2. Tapping a MetaCategory with SubCategories **drills down**: the MetaCategory grid is replaced by a drill-down view showing a back button + the MetaCategory name as a header, a full-width "Log to [Name] directly" tile at the top, and the SubCategory tiles in the same 3-column grid below. Tapping the back button returns to the top-level grid. Tapping any tile advances to step 2 for that category.
 
-When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has SubCategories, the quick-log opens directly at the already-expanded state for that MetaCategory, skipping the initial tap. When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has no SubCategories, step 2 opens directly (existing behaviour). When `ActiveFilter.Sub` is active, step 2 opens directly for the subcategory.
+When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has SubCategories, the quick-log opens directly in the drill-down view for that MetaCategory, skipping the initial tap. When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has no SubCategories, step 2 opens directly (existing behaviour). When `ActiveFilter.Sub` is active, step 2 opens directly for the subcategory.
 
 **Step 2 — Value + details**
 - Value input (see Value Input section below); for Number, Text, and Duration types the input field is automatically focused on entry so the keyboard rises without an extra tap
@@ -227,7 +227,7 @@ sealed class DayEntry {
 
 - `categories: StateFlow<List<Category>>` — from `repository.getCategories()`
 - `selectedCategory: StateFlow<Category?>` — set when user picks in step 1
-- `expandedMetaCategoryId: MutableStateFlow<String?>` — which MetaCategory is expanded in the step 1 grid; null = none expanded
+- `expandedMetaCategoryId: MutableStateFlow<String?>` — which MetaCategory is shown in the drill-down view; null = top-level grid is shown
 - Form state: `timestamp`, `value: MutableStateFlow<ValueUIState>`, `notes`, `imagePath` (single, nullable)
 - `timestamp` defaults to `Instant.now()` at sheet open; user-editable
 - `value` is initialized to `ValueUIState.None`; updated to the type-appropriate default when a category is selected (see `selectCategory` below)
@@ -242,7 +242,7 @@ sealed class DayEntry {
   `ValueUIState.matchesType(ValueType): Boolean` — parallel to `matchesValueType`; `ReadOnly` and `Mismatched` return false for all types.
 - `save()`: calls `validateValueForSave(value.value, category)`; if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, generates a UUID, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, clears `imagePath` to null (transferring ownership of the file to the repository), emits `SaveResult.Success`.
 - `reset()`: called when sheet is dismissed (with or without saving); clears all form state — including `value` back to `ValueUIState.None`, `valueDirty` back to `false`, and `saveResult` back to `Idle` — and deletes any captured-but-unsaved image file (if `imagePath` is still non-null, meaning `save()` did not run)
-- **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1. If a MetaCategory is deleted while the user has expanded it in step 1, the expansion collapses.
+- **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1. If a MetaCategory is deleted while the user is in its drill-down view, the view collapses back to the top-level grid.
 
 ### EventEditViewModel
 
