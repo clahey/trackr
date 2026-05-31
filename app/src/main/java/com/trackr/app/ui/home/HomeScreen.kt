@@ -550,11 +550,10 @@ private fun QuickLogSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${cat.resolvedEmoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = { viewModel.selectedCategory.value = null }) {
-                    Text("Change category")
+                IconButton(onClick = { viewModel.selectedCategory.value = null }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
+                Text("${cat.resolvedEmoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
             }
 
             if (cat.resolvedValueType != ValueType.None) {
