@@ -31,7 +31,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -61,7 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -492,20 +498,22 @@ private fun QuickLogSheet(
                         }
                     } else {
                         item(key = "meta-${meta.id}") {
-                            Button(
+                            OutlinedButton(
                                 onClick = {
                                     if (subCats.isNotEmpty()) viewModel.expandMetaCategory(meta.id)
                                     else viewModel.selectCategory(meta)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(meta.resolvedColor),
-                                    contentColor = Color(foregroundColorForBackground(meta.resolvedColor)),
-                                ),
+                                border = BorderStroke(3.dp, Color(meta.resolvedColor)),
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(meta.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)
-                                    Text(meta.name, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                    Text(
+                                        meta.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                    )
                                 }
                             }
                         }
@@ -518,14 +526,17 @@ private fun QuickLogSheet(
         // Step 2 — Value + details
         val cat = selectedCategory!!
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${cat.resolvedEmoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { viewModel.selectedCategory.value = null }) {
-                    Text("Change")
+                    Text("Change category")
                 }
             }
 
