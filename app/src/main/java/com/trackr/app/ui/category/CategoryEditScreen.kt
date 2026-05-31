@@ -6,8 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -50,6 +50,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackr.app.domain.Category
@@ -65,7 +67,7 @@ import kotlinx.coroutines.launch
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
 // CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057,
 // CAT-UI-059, CAT-UI-060, CAT-UI-061, CAT-NAV-005, CAT-NAV-010, APP-NAV-004
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditScreen(
     onNavigateBack: (errorMessage: String?) -> Unit,
@@ -167,53 +169,14 @@ fun CategoryEditScreen(
             )
 
             Text("Color", style = MaterialTheme.typography.labelMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // @spec CAT-UI-056
-                if (parentCategory != null) {
-                    val parentColor = parentCategory!!.color
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(parentColor))
-                            .then(
-                                if (isColorInherited) Modifier.border(3.dp, Color.White, CircleShape)
-                                else Modifier
-                            )
-                            .clickable { viewModel.colorState.value = null },
-                    ) {
-                        Text(
-                            text = "↑",
-                            color = Color(foregroundColorForBackground(parentColor)),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                }
-                categoryColorPalette.forEach { paletteColor ->
-                    val isSelected = paletteColor == colorState
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(paletteColor))
-                            .then(
-                                if (isSelected) Modifier.border(3.dp, Color.White, CircleShape)
-                                else Modifier
-                            )
-                            .clickable { viewModel.colorState.value = paletteColor },
-                    )
-                }
-                if (colorState != null && colorState !in categoryColorPalette) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(effectiveColor))
-                            .border(3.dp, Color.White, CircleShape),
-                    )
-                }
-            }
+            // @spec CAT-UI-056
+            ColorPicker(
+                colorState = colorState,
+                parentCategory = parentCategory,
+                effectiveColor = effectiveColor,
+                isColorInherited = isColorInherited,
+                onSelectColor = { viewModel.colorState.value = it },
+            )
 
             // @spec CAT-UI-057
             ValueTypeSelector(
@@ -319,6 +282,87 @@ private fun EmojiField(
             enabled = !isInherited,
             isError = isError,
         )
+    }
+}
+
+private data class SwatchSpec(
+    val color: Long,
+    val cells: Int = 1,
+    val label: String? = null,
+    val isSelected: Boolean = false,
+    val onClick: (() -> Unit)? = null,
+)
+
+@Composable
+private fun Swatch(spec: SwatchSpec, width: Dp, height: Dp, shape: Shape) {
+    val modifier = Modifier
+        .width(width)
+        .height(height)
+        .clip(shape)
+        .background(Color(spec.color))
+        .then(if (spec.isSelected) Modifier.border(3.dp, Color.White, shape) else Modifier)
+        .then(spec.onClick?.let { Modifier.clickable(onClick = it) } ?: Modifier)
+    Box(contentAlignment = Alignment.Center, modifier = modifier) {
+        if (spec.label != null) {
+            Text(
+                text = spec.label,
+                color = Color(foregroundColorForBackground(spec.color)),
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColorPicker(
+    colorState: Long?,
+    parentCategory: Category.MetaCategory?,
+    effectiveColor: Long,
+    isColorInherited: Boolean,
+    onSelectColor: (Long?) -> Unit,
+) {
+    val swatchHeight = 44.dp
+    val cornerShape = RoundedCornerShape(8.dp)
+    val spacing = 6.dp
+
+    BoxWithConstraints {
+        val columns = if (maxWidth >= 480.dp) 12 else 6
+        val swatchWidth = (maxWidth - spacing * (columns - 1)) / columns
+
+        val hasCustomColor = colorState != null && colorState !in categoryColorPalette
+        val rows: List<List<SwatchSpec>> = buildList {
+            buildList {
+                if (parentCategory != null) add(SwatchSpec(
+                    color = parentCategory.color, cells = 3, label = "Inherited",
+                    isSelected = isColorInherited, onClick = { onSelectColor(null) },
+                ))
+                if (hasCustomColor) add(SwatchSpec(
+                    color = effectiveColor, cells = 3, label = "Custom",
+                    isSelected = !isColorInherited,
+                ))
+            }.takeIf { it.isNotEmpty() }?.let { add(it) }
+            categoryColorPalette.chunked(columns).forEach { chunk ->
+                add(chunk.map { color -> SwatchSpec(
+                    color = color, isSelected = color == colorState,
+                    onClick = { onSelectColor(color) },
+                )})
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+            rows.forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                    row.forEach { spec ->
+                        Swatch(
+                            spec = spec,
+                            width = swatchWidth * spec.cells + spacing * (spec.cells - 1),
+                            height = swatchHeight,
+                            shape = cornerShape,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
