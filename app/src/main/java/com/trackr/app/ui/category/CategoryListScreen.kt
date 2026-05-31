@@ -207,7 +207,7 @@ private fun GroupPickerDialog(
 
     if (showNameEntry) {
         AlertDialog(
-            onDismissRequest = { showNameEntry = false; newGroupName = "" },
+            onDismissRequest = { showNameEntry = false },
             title = { Text("New group name") },
             text = {
                 OutlinedTextField(
@@ -224,7 +224,7 @@ private fun GroupPickerDialog(
                 ) { Text("Create") }
             },
             dismissButton = {
-                TextButton(onClick = { showNameEntry = false; newGroupName = "" }) { Text("Back") }
+                TextButton(onClick = { showNameEntry = false }) { Text("Back") }
             },
         )
     } else {
@@ -245,7 +245,7 @@ private fun GroupPickerDialog(
                         }
                     }
                     TextButton(
-                        onClick = { showNameEntry = true },
+                        onClick = { newGroupName = ""; showNameEntry = true },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
