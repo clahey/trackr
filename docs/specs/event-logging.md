@@ -41,6 +41,7 @@ LLD: `docs/llds/event-logging.md`
 
 - [x] **EL-UI-030**: The quick-log sheet shall present a two-step flow: step 1 is a grid of MetaCategory items (resolved emoji + name); tapping a MetaCategory with no SubCategories advances to step 2; tapping a MetaCategory with SubCategories replaces the grid with a drill-down view for that MetaCategory.
 - [ ] **EL-UI-031**: Step 2 of the quick-log sheet shall display a value input appropriate for the selected category's value type, an optional single-photo field (at most one image), an optional notes field, a tappable timestamp field, and a save button.
+- [x] **EL-UI-031c**: Step 2 of the quick-log sheet shall display a header row containing a back arrow on the left and the selected category's resolved emoji and name; tapping the back arrow shall return to step 1.
 - [x] **EL-UI-031a**: While no image is attached in the quick-log sheet, the system shall display an "Add image" button; tapping it shall present a choice of "Take photo" (camera) or "Choose from gallery".
 - [x] **EL-UI-031b**: While an image is attached in the quick-log sheet, the system shall display the attached photo as a full-width thumbnail with a Remove button and a Replace button below it; tapping Remove shall delete the image file and clear the attached image; tapping Replace shall present the same "Take photo" / "Choose from gallery" choice and, on selection, delete the previous image file and attach the new one.
 - [x] **EL-UI-044a**: The event edit screen shall display an "Add image" button that presents a choice of "Take photo" (camera) or "Choose from gallery"; each image added is appended to the event's image list with no cap on total count.
@@ -119,6 +120,8 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-NAV-002**: When the user saves a new event in the quick-log sheet, the system shall dismiss the sheet and update the timeline.
 - [x] **EL-NAV-002b**: After the quick-log sheet is dismissed for any reason (save or user dismiss), the system shall reset all form state — including the save result — so that the sheet opens in step 1 with a clean state on the next open.
 - [ ] **EL-NAV-003**: When the user dismisses the quick-log sheet without saving, the system shall delete any unsaved captured image and return to the timeline.
+- [x] **EL-NAV-003b**: When the user presses the system back button or performs a back edge swipe while the quick-log sheet is at step 2, the system shall return to step 1 without dismissing the sheet.
+- [x] **EL-NAV-003c**: When the user presses the system back button or performs a back edge swipe while the quick-log sheet is at step 1 in the drill-down view, the system shall return to the top-level category grid without dismissing the sheet.
 - [ ] **EL-NAV-004**: When the user taps an event row on the timeline, the system shall navigate to the event edit screen for that event.
 - [x] **EL-NAV-005**: When the user saves changes on the event edit screen, the system shall navigate back to the timeline.
 - [x] **EL-NAV-006**: When the user confirms deletion on the event edit screen, the system shall delete the event and navigate back to the timeline.

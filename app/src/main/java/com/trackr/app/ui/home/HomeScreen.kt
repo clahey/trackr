@@ -1,5 +1,6 @@
 package com.trackr.app.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -424,6 +425,11 @@ private fun QuickLogSheet(
     val saveResult by viewModel.saveResult.collectAsState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    BackHandler(enabled = selectedCategory != null) { viewModel.selectedCategory.value = null }
+    BackHandler(enabled = selectedCategory == null && expandedMetaCategoryId != null) {
+        viewModel.expandMetaCategory(null)
+    }
 
     var showImageSourceDialog by remember { mutableStateOf(false) }
     var pendingCameraPath by remember { mutableStateOf<String?>(null) }

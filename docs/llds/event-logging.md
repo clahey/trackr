@@ -282,12 +282,16 @@ sealed class DayEntry {
 Home (timeline)
     ├── [FAB]              → Quick-Log Sheet (bottom sheet)
     │       ├── [save]     → dismiss sheet, timeline refreshes via Flow
-    │       └── [dismiss]  → reset(), delete any unsaved image
+    │       ├── [dismiss]  → reset(), delete any unsaved image
+    │       ├── [back in step 2]           → step 1 (selectedCategory = null)
+    │       └── [back in step 1 drill-down] → top-level grid (expandedMetaCategoryId = null)
     └── [tap event]        → Event Edit
             ├── [save]     → back to Home
             ├── [delete]   → confirm → back to Home
             └── [back]     → cancel, clean up unsaved captures
 ```
+
+System back and edge swipe are intercepted by `BackHandler` within the sheet: step 2 intercepts first (returns to step 1), then drill-down (returns to top-level grid); step 1 top-level lets the sheet's native dismiss handler take over.
 
 ## Decisions & Alternatives
 
