@@ -15,6 +15,7 @@ The primary screen. Displays all events grouped by calendar day of `timestamp` (
 Each event row is rendered by the shared `EventRow` composable (`ui/components/EventRow.kt`). Layout:
 - **Left**: 48dp filled circle using the category color; category emoji centered inside with WCAG foreground color (see `docs/llds/theme.md § Circle avatar`)
 - **Center**: category name (subtitle), value summary (formatted per `ValueType`), and notes (if any) stacked vertically
+- **Right (before time)**: when `event.imagePaths` is non-empty, a 48×48dp square thumbnail of the first image, clipped to `RoundedCornerShape(4.dp)`, loaded via Coil `AsyncImage` from the absolute file path
 - **Right**: time of day (from `timestamp`)
 
 `EventRow` is extracted to `ui/components/` so it can be reused by the Category Edit screen's live preview (see `docs/llds/category-management.md § Category Edit Screen`). Its `onClick` parameter is nullable (`(() -> Unit)?`); when null the card renders as non-interactive (no ripple, no click affordance).
@@ -199,9 +200,9 @@ Mismatch detection occurs at the ViewModel layer (not inside `ValueInputField`).
 - `setFilter(filter: ActiveFilter)` — sets `activeFilter`; records the current top day in `preFilterTopDay` only when transitioning from `All` to a non-`All` filter; switching between two non-`All` filters preserves the existing `preFilterTopDay`; `All` clears the filter
 - `onUserScrolled()` — called by the UI when the user manually scrolls; clears `preFilterTopDay`
 - `pendingDelete: StateFlow<Event?>` — the event swiped away but not yet committed; null when no undo is available
-- `swipeDelete(event: Event)` — immediately calls `repository.deleteEvent()`; stores the full `Event` in `pendingDelete` and injects an undo placeholder into the day group at the event's original position
-- `undoDelete()` — calls `repository.saveEvent(pendingDelete!!)` to restore; clears `pendingDelete`
-- `clearPendingDelete()` — called internally before any other mutating action (new log, another delete, open event); discards `pendingDelete` without restoring
+- `swipeDelete(event: Event)` — calls `repository.deleteEvent()` (DB row only; files are not deleted yet); stores the full `Event` in `pendingDelete` and injects an undo placeholder into the day group at the event's original position; if a previous `pendingDelete` exists, calls `repository.deleteEventFiles()` for it first
+- `undoDelete()` — calls `repository.saveEvent(pendingDelete!!)` to restore (image files were never deleted); clears `pendingDelete`
+- `clearPendingDelete()` — called internally before any other mutating action (new log, another delete, open event); calls `repository.deleteEventFiles(pendingDelete!!.imagePaths)` then discards `pendingDelete`
 
 **Active filter guard:** `HomeViewModel` observes the category list. If the active filter references a deleted category, the filter clears to `All` regardless of whether the deleted category is a MetaCategory or SubCategory.
 
@@ -210,7 +211,7 @@ Mismatch detection occurs at the ViewModel layer (not inside `ValueInputField`).
 - A new event is logged (sheet saves)
 - An event is opened for editing
 
-The DB delete fires immediately on swipe — undo is a restore (`saveEvent`) not a rollback. The placeholder occupies the deleted event's original position in the day group until `pendingDelete` is cleared.
+The DB delete fires immediately on swipe — undo is a restore (`saveEvent`) not a rollback. Image file deletion is deferred to `clearPendingDelete()` so that undo can restore the event with its images intact. The placeholder occupies the deleted event's original position in the day group until `pendingDelete` is cleared.
 
 `DayGroup` is a ViewModel-layer data class (not a domain model):
 ```kotlin
@@ -239,8 +240,8 @@ sealed class DayEntry {
   4. If `effectiveState.matchesType(targetType)` → use `effectiveState` verbatim (preserves in-progress text without snap-back). For `Number`, variant match is sufficient — unit field is not compared.
   5. Otherwise: `ev = effectiveState.toEventValue()`. If null (partial/invalid input such as `Bool(null)`) → seed per EL-UI-078 as in step 1. If non-null → `Mismatched(originalValue=ev, targetType=targetType, editableState=editableStateFor(ev, targetType))`.
   `ValueUIState.matchesType(ValueType): Boolean` — parallel to `matchesValueType`; `ReadOnly` and `Mismatched` return false for all types.
-- `save()`: calls `validateValueForSave(value.value, category)`; if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, generates a UUID, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, emits `SaveResult.Success`.
-- `reset()`: called when sheet is dismissed (with or without saving); clears all form state — including `value` back to `ValueUIState.None`, `valueDirty` back to `false`, and `saveResult` back to `Idle` — and deletes any captured-but-unsaved image file
+- `save()`: calls `validateValueForSave(value.value, category)`; if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, generates a UUID, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, clears `imagePath` to null (transferring ownership of the file to the repository), emits `SaveResult.Success`.
+- `reset()`: called when sheet is dismissed (with or without saving); clears all form state — including `value` back to `ValueUIState.None`, `valueDirty` back to `false`, and `saveResult` back to `Idle` — and deletes any captured-but-unsaved image file (if `imagePath` is still non-null, meaning `save()` did not run)
 - **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1. If a MetaCategory is deleted while the user has expanded it in step 1, the expansion collapses.
 
 ### EventEditViewModel
@@ -249,11 +250,13 @@ sealed class DayEntry {
 - Full form state mirroring `Event` fields; `value: MutableStateFlow<ValueUIState>`
 - On load: initializes `value` by calling `event.value.toValueUIState(category.resolvedValueType)`, which produces `ValueUIState.Mismatched` when the stored value does not match the category type.
 - `save()`: calls `validateValueForSave(value.value, category)` (category may be null if not yet loaded — treat as no validation required); if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, diffs image paths, calls `repository.saveEvent()`, emits `SaveResult.Success`.
-- `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()`
+- `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()` (DB row) followed immediately by `repository.deleteEventFiles(imagePaths)` (no undo path here)
 - **Stale event guard:** if `getEventById` returns null on init, emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`; the UI layer invokes `onNavigateBack(errorMessage)` with a non-null message, which the caller (timeline) displays as a snackbar.
 - Mismatch detection is owned by `EventEditViewModel` (embedded in `ValueUIState.Mismatched` on load); `ValueInputField` renders the banner and calls `onStateChange` to resolve it. The ViewModel does not expose a separate `conversionOutcome` or `applyConversion()` method.
 
 ## Image Handling
+
+**Image rendering:** `io.coil-kt:coil-compose` is the image loading library. `AsyncImage` is used wherever a local file path must be rendered as a bitmap; pass the path as `File(path).toUri()` to produce an explicit `file://` URI. Coil handles background decoding, memory caching, and error states (shows nothing when the file is missing — tolerated, recovered by startup orphan scan).
 
 **FileProvider** — camera capture requires sharing a `file://` URI with the system camera app via `FileProvider`. The app declares a `FileProvider` in `AndroidManifest.xml` (authority `${packageName}.fileprovider`) backed by `res/xml/file_paths.xml` exposing `context.filesDir`. No `CAMERA` permission is required on Android 10+ when delegating to the system camera via `TakePicture` intent.
 
@@ -265,9 +268,9 @@ sealed class DayEntry {
 
 **Gallery flow:** `PickVisualMedia` returns a content URI. Copy to `imageStore.newFile()` via `contentResolver.openInputStream(uri)`. Store the resulting absolute file path — never store a content URI (violates DM-DATA-034; does not survive process restart). If the copy fails, delete the destination file and surface no image added.
 
-**Quick-log:** `imagePath: MutableStateFlow<String?>` holds the single image path (null = no image). While null, show an "Add image" button that opens a dialog with "Take photo" and "Choose from gallery". While non-null, show a photo indicator with a **Remove** button (deletes file, clears `imagePath`) and a **Replace** button (opens picker; on selection, deletes old file and sets new path). `reset()` already deletes and clears `imagePath`. For camera, `imagePath` doubles as the pending camera path — if camera result is `false`, delete and clear it.
+**Quick-log:** `imagePath: MutableStateFlow<String?>` holds the single image path (null = no image). While null, show an "Add image" button that opens a dialog with "Take photo" and "Choose from gallery". While non-null, display the captured photo as a full-width thumbnail (160dp tall, `ContentScale.Crop`, `RoundedCornerShape(8.dp)`, loaded via Coil `AsyncImage`) with a **Remove** button (deletes file, clears `imagePath`) and a **Replace** button (opens picker; on selection, deletes old file and sets new path) below. `reset()` deletes and clears `imagePath` if still non-null (i.e., if `save()` did not already clear it). For camera, `imagePath` doubles as the pending camera path — if camera result is `false`, delete and clear it.
 
-**Event edit:** `pendingCameraPath: MutableStateFlow<String?> = null` tracks the file created before launching the camera. On camera result `true`, append `pendingCameraPath` to `imagePaths` and clear it. On result `false`, delete and clear. `cancel()` and `onCleared()` delete `pendingCameraPath` (if non-null) in addition to new images not in `originalImagePaths`. Gallery picks are copied to app-private storage then appended to `imagePaths` directly (no pending state needed). The "Add image" button is always visible; show an "Add image" button that opens a dialog with "Take photo" and "Choose from gallery".
+**Event edit:** `pendingCameraPath: MutableStateFlow<String?> = null` tracks the file created before launching the camera. On camera result `true`, append `pendingCameraPath` to `imagePaths` and clear it. On result `false`, delete and clear. `cancel()` and `onCleared()` delete `pendingCameraPath` (if non-null) in addition to new images not in `originalImagePaths`. Gallery picks are copied to app-private storage then appended to `imagePaths` directly (no pending state needed). The "Add image" button is always visible. Each image in `imagePaths` is rendered as a full-width thumbnail (160dp tall, `ContentScale.Crop`, `RoundedCornerShape(8.dp)`, loaded via Coil `AsyncImage`) with a remove `IconButton` overlaid in the top-right corner.
 
 **Unsaved captures — edit screen:** `EventEditViewModel` tracks newly captured paths separately. On explicit cancel (back without save) or `onCleared()`, any newly captured path not present in the saved event's `imagePaths` is deleted via `ImageStore`. Process kill before `onCleared()` is the only gap — recovered by the startup orphan scan.
 
