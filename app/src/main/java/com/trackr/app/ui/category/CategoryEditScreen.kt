@@ -338,7 +338,7 @@ private fun ColorPicker(
                 ))
                 if (hasCustomColor) add(SwatchSpec(
                     color = effectiveColor, cells = 3, label = "Custom",
-                    isSelected = !isColorInherited,
+                    isSelected = true,
                 ))
             }.takeIf { it.isNotEmpty() }?.let { add(it) }
             categoryColorPalette.chunked(columns).forEach { chunk ->
