@@ -100,7 +100,6 @@ class QuickLogViewModel @Inject constructor(
             }
         }
         selectedCategory.value = category
-        expandedMetaCategoryId.value = null
     }
 
     // @spec EL-UI-078

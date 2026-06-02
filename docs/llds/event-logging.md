@@ -233,7 +233,7 @@ sealed class DayEntry {
 - `value` is initialized to `ValueUIState.None`; updated to the type-appropriate default when a category is selected (see `selectCategory` below)
 - `valueDirty: MutableStateFlow<Boolean>` — tracks whether the user has interacted with the value input during this sheet session. Set to `false` on init and `reset()`; set to `true` when the UI calls `updateValue()`. Never reset on `selectCategory` — edits persist across back-and-forth category navigation within one session.
 - `updateValue(state: ValueUIState)`: sets `value.value = state` and `valueDirty.value = true`. The UI calls this instead of writing to `value` directly, so dirty tracking is centralised.
-- `selectCategory(category)`: sets `selectedCategory`. Then:
+- `selectCategory(category)`: sets `selectedCategory`; does **not** clear `expandedMetaCategoryId`, so pressing back from step 2 restores the drill-down view if the user arrived via one. Then:
   1. If `!valueDirty` → seed per EL-UI-078: if `resolvedDefaultValue` is non-null and `matchesValueType(resolvedDefaultValue, resolvedValueType)` is true, use `resolvedDefaultValue.toValueUIState()`; else use `defaultValueUIStateForType(targetType)` (user hasn't typed anything this session).
   2. Unwrap `Mismatched`: if `editableState` is non-null use it as `effectiveState`; if `editableState` is null, call `originalValue.toValueUIState()` to reconstruct an effective state from the stored EventValue (preserves the value across a Discard pass-through, though intermediate text precision may normalize, e.g. "75" → "75.0").
   3. If `effectiveState` is `None` → seed per EL-UI-078 as in step 1.
@@ -283,7 +283,7 @@ Home (timeline)
     ├── [FAB]              → Quick-Log Sheet (bottom sheet)
     │       ├── [save]     → dismiss sheet, timeline refreshes via Flow
     │       ├── [dismiss]  → reset(), delete any unsaved image
-    │       ├── [back in step 2]           → step 1 (selectedCategory = null)
+    │       ├── [back in step 2]           → step 1 (selectedCategory = null; expandedMetaCategoryId preserved → drill-down if present)
     │       └── [back in step 1 drill-down] → top-level grid (expandedMetaCategoryId = null)
     └── [tap event]        → Event Edit
             ├── [save]     → back to Home
