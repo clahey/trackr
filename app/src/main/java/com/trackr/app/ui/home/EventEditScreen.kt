@@ -201,6 +201,7 @@ fun EventEditScreen(
             ValueInputField(
                 uiState = value,
                 onStateChange = { viewModel.value.value = it },
+                onDone = { scope.launch { viewModel.save() } },
             )
 
             OutlinedTextField(

@@ -568,6 +568,7 @@ private fun QuickLogSheet(
                     uiState = value,
                     onStateChange = { viewModel.updateValue(it) },
                     autoFocus = true,
+                    onDone = { scope.launch { viewModel.save() } },
                 )
                 if (saveResult is SaveResult.ValidationError) {
                     Text(
