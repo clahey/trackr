@@ -16,18 +16,17 @@ fun DeleteCategoryDialog(
         onDismissRequest = onDismiss,
         title = { Text("Delete category?") },
         text = {
-            val text = buildString {
+            val sentences = buildList {
                 if (confirmation.ownEventCount > 0) {
                     val n = confirmation.ownEventCount
-                    append("$n ${if (n == 1) "event" else "events"} from this category will be permanently deleted.")
+                    add("$n ${if (n == 1) "event" else "events"} from this category will be permanently deleted.")
                 }
                 if (confirmation.subCategoryCount > 0) {
-                    if (isNotEmpty()) append(" ")
                     val n = confirmation.subCategoryCount
-                    append("$n ${if (n == 1) "subcategory" else "subcategories"} will be promoted to top-level categories.")
+                    add("$n ${if (n == 1) "subcategory" else "subcategories"} will be promoted to top-level categories.")
                 }
             }
-            Text(text)
+            Text(sentences.joinToString(" "))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) { Text("Delete") }
