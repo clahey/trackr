@@ -253,7 +253,7 @@ class CategoryEditViewModel @Inject constructor(
         // @spec CAT-UI-063, CAT-UI-064, CAT-UI-065, CAT-UI-066
         val effectiveVt = effectiveValueType.value
         val defaultValueToSave: EventValue? = when {
-            parent != null && !defaultValueDirty -> null  // inherit; CAT-UI-066
+            !defaultValueDirty -> storedDefaultValue  // CAT-UI-066: preserve unchanged when user hasn't edited fields
             effectiveVt == ValueType.Number -> EventValue.NumberValue(
                 (storedDefaultValue as? EventValue.NumberValue)?.value ?: 0.0,
                 numberDefaultUnit.value.takeIf { it.isNotBlank() },
