@@ -72,6 +72,10 @@ graph TD
 
 **Hilt for DI.** Standard Android DI; keeps ViewModels testable and repository injection straightforward.
 
+**Localizable strings via Android resource system.** All user-visible text is defined in `res/values/strings.xml` (and future `res/values-XX/strings.xml` locale overrides) rather than hardcoded in Kotlin. Plurals use `<plurals>` resources and `pluralStringResource()`. The app follows the system locale; no in-app language picker is provided.
+
+*Alternatives considered:* hardcoded strings (fast but unlocalizeable); third-party i18n libraries (unnecessary when the Android resource system covers the need).
+
 **Two-level category hierarchy.** Categories support one level of nesting (parent → subcategory). A category with children cannot be re-parented; a category with a parent cannot receive children. This covers the grouping and subtype use case without recursive query complexity or deep-tree UI problems.
 
 *Alternatives considered:* full tree (arbitrary depth) — adds recursive Room queries and unwieldy navigation UI; flat groups (separate entity, not loggable) — prevents logging at the group level, which allows the UX to be flexible to user needs.
