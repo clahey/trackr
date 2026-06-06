@@ -51,9 +51,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackr.app.R
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
@@ -95,8 +97,9 @@ fun CategoryEditScreen(
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
 
+    val categoryNotFound = stringResource(R.string.category_not_found)
     LaunchedEffect(navigateBack) {
-        if (navigateBack) onNavigateBack("Category not found.")
+        if (navigateBack) onNavigateBack(categoryNotFound)
     }
     LaunchedEffect(saveResult) {
         if (saveResult is SaveResult.Success) onNavigateBack(null)
@@ -114,17 +117,17 @@ fun CategoryEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isEditMode) "Edit Category" else "New Category") },
+                title = { Text(stringResource(if (isEditMode) R.string.category_edit_title else R.string.category_new_title)) },
                 navigationIcon = {
                     IconButton(onClick = { onNavigateBack(null) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     // @spec CAT-UI-012, CAT-UI-013, CAT-UI-004, CAT-UI-005, CAT-NAV-005
                     if (isEditMode) {
                         IconButton(onClick = { viewModel.requestDelete() }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete))
                         }
                     }
                     // @spec CAT-UI-053, CAT-NAV-010
@@ -132,7 +135,7 @@ fun CategoryEditScreen(
                         IconButton(onClick = {
                             viewModel.categoryId?.let { onNavigateToCreateSubCategory(it) }
                         }) {
-                            Icon(Icons.Default.Add, contentDescription = "Create subcategory")
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_create_subcategory))
                         }
                     }
 
@@ -154,7 +157,7 @@ fun CategoryEditScreen(
             OutlinedTextField(
                 value = name,
                 onValueChange = { viewModel.name.value = it },
-                label = { Text("Name") },
+                label = { Text(stringResource(R.string.category_field_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 isError = saveResult is SaveResult.ValidationError &&
                         (saveResult as SaveResult.ValidationError).field == "name",
@@ -168,7 +171,7 @@ fun CategoryEditScreen(
                 onUIStateChange = { viewModel.emojiUIState.value = it },
             )
 
-            Text("Color", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.category_field_color), style = MaterialTheme.typography.labelMedium)
             // @spec CAT-UI-056
             ColorPicker(
                 colorState = colorState,
@@ -189,14 +192,11 @@ fun CategoryEditScreen(
 
             valueTypeWarning?.let { tier ->
                 Text(
-                    text = when (tier) {
-                        ValueTypeWarningTier.IrreversibleSafe ->
-                            "Existing events will be converted. This change cannot be reversed by switching back."
-                        ValueTypeWarningTier.Partial ->
-                            "Some existing events may not be convertible and will display incorrectly."
-                        ValueTypeWarningTier.Unsafe ->
-                            "Existing events cannot be converted and will display incorrectly."
-                    },
+                    text = stringResource(when (tier) {
+                        ValueTypeWarningTier.IrreversibleSafe -> R.string.category_warning_irreversible_safe
+                        ValueTypeWarningTier.Partial -> R.string.category_warning_partial
+                        ValueTypeWarningTier.Unsafe -> R.string.category_warning_unsafe
+                    }),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -207,7 +207,7 @@ fun CategoryEditScreen(
                 OutlinedTextField(
                     value = numberDefaultUnit,
                     onValueChange = { viewModel.updateNumberDefaultUnit(it) },
-                    label = { Text("Unit (optional)") },
+                    label = { Text(stringResource(R.string.category_field_unit_optional)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -220,13 +220,13 @@ fun CategoryEditScreen(
                     OutlinedTextField(
                         value = exerciseDefaultSets,
                         onValueChange = { viewModel.updateExerciseDefaultSets(it) },
-                        label = { Text("Default sets") },
+                        label = { Text(stringResource(R.string.category_field_default_sets)) },
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
                         value = exerciseDefaultReps,
                         onValueChange = { viewModel.updateExerciseDefaultReps(it) },
-                        label = { Text("Default reps") },
+                        label = { Text(stringResource(R.string.category_field_default_reps)) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -238,7 +238,7 @@ fun CategoryEditScreen(
                 onClick = { scope.launch { viewModel.save() } },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         }
     }
@@ -271,13 +271,13 @@ private fun EmojiField(
                         ))
                     },
                 )
-                Text("Inherit")
+                Text(stringResource(R.string.category_emoji_inherit))
             }
         }
         OutlinedTextField(
             value = if (isInherited) parentEmoji ?: "" else emojiUIState.customValue,
             onValueChange = { onUIStateChange(emojiUIState.copy(mode = EmojiMode.CUSTOM, customValue = it)) },
-            label = { Text("Emoji") },
+            label = { Text(stringResource(R.string.category_field_emoji)) },
             modifier = Modifier.weight(1f),
             enabled = !isInherited,
             isError = isError,
@@ -325,6 +325,8 @@ private fun ColorPicker(
     val cornerShape = RoundedCornerShape(8.dp)
     val spacing = 6.dp
 
+    val inheritedLabel = stringResource(R.string.category_color_inherited)
+    val customLabel = stringResource(R.string.category_color_custom)
     BoxWithConstraints {
         val columns = if (maxWidth >= 480.dp) 12 else 6
         val swatchWidth = (maxWidth - spacing * (columns - 1)) / columns
@@ -333,11 +335,11 @@ private fun ColorPicker(
         val rows: List<List<SwatchSpec>> = buildList {
             buildList {
                 if (parentCategory != null) add(SwatchSpec(
-                    color = parentCategory.color, cells = 3, label = "Inherited",
+                    color = parentCategory.color, cells = 3, label = inheritedLabel,
                     isSelected = isColorInherited, onClick = { onSelectColor(null) },
                 ))
                 if (hasCustomColor) add(SwatchSpec(
-                    color = effectiveColor, cells = 3, label = "Custom",
+                    color = effectiveColor, cells = 3, label = customLabel,
                     isSelected = true,
                 ))
             }.takeIf { it.isNotEmpty() }?.let { add(it) }
@@ -385,17 +387,19 @@ private fun ValueTypeSelector(
         ValueType.Exercise,
     )
     var expanded by remember { mutableStateOf(false) }
-    val inheritLabel = parentCategory?.let { "Same as ${it.name} (${valueTypeLabel(it.valueType)})" }
+    val inheritLabel = parentCategory?.let {
+        stringResource(R.string.category_value_type_inherit, it.name, stringResource(valueTypeStringRes(it.valueType)))
+    }
 
     val displayLabel = if (inheritLabel != null && isValueTypeInherited) inheritLabel
-    else valueTypeLabel(selected)
+    else stringResource(valueTypeStringRes(selected))
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = displayLabel,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Value type") },
+            label = { Text(stringResource(R.string.category_field_value_type)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
         )
@@ -409,7 +413,7 @@ private fun ValueTypeSelector(
             }
             types.forEach { type ->
                 DropdownMenuItem(
-                    text = { Text(valueTypeLabel(type)) },
+                    text = { Text(stringResource(valueTypeStringRes(type))) },
                     onClick = { onSelect(type); expanded = false },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )

@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.trackr.app.R
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -58,8 +60,8 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
                                 }
                             }
                         },
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Timeline") },
-                        label = { Text("Timeline") },
+                        icon = { Icon(Icons.Default.Home, contentDescription = stringResource(R.string.nav_timeline)) },
+                        label = { Text(stringResource(R.string.nav_timeline)) },
                     )
                     NavigationBarItem(
                         selected = currentRoute == Routes.CATEGORY_LIST,
@@ -70,8 +72,8 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
                                 }
                             }
                         },
-                        icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Categories") },
-                        label = { Text("Categories") },
+                        icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = stringResource(R.string.nav_categories)) },
+                        label = { Text(stringResource(R.string.nav_categories)) },
                     )
                 }
             }

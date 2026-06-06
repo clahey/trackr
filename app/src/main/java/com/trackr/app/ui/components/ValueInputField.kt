@@ -23,9 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.trackr.app.R
 import com.trackr.app.domain.ConversionOutcome
 import com.trackr.app.domain.EventValue
 
@@ -55,7 +57,7 @@ fun ValueInputField(
 @Composable
 private fun ScaleInput(uiState: ValueUIState.Scale, onStateChange: (ValueUIState) -> Unit) {
     Column {
-        Text("Scale: ${uiState.value}")
+        Text(stringResource(R.string.value_input_scale, uiState.value))
         Slider(
             value = uiState.value.toFloat(),
             onValueChange = { onStateChange(uiState.copy(value = it.toInt())) },
@@ -73,23 +75,23 @@ private fun BoolInput(uiState: ValueUIState.Bool, onStateChange: (ValueUIState) 
             Button(
                 onClick = { onStateChange(uiState.copy(selected = true)) },
                 modifier = Modifier.weight(1f),
-            ) { Text("Yes") }
+            ) { Text(stringResource(R.string.value_input_yes)) }
         } else {
             OutlinedButton(
                 onClick = { onStateChange(uiState.copy(selected = true)) },
                 modifier = Modifier.weight(1f),
-            ) { Text("Yes") }
+            ) { Text(stringResource(R.string.value_input_yes)) }
         }
         if (uiState.selected == false) {
             Button(
                 onClick = { onStateChange(uiState.copy(selected = false)) },
                 modifier = Modifier.weight(1f),
-            ) { Text("No") }
+            ) { Text(stringResource(R.string.value_input_no)) }
         } else {
             OutlinedButton(
                 onClick = { onStateChange(uiState.copy(selected = false)) },
                 modifier = Modifier.weight(1f),
-            ) { Text("No") }
+            ) { Text(stringResource(R.string.value_input_no)) }
         }
     }
 }
@@ -110,7 +112,7 @@ private fun NumberInput(
         OutlinedTextField(
             value = uiState.text,
             onValueChange = { onStateChange(uiState.copy(text = it)) },
-            label = { Text("Value") },
+            label = { Text(stringResource(R.string.value_input_value)) },
             keyboardOptions = doneOptions.copy(keyboardType = KeyboardType.Decimal),
             keyboardActions = doneActions,
             modifier = Modifier.weight(1f).focusRequester(focusRequester).testTag("value_input_field"),
@@ -118,7 +120,7 @@ private fun NumberInput(
         OutlinedTextField(
             value = uiState.unit,
             onValueChange = { onStateChange(uiState.copy(unit = it)) },
-            label = { Text("Unit") },
+            label = { Text(stringResource(R.string.value_input_unit)) },
             keyboardOptions = doneOptions,
             keyboardActions = doneActions,
             modifier = Modifier.weight(1f),
@@ -138,7 +140,7 @@ private fun TextInput(
     OutlinedTextField(
         value = uiState.text,
         onValueChange = { onStateChange(uiState.copy(text = it)) },
-        label = { Text("Value") },
+        label = { Text(stringResource(R.string.value_input_value)) },
         modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).testTag("value_input_field"),
         minLines = 2,
     )
@@ -162,7 +164,7 @@ private fun DurationInput(
         OutlinedTextField(
             value = uiState.hoursText,
             onValueChange = { onStateChange(uiState.copy(hoursText = it)) },
-            label = { Text("H") },
+            label = { Text(stringResource(R.string.value_input_hours)) },
             keyboardOptions = numberNext,
             keyboardActions = KeyboardActions(onNext = { minutesFocus.requestFocus() }),
             modifier = Modifier.weight(1f).focusRequester(hoursFocus).testTag("value_duration_h"),
@@ -170,7 +172,7 @@ private fun DurationInput(
         OutlinedTextField(
             value = uiState.minutesText,
             onValueChange = { onStateChange(uiState.copy(minutesText = it)) },
-            label = { Text("M") },
+            label = { Text(stringResource(R.string.value_input_minutes)) },
             keyboardOptions = numberNext,
             keyboardActions = KeyboardActions(onNext = { secondsFocus.requestFocus() }),
             modifier = Modifier.weight(1f).focusRequester(minutesFocus),
@@ -178,7 +180,7 @@ private fun DurationInput(
         OutlinedTextField(
             value = uiState.secondsText,
             onValueChange = { onStateChange(uiState.copy(secondsText = it)) },
-            label = { Text("S") },
+            label = { Text(stringResource(R.string.value_input_seconds)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = if (onDone != null) ImeAction.Done else ImeAction.Default),
             keyboardActions = doneActions,
             modifier = Modifier.weight(1f).focusRequester(secondsFocus),
@@ -201,7 +203,7 @@ private fun ExerciseInput(
         OutlinedTextField(
             value = uiState.setsText,
             onValueChange = { onStateChange(uiState.copy(setsText = it)) },
-            label = { Text("Sets") },
+            label = { Text(stringResource(R.string.value_input_sets)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { repsFocus.requestFocus() }),
             modifier = Modifier.weight(1f).focusRequester(setsFocus),
@@ -209,7 +211,7 @@ private fun ExerciseInput(
         OutlinedTextField(
             value = uiState.repsText,
             onValueChange = { onStateChange(uiState.copy(repsText = it)) },
-            label = { Text("Reps") },
+            label = { Text(stringResource(R.string.value_input_reps)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = if (onDone != null) ImeAction.Done else ImeAction.Default),
             keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
             modifier = Modifier.weight(1f).focusRequester(repsFocus),
@@ -240,14 +242,14 @@ private fun MismatchedInput(
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "Stored value doesn't match the category type.",
+                stringResource(R.string.mismatch_message),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
             val buttonLabel = when (val outcome = uiState.outcome) {
-                is ConversionOutcome.Converted -> "Convert to ${describeValue(outcome.value)}"
-                is ConversionOutcome.UsedDefault -> "Replace with default: ${describeValue(outcome.value)}"
-                ConversionOutcome.Discard -> "Discard value"
+                is ConversionOutcome.Converted -> stringResource(R.string.mismatch_convert, describeValue(outcome.value))
+                is ConversionOutcome.UsedDefault -> stringResource(R.string.mismatch_replace_default, describeValue(outcome.value))
+                ConversionOutcome.Discard -> stringResource(R.string.mismatch_discard)
             }
             TextButton(onClick = {
                 val newState = when (val outcome = uiState.outcome) {

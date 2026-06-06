@@ -75,8 +75,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import com.trackr.app.R
 import coil.compose.AsyncImage
 import java.io.File
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -150,11 +152,13 @@ fun HomeScreen(
         }
     }
 
+    val eventDeletedMessage = stringResource(R.string.event_deleted_snackbar)
+    val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(pendingDelete) {
         if (pendingDelete != null) {
             val result = snackbarHostState.showSnackbar(
-                message = "Event deleted",
-                actionLabel = "Undo",
+                message = eventDeletedMessage,
+                actionLabel = undoLabel,
             )
             when (result) {
                 SnackbarResult.ActionPerformed -> homeVm.undoDelete()
@@ -164,7 +168,7 @@ fun HomeScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Timeline") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.timeline_title)) }) },
         floatingActionButton = {
             // @spec EL-UI-013, EL-UI-075
             FloatingActionButton(onClick = {
@@ -180,7 +184,7 @@ fun HomeScreen(
                 }
                 showSheet = true
             }) {
-                Icon(Icons.Default.Add, contentDescription = "Log event")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_log_event))
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -197,7 +201,7 @@ fun HomeScreen(
                         FilterChip(
                             selected = activeFilter is ActiveFilter.All,
                             onClick = { homeVm.setFilter(ActiveFilter.All) },
-                            label = { Text("All") },
+                            label = { Text(stringResource(R.string.filter_all)) },
                         )
                     }
                     metaCategories.forEach { meta ->
@@ -341,7 +345,7 @@ private fun SwipeableEventRow(
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_delete_swipe), tint = Color.Red)
             }
         },
     ) {
@@ -360,11 +364,11 @@ private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            "Event deleted",
+            stringResource(R.string.event_deleted_snackbar),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = onUndo) { Text("Undo") }
+        TextButton(onClick = onUndo) { Text(stringResource(R.string.action_undo)) }
     }
 }
 
@@ -372,8 +376,8 @@ private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {
 private fun DayHeader(date: LocalDate) {
     val today = LocalDate.now()
     val label = when (date) {
-        today -> "Today"
-        today.minusDays(1) -> "Yesterday"
+        today -> stringResource(R.string.timeline_day_today)
+        today.minusDays(1) -> stringResource(R.string.timeline_day_yesterday)
         else -> date.format(DateTimeFormatter.ofPattern("EEEE, MMM d"))
     }
     Text(
@@ -468,17 +472,17 @@ private fun QuickLogSheet(
     if (showImageSourceDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showImageSourceDialog = false },
-            title = { Text("Add image") },
+            title = { Text(stringResource(R.string.add_image_dialog_title)) },
             confirmButton = {
                 TextButton(onClick = { showImageSourceDialog = false; launchCamera() }) {
-                    Text("Take photo")
+                    Text(stringResource(R.string.action_take_photo))
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showImageSourceDialog = false
                     galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }) { Text("Choose from gallery") }
+                }) { Text(stringResource(R.string.action_choose_from_gallery)) }
             },
         )
     }
@@ -496,7 +500,7 @@ private fun QuickLogSheet(
                 // Drill-down: subcategory picker for the selected MetaCategory
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { viewModel.expandMetaCategory(null) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                     Text(
                         "${expandedMeta.resolvedEmoji} ${expandedMeta.name}",
@@ -509,7 +513,7 @@ private fun QuickLogSheet(
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         CategoryTile(
                             emoji = null,
-                            name = "Log to ${expandedMeta.name} directly",
+                            name = stringResource(R.string.quick_log_log_directly, expandedMeta.name),
                             color = expandedMeta.resolvedColor,
                             onClick = { viewModel.selectCategory(expandedMeta) },
                         )
@@ -525,7 +529,7 @@ private fun QuickLogSheet(
                 }
             } else {
                 // Top-level MetaCategory grid
-                Text("Choose a category", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.quick_log_choose_category), style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(12.dp))
                 // @spec EL-UI-072, EL-UI-073, EL-UI-074
                 CategoryGrid {
@@ -558,7 +562,7 @@ private fun QuickLogSheet(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { viewModel.selectedCategory.value = null }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                 }
                 Text("${cat.resolvedEmoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
             }
@@ -572,7 +576,7 @@ private fun QuickLogSheet(
                 )
                 if (saveResult is SaveResult.ValidationError) {
                     Text(
-                        "Value is required",
+                        stringResource(R.string.value_required_error),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -582,13 +586,13 @@ private fun QuickLogSheet(
             OutlinedTextField(
                 value = notes,
                 onValueChange = { viewModel.notes.value = it },
-                label = { Text("Notes (optional)") },
+                label = { Text(stringResource(R.string.event_field_notes_optional)) },
                 modifier = Modifier.fillMaxWidth(),
             )
 
             // @spec EL-UI-031a, EL-UI-031b
             if (imagePath == null) {
-                TextButton(onClick = { showImageSourceDialog = true }) { Text("Add image") }
+                TextButton(onClick = { showImageSourceDialog = true }) { Text(stringResource(R.string.action_add_image)) }
             } else {
                 AsyncImage(
                     model = File(imagePath!!).toUri(),
@@ -600,8 +604,8 @@ private fun QuickLogSheet(
                         .clip(RoundedCornerShape(8.dp)),
                 )
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(onClick = { viewModel.removeImage() }) { Text("Remove") }
-                    TextButton(onClick = { showImageSourceDialog = true }) { Text("Replace") }
+                    TextButton(onClick = { viewModel.removeImage() }) { Text(stringResource(R.string.action_remove)) }
+                    TextButton(onClick = { showImageSourceDialog = true }) { Text(stringResource(R.string.action_replace)) }
                 }
             }
 
@@ -609,7 +613,7 @@ private fun QuickLogSheet(
                 onClick = { scope.launch { viewModel.save() } },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
 
             Spacer(modifier = Modifier.height(16.dp))

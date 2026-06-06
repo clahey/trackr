@@ -37,7 +37,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import com.trackr.app.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -70,11 +73,11 @@ fun CategoryListScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Categories") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.categories_title)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { onNavigateToCategoryEdit(null) }) {
-                Icon(Icons.Default.Add, contentDescription = "Add category")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_add_category))
             }
         }
     ) { innerPadding ->
@@ -162,7 +165,7 @@ private fun CategoryRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = category.name, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = valueTypeLabel(category.resolvedValueType),
+                    text = stringResource(valueTypeStringRes(category.resolvedValueType)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -171,23 +174,23 @@ private fun CategoryRow(
         // @spec CAT-UI-003
         DropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
             DropdownMenuItem(
-                text = { Text("Delete") },
+                text = { Text(stringResource(R.string.action_delete)) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                 onClick = onDeleteClick,
             )
             if (category is Category.MetaCategory && !hasSubCategories) {
                 DropdownMenuItem(
-                    text = { Text("Add to group") },
+                    text = { Text(stringResource(R.string.category_menu_add_to_group)) },
                     onClick = onAddToGroupClick,
                 )
             }
             if (category is Category.SubCategory) {
                 DropdownMenuItem(
-                    text = { Text("Move to another group") },
+                    text = { Text(stringResource(R.string.category_menu_move_to_group)) },
                     onClick = onMoveToAnotherGroupClick,
                 )
                 DropdownMenuItem(
-                    text = { Text("Remove from group") },
+                    text = { Text(stringResource(R.string.category_menu_remove_from_group)) },
                     onClick = onRemoveFromGroupClick,
                 )
             }
@@ -208,12 +211,12 @@ private fun GroupPickerDialog(
     if (showNameEntry) {
         AlertDialog(
             onDismissRequest = { showNameEntry = false },
-            title = { Text("New group name") },
+            title = { Text(stringResource(R.string.category_group_new_name_title)) },
             text = {
                 OutlinedTextField(
                     value = newGroupName,
                     onValueChange = { newGroupName = it },
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.category_field_name)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
@@ -221,16 +224,16 @@ private fun GroupPickerDialog(
                 TextButton(
                     onClick = { onCreateNewGroup(newGroupName.trim()) },
                     enabled = newGroupName.isNotBlank(),
-                ) { Text("Create") }
+                ) { Text(stringResource(R.string.action_create)) }
             },
             dismissButton = {
-                TextButton(onClick = { showNameEntry = false }) { Text("Back") }
+                TextButton(onClick = { showNameEntry = false }) { Text(stringResource(R.string.action_back)) }
             },
         )
     } else {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(if (state.isMoveOperation) "Move to group" else "Add to group") },
+            title = { Text(stringResource(if (state.isMoveOperation) R.string.category_group_picker_title_move else R.string.category_group_picker_title_add)) },
             text = {
                 Column {
                     state.eligibleParents.forEach { parent ->
@@ -249,26 +252,27 @@ private fun GroupPickerDialog(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
-                            text = "+ Create new group",
+                            text = stringResource(R.string.category_group_create),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
 }
 
-internal fun valueTypeLabel(type: ValueType): String = when (type) {
-    ValueType.None -> "None"
-    ValueType.Scale -> "Scale (1–10)"
-    ValueType.Boolean -> "Yes / No"
-    ValueType.Number -> "Number"
-    ValueType.Text -> "Text"
-    ValueType.Duration -> "Duration"
-    ValueType.Exercise -> "Exercise (sets × reps)"
-    is ValueType.Unknown -> "Unknown"
+@StringRes
+internal fun valueTypeStringRes(type: ValueType): Int = when (type) {
+    ValueType.None -> R.string.value_type_none
+    ValueType.Scale -> R.string.value_type_scale
+    ValueType.Boolean -> R.string.value_type_boolean
+    ValueType.Number -> R.string.value_type_number
+    ValueType.Text -> R.string.value_type_text
+    ValueType.Duration -> R.string.value_type_duration
+    ValueType.Exercise -> R.string.value_type_exercise
+    is ValueType.Unknown -> R.string.value_type_unknown
 }

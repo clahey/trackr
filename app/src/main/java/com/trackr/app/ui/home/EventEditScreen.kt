@@ -38,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import com.trackr.app.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -113,8 +115,9 @@ fun EventEditScreen(
         cameraLauncher.launch(uri)
     }
 
+    val eventNotFound = stringResource(R.string.event_not_found)
     LaunchedEffect(navigateBack) {
-        if (navigateBack) onNavigateBack("Event not found.")
+        if (navigateBack) onNavigateBack(eventNotFound)
     }
     LaunchedEffect(saveResult) {
         if (saveResult is SaveResult.Success) onNavigateBack(null)
@@ -126,13 +129,13 @@ fun EventEditScreen(
     if (pendingDelete) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelDelete() },
-            title = { Text("Delete event?") },
-            text = { Text("This event will be permanently deleted.") },
+            title = { Text(stringResource(R.string.event_delete_title)) },
+            text = { Text(stringResource(R.string.event_delete_message)) },
             confirmButton = {
-                TextButton(onClick = { scope.launch { viewModel.confirmDelete() } }) { Text("Delete") }
+                TextButton(onClick = { scope.launch { viewModel.confirmDelete() } }) { Text(stringResource(R.string.action_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.cancelDelete() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.cancelDelete() }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -140,17 +143,17 @@ fun EventEditScreen(
     if (showImageSourceDialog) {
         AlertDialog(
             onDismissRequest = { showImageSourceDialog = false },
-            title = { Text("Add image") },
+            title = { Text(stringResource(R.string.add_image_dialog_title)) },
             confirmButton = {
                 TextButton(onClick = { showImageSourceDialog = false; launchCamera() }) {
-                    Text("Take photo")
+                    Text(stringResource(R.string.action_take_photo))
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showImageSourceDialog = false
                     galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }) { Text("Choose from gallery") }
+                }) { Text(stringResource(R.string.action_choose_from_gallery)) }
             },
         )
     }
@@ -158,18 +161,18 @@ fun EventEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Event") },
+                title = { Text(stringResource(R.string.event_edit_title)) },
                 navigationIcon = {
                     IconButton(onClick = {
                         viewModel.cancel()
                         onNavigateBack(null)
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.requestDelete() }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete))
                     }
                 },
             )
@@ -194,7 +197,7 @@ fun EventEditScreen(
                 value = timestampFormatter.format(timestamp),
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Timestamp") },
+                label = { Text(stringResource(R.string.event_field_timestamp)) },
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -207,7 +210,7 @@ fun EventEditScreen(
             OutlinedTextField(
                 value = notes,
                 onValueChange = { viewModel.notes.value = it },
-                label = { Text("Notes") },
+                label = { Text(stringResource(R.string.event_field_notes)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
             )
@@ -217,7 +220,7 @@ fun EventEditScreen(
                 Box {
                     AsyncImage(
                         model = File(path).toUri(),
-                        contentDescription = "Attached photo",
+                        contentDescription = stringResource(R.string.cd_attached_photo),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -228,11 +231,11 @@ fun EventEditScreen(
                         onClick = { viewModel.removeImage(path) },
                         modifier = Modifier.align(Alignment.TopEnd),
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove image", tint = Color.White)
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_remove_image), tint = Color.White)
                     }
                 }
             }
-            TextButton(onClick = { showImageSourceDialog = true }) { Text("Add image") }
+            TextButton(onClick = { showImageSourceDialog = true }) { Text(stringResource(R.string.action_add_image)) }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -240,7 +243,7 @@ fun EventEditScreen(
                 onClick = { scope.launch { viewModel.save() } },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         }
     }

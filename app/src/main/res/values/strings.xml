@@ -2,6 +2,108 @@
 <resources>
     <string name="app_name">Trackr</string>
 
+    <!-- Navigation -->
+    <string name="nav_timeline">Timeline</string>
+    <string name="nav_categories">Categories</string>
+
+    <!-- Common actions -->
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_create">Create</string>
+    <string name="action_undo">Undo</string>
+    <string name="action_back">Back</string>
+    <string name="action_add_image">Add image</string>
+    <string name="action_take_photo">Take photo</string>
+    <string name="action_choose_from_gallery">Choose from gallery</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_replace">Replace</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_add_category">Add category</string>
+    <string name="cd_create_subcategory">Create subcategory</string>
+    <string name="cd_log_event">Log event</string>
+    <string name="cd_attached_photo">Attached photo</string>
+    <string name="cd_remove_image">Remove image</string>
+    <string name="cd_delete_swipe">Delete</string>
+
+    <!-- Value input labels -->
+    <string name="value_input_value">Value</string>
+    <string name="value_input_unit">Unit</string>
+    <string name="value_input_sets">Sets</string>
+    <string name="value_input_reps">Reps</string>
+    <string name="value_input_hours">H</string>
+    <string name="value_input_minutes">M</string>
+    <string name="value_input_seconds">S</string>
+    <string name="value_input_yes">Yes</string>
+    <string name="value_input_no">No</string>
+    <string name="value_input_scale">Scale: %d</string>
+
+    <!-- Value mismatch banner -->
+    <string name="mismatch_message">Stored value doesn\'t match the category type.</string>
+    <string name="mismatch_convert">Convert to %s</string>
+    <string name="mismatch_replace_default">Replace with default: %s</string>
+    <string name="mismatch_discard">Discard value</string>
+
+    <!-- Event edit -->
+    <string name="event_edit_title">Edit Event</string>
+    <string name="event_not_found">Event not found.</string>
+    <string name="event_delete_title">Delete event?</string>
+    <string name="event_delete_message">This event will be permanently deleted.</string>
+    <string name="event_deleted_snackbar">Event deleted</string>
+    <string name="event_field_timestamp">Timestamp</string>
+    <string name="event_field_notes">Notes</string>
+    <string name="event_field_notes_optional">Notes (optional)</string>
+    <string name="value_required_error">Value is required</string>
+
+    <!-- Category list -->
+    <string name="categories_title">Categories</string>
+    <string name="category_menu_add_to_group">Add to group</string>
+    <string name="category_menu_move_to_group">Move to another group</string>
+    <string name="category_menu_remove_from_group">Remove from group</string>
+    <string name="category_group_picker_title_add">Add to group</string>
+    <string name="category_group_picker_title_move">Move to group</string>
+    <string name="category_group_create">+ Create new group</string>
+    <string name="category_group_new_name_title">New group name</string>
+
+    <!-- Category edit -->
+    <string name="category_edit_title">Edit Category</string>
+    <string name="category_new_title">New Category</string>
+    <string name="category_not_found">Category not found.</string>
+    <string name="category_field_name">Name</string>
+    <string name="category_field_emoji">Emoji</string>
+    <string name="category_emoji_inherit">Inherit</string>
+    <string name="category_field_color">Color</string>
+    <string name="category_color_inherited">Inherited</string>
+    <string name="category_color_custom">Custom</string>
+    <string name="category_field_value_type">Value type</string>
+    <string name="category_value_type_inherit">Same as %1$s (%2$s)</string>
+    <string name="category_field_unit_optional">Unit (optional)</string>
+    <string name="category_field_default_sets">Default sets</string>
+    <string name="category_field_default_reps">Default reps</string>
+    <string name="category_warning_irreversible_safe">Existing events will be converted. This change cannot be reversed by switching back.</string>
+    <string name="category_warning_partial">Some existing events may not be convertible and will display incorrectly.</string>
+    <string name="category_warning_unsafe">Existing events cannot be converted and will display incorrectly.</string>
+
+    <!-- Value types -->
+    <string name="value_type_none">None</string>
+    <string name="value_type_scale">Scale (1–10)</string>
+    <string name="value_type_boolean">Yes / No</string>
+    <string name="value_type_number">Number</string>
+    <string name="value_type_text">Text</string>
+    <string name="value_type_duration">Duration</string>
+    <string name="value_type_exercise">Exercise (sets × reps)</string>
+    <string name="value_type_unknown">Unknown</string>
+
+    <!-- Timeline / home -->
+    <string name="timeline_title">Timeline</string>
+    <string name="filter_all">All</string>
+    <string name="timeline_day_today">Today</string>
+    <string name="timeline_day_yesterday">Yesterday</string>
+    <string name="quick_log_choose_category">Choose a category</string>
+    <string name="quick_log_log_directly">Log to %s directly</string>
+    <string name="add_image_dialog_title">Add image</string>
+
     <!-- Delete category dialog -->
     <string name="delete_category_title">Delete category?</string>
     <string name="delete_category_confirm">Delete</string>
