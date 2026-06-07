@@ -11,15 +11,20 @@ interface TrackrRepository {
     fun getCategoryById(id: String): Flow<Category?>
     suspend fun saveCategory(category: Category)
     suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)
+    // @spec CAT-UI-006
     suspend fun deleteCategory(id: String)
     suspend fun reorderCategories(orderedIds: List<String>)
-    fun getEventCountForCategory(categoryId: String): Flow<Int>
+    fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
+    fun getSubCategoryCount(categoryId: String): Flow<Int>
 
     fun getEvents(start: Instant? = null, end: Instant? = null): Flow<List<Event>>
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>
+    // @spec EL-UI-011
+    fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>>
     fun getEventById(id: String): Flow<Event?>
     suspend fun saveEvent(event: Event)
     suspend fun deleteEvent(id: String)
+    suspend fun deleteEventFiles(imagePaths: List<String>)
 
     suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int
 

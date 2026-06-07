@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.3"
+agp = "8.13.2"
 kotlin = "2.1.0"
 ksp = "2.1.0-1.0.29"
 compose-bom = "2025.01.01"
@@ -14,6 +14,7 @@ datastore = "1.1.1"
 junit = "4.13.2"
 androidx-test-ext-junit = "1.2.1"
 turbine = "1.2.0"
+coil = "2.7.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }
@@ -44,6 +45,7 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

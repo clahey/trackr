@@ -1,5 +1,6 @@
 package com.trackr.app.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,20 +21,27 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -59,16 +67,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import com.trackr.app.R
+import coil.compose.AsyncImage
+import java.io.File
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
 import com.trackr.app.ui.SaveResult
+import com.trackr.app.ui.components.EventRow
 import com.trackr.app.ui.components.ValueInputField
 import com.trackr.app.ui.components.formatValue
-import com.trackr.app.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -76,9 +98,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-// @spec EL-UI-001, EL-UI-011, EL-UI-012, EL-UI-013, EL-UI-013b, EL-UI-017, EL-UI-018,
-// EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022, EL-UI-023, EL-UI-023b,
-// EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-045, EL-NAV-002, EL-PROC-001, APP-NAV-002
+// @spec EL-UI-001, EL-UI-010, EL-UI-011, EL-UI-012, EL-UI-013, EL-UI-013b, EL-UI-014,
+// EL-UI-017, EL-UI-018, EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022,
+// EL-UI-023, EL-UI-023b, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-045, EL-UI-070,
+// EL-UI-071, EL-UI-072, EL-UI-073, EL-UI-074, EL-UI-075, EL-NAV-002, EL-PROC-001, APP-NAV-002
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -129,11 +152,13 @@ fun HomeScreen(
         }
     }
 
+    val eventDeletedMessage = stringResource(R.string.event_deleted_snackbar)
+    val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(pendingDelete) {
         if (pendingDelete != null) {
             val result = snackbarHostState.showSnackbar(
-                message = "Event deleted",
-                actionLabel = "Undo",
+                message = eventDeletedMessage,
+                actionLabel = undoLabel,
             )
             when (result) {
                 SnackbarResult.ActionPerformed -> homeVm.undoDelete()
@@ -143,38 +168,86 @@ fun HomeScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Timeline") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.timeline_title)) }) },
         floatingActionButton = {
+            // @spec EL-UI-013, EL-UI-075
             FloatingActionButton(onClick = {
-                activeFilter?.let { quickLogVm.selectCategory(it) }
+                when (val f = activeFilter) {
+                    is ActiveFilter.Sub -> quickLogVm.selectCategory(f.sub)
+                    is ActiveFilter.TopLevel -> {
+                        val hasSubCats = categories.filterIsInstance<Category.SubCategory>()
+                            .any { it.parent.id == f.category.id }
+                        if (hasSubCats) quickLogVm.expandMetaCategory(f.category.id)
+                        else quickLogVm.selectCategory(f.category)
+                    }
+                    is ActiveFilter.All -> {}
+                }
                 showSheet = true
             }) {
-                Icon(Icons.Default.Add, contentDescription = "Log event")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_log_event))
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            // @spec EL-UI-010, EL-UI-012, EL-UI-014, EL-UI-070, EL-UI-071
             if (categories.isNotEmpty()) {
+                val metaCategories = categories.filterIsInstance<Category.MetaCategory>()
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
                         FilterChip(
-                            selected = activeFilter == null,
-                            onClick = { homeVm.setFilter(null) },
-                            label = { Text("All") },
+                            selected = activeFilter is ActiveFilter.All,
+                            onClick = { homeVm.setFilter(ActiveFilter.All) },
+                            label = { Text(stringResource(R.string.filter_all)) },
                         )
                     }
-                    items(categories) { cat ->
-                        FilterChip(
-                            selected = activeFilter?.id == cat.id,
-                            onClick = {
-                                homeVm.setFilter(if (activeFilter?.id == cat.id) null else cat)
-                            },
-                            label = { Text("${cat.emoji} ${cat.name}") },
-                        )
+                    metaCategories.forEach { meta ->
+                        val isMetaSelected = when (val f = activeFilter) {
+                            is ActiveFilter.TopLevel -> f.category.id == meta.id
+                            else -> false
+                        }
+                        val showSubChips = when (val f = activeFilter) {
+                            is ActiveFilter.TopLevel -> f.category.id == meta.id
+                            is ActiveFilter.Sub -> f.parent.id == meta.id
+                            else -> false
+                        }
+                        item(key = "meta-${meta.id}") {
+                            FilterChip(
+                                selected = isMetaSelected,
+                                onClick = {
+                                    val f = activeFilter
+                                    when {
+                                        f is ActiveFilter.TopLevel && f.category.id == meta.id ->
+                                            homeVm.setFilter(ActiveFilter.All)
+                                        else -> homeVm.setFilter(ActiveFilter.TopLevel(meta))
+                                    }
+                                },
+                                label = { Text("${meta.resolvedEmoji} ${meta.name}") },
+                            )
+                        }
+                        if (showSubChips) {
+                            val subCats = categories.filterIsInstance<Category.SubCategory>()
+                                .filter { it.parent.id == meta.id }
+                            items(subCats, key = { "sub-${it.id}" }) { sub ->
+                                val isSubSelected = when (val f = activeFilter) {
+                                    is ActiveFilter.Sub -> f.sub.id == sub.id
+                                    else -> false
+                                }
+                                FilterChip(
+                                    selected = isSubSelected,
+                                    onClick = {
+                                        homeVm.setFilter(
+                                            if (isSubSelected) ActiveFilter.TopLevel(meta)
+                                            else ActiveFilter.Sub(meta, sub)
+                                        )
+                                    },
+                                    label = { Text("${sub.resolvedEmoji} ${sub.name}") },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -248,7 +321,7 @@ fun HomeScreen(
 @Composable
 private fun SwipeableEventRow(
     event: Event,
-    category: com.trackr.app.domain.Category?,
+    category: com.trackr.app.domain.Category,
     hasMismatch: Boolean,
     onSwipeDelete: () -> Unit,
     onClick: () -> Unit,
@@ -272,7 +345,7 @@ private fun SwipeableEventRow(
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_delete_swipe), tint = Color.Red)
             }
         },
     ) {
@@ -280,74 +353,6 @@ private fun SwipeableEventRow(
     }
 }
 
-// @spec EL-UI-002, EL-UI-004, EL-UI-005, EL-UI-061, THEME-UI-011
-@Composable
-private fun EventRow(event: Event, category: com.trackr.app.domain.Category?, hasMismatch: Boolean, onClick: () -> Unit) {
-    ElevatedCard(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // @spec EL-UI-005, THEME-UI-011
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = category?.let { Color(it.color) } ?: MaterialTheme.colorScheme.primaryContainer,
-                        shape = CircleShape,
-                    ),
-            ) {
-                Text(
-                    text = category?.emoji ?: "",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = category?.let { Color(foregroundColorForBackground(it.color)) }
-                        ?: MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = category?.name ?: "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                event.value?.let {
-                    // @spec EL-UI-061
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(formatValue(it), style = MaterialTheme.typography.bodyMedium)
-                        if (hasMismatch) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = "Value type mismatch",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(16.dp).padding(start = 4.dp),
-                            )
-                        }
-                    }
-                }
-                event.notes?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Text(
-                text = event.timestamp.atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("HH:mm")),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
 @Composable
 private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {
@@ -359,11 +364,11 @@ private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            "Event deleted",
+            stringResource(R.string.event_deleted_snackbar),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = onUndo) { Text("Undo") }
+        TextButton(onClick = onUndo) { Text(stringResource(R.string.action_undo)) }
     }
 }
 
@@ -371,8 +376,8 @@ private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {
 private fun DayHeader(date: LocalDate) {
     val today = LocalDate.now()
     val label = when (date) {
-        today -> "Today"
-        today.minusDays(1) -> "Yesterday"
+        today -> stringResource(R.string.timeline_day_today)
+        today.minusDays(1) -> stringResource(R.string.timeline_day_yesterday)
         else -> date.format(DateTimeFormatter.ofPattern("EEEE, MMM d"))
     }
     Text(
@@ -383,8 +388,33 @@ private fun DayHeader(date: LocalDate) {
     )
 }
 
-// @spec EL-UI-013, EL-UI-030, EL-UI-032, EL-UI-034, EL-UI-052b, EL-UI-054, EL-UI-055b,
-// EL-NAV-002, EL-PROC-001
+// @spec EL-UI-013, EL-UI-030, EL-UI-031a, EL-UI-031b, EL-UI-032, EL-UI-034, EL-UI-052b,
+@Composable
+private fun CategoryGrid(content: LazyGridScope.() -> Unit) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.height(300.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun CategoryTile(emoji: String?, name: String, color: Long, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(3.dp, Color(color)),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (emoji != null) Text(emoji, style = MaterialTheme.typography.headlineSmall)
+            Text(name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
+// EL-UI-054, EL-UI-055b, EL-UI-072, EL-UI-073, EL-UI-074, EL-NAV-002, EL-PROC-001
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickLogSheet(
@@ -393,37 +423,128 @@ private fun QuickLogSheet(
     onDismiss: () -> Unit,
 ) {
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val expandedMetaCategoryId by viewModel.expandedMetaCategoryId.collectAsState()
     val notes by viewModel.notes.collectAsState()
+    val imagePath by viewModel.imagePath.collectAsState()
     val value by viewModel.value.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
-    val galleryLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        uri?.let { viewModel.imagePath.value = it.toString() }
+    BackHandler(enabled = selectedCategory != null) { viewModel.selectedCategory.value = null }
+    BackHandler(enabled = selectedCategory == null && expandedMetaCategoryId != null) {
+        viewModel.expandMetaCategory(null)
+    }
+
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var pendingCameraPath by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val path = pendingCameraPath ?: return@rememberLauncherForActivityResult
+        if (success) viewModel.commitImage(path) else viewModel.cancelImage(path)
+        pendingCameraPath = null
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch(Dispatchers.IO) {
+            val path = viewModel.createImageFile()
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.File(path).outputStream().use { input.copyTo(it) }
+                }
+                withContext(Dispatchers.Main) { viewModel.commitImage(path) }
+            } catch (_: Exception) {
+                viewModel.cancelImage(path)
+            }
+        }
+    }
+
+    fun launchCamera() {
+        val path = viewModel.createImageFile()
+        pendingCameraPath = path
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", java.io.File(path)
+        )
+        cameraLauncher.launch(uri)
+    }
+
+    if (showImageSourceDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = { Text(stringResource(R.string.add_image_dialog_title)) },
+            confirmButton = {
+                TextButton(onClick = { showImageSourceDialog = false; launchCamera() }) {
+                    Text(stringResource(R.string.action_take_photo))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImageSourceDialog = false
+                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) { Text(stringResource(R.string.action_choose_from_gallery)) }
+            },
+        )
     }
 
     if (selectedCategory == null) {
         // Step 1 — Category picker
+        val metaCategories = categories.filterIsInstance<Category.MetaCategory>()
+        val expandedMeta = metaCategories.find { it.id == expandedMetaCategoryId }
+        val expandedSubCats = expandedMeta?.let { meta ->
+            categories.filterIsInstance<Category.SubCategory>().filter { it.parent.id == meta.id }
+        }
+
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Choose a category", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(12.dp))
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.height(300.dp),
-            ) {
-                items(categories) { cat ->
-                    Button(
-                        onClick = { viewModel.selectCategory(cat) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(cat.emoji, style = MaterialTheme.typography.headlineSmall)
-                            Text(cat.name, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                        }
+            if (expandedMeta != null && expandedSubCats != null) {
+                // Drill-down: subcategory picker for the selected MetaCategory
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { viewModel.expandMetaCategory(null) }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                    }
+                    Text(
+                        "${expandedMeta.resolvedEmoji} ${expandedMeta.name}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                // @spec EL-UI-072, EL-UI-073, EL-UI-074
+                CategoryGrid {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        CategoryTile(
+                            emoji = null,
+                            name = stringResource(R.string.quick_log_log_directly, expandedMeta.name),
+                            color = expandedMeta.resolvedColor,
+                            onClick = { viewModel.selectCategory(expandedMeta) },
+                        )
+                    }
+                    items(expandedSubCats, key = { it.id }) { sub ->
+                        CategoryTile(
+                            emoji = sub.resolvedEmoji ?: expandedMeta.resolvedEmoji,
+                            name = sub.name,
+                            color = sub.resolvedColor,
+                            onClick = { viewModel.selectCategory(sub) },
+                        )
+                    }
+                }
+            } else {
+                // Top-level MetaCategory grid
+                Text(stringResource(R.string.quick_log_choose_category), style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(12.dp))
+                // @spec EL-UI-072, EL-UI-073, EL-UI-074
+                CategoryGrid {
+                    items(metaCategories, key = { it.id }) { meta ->
+                        val subCats = categories.filterIsInstance<Category.SubCategory>()
+                            .filter { it.parent.id == meta.id }
+                        CategoryTile(
+                            emoji = meta.resolvedEmoji,
+                            name = meta.name,
+                            color = meta.resolvedColor,
+                            onClick = {
+                                if (subCats.isNotEmpty()) viewModel.expandMetaCategory(meta.id)
+                                else viewModel.selectCategory(meta)
+                            },
+                        )
                     }
                 }
             }
@@ -433,27 +554,29 @@ private fun QuickLogSheet(
         // Step 2 — Value + details
         val cat = selectedCategory!!
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${cat.emoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = { viewModel.selectedCategory.value = null }) {
-                    Text("Change")
+                IconButton(onClick = { viewModel.selectedCategory.value = null }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                 }
+                Text("${cat.resolvedEmoji} ${cat.name}", style = MaterialTheme.typography.titleMedium)
             }
 
-            if (cat.valueType != ValueType.None) {
+            if (cat.resolvedValueType != ValueType.None) {
                 ValueInputField(
-                    value = value,
-                    onValueChange = { viewModel.value.value = it },
-                    valueType = cat.valueType,
+                    uiState = value,
+                    onStateChange = { viewModel.updateValue(it) },
                     autoFocus = true,
+                    onDone = { scope.launch { viewModel.save() } },
                 )
                 if (saveResult is SaveResult.ValidationError) {
                     Text(
-                        "Value is required",
+                        stringResource(R.string.value_required_error),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -463,25 +586,34 @@ private fun QuickLogSheet(
             OutlinedTextField(
                 value = notes,
                 onValueChange = { viewModel.notes.value = it },
-                label = { Text("Notes (optional)") },
+                label = { Text(stringResource(R.string.event_field_notes_optional)) },
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            TextButton(
-                onClick = {
-                    galleryLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
-            ) {
-                Text(if (viewModel.imagePath.value != null) "Photo added ✓" else "Add photo")
+            // @spec EL-UI-031a, EL-UI-031b
+            if (imagePath == null) {
+                TextButton(onClick = { showImageSourceDialog = true }) { Text(stringResource(R.string.action_add_image)) }
+            } else {
+                AsyncImage(
+                    model = File(imagePath!!).toUri(),
+                    contentDescription = "Attached photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { viewModel.removeImage() }) { Text(stringResource(R.string.action_remove)) }
+                    TextButton(onClick = { showImageSourceDialog = true }) { Text(stringResource(R.string.action_replace)) }
+                }
             }
 
             Button(
                 onClick = { scope.launch { viewModel.save() } },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
 
             Spacer(modifier = Modifier.height(16.dp))

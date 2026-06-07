@@ -34,9 +34,16 @@ class HomeViewModelTest {
         val anchor: Instant = Instant.parse("2024-01-15T12:00:00Z")
     }
 
-    private fun makeCategory(id: String, name: String = id) = Category(
+    private fun makeMeta(id: String, name: String = id) = Category.MetaCategory(
         id = id, name = name, emoji = "📌", color = 0xFFE53935L,
-        valueType = ValueType.None, unit = null, allowEmptyText = true, sortOrder = 0,
+        valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = 0,
+    )
+
+    private fun makeCategory(id: String, name: String = id) = makeMeta(id, name)
+
+    private fun makeSub(id: String, parent: Category.MetaCategory) = Category.SubCategory(
+        id = id, name = id, emoji = null, color = null, valueType = null,
+        defaultValue = null, allowEmptyText = true, sortOrder = 0, parent = parent,
     )
 
     private fun makeEvent(
@@ -74,12 +81,45 @@ class HomeViewModelTest {
     }
 
     // @spec EL-UI-011
-    @Test fun `active filter shows only events from that category`() = runTest {
+    @Test fun `TopLevel filter shows events from MetaCategory and its SubCategories`() = runTest {
+        val meta = makeMeta("m1")
+        val sub = makeSub("s1", parent = meta)
+        val other = makeMeta("m2")
+        repo.setCategories(meta, sub, other)
+        repo.setEvents(
+            makeEvent("e_meta", "m1"),
+            makeEvent("e_sub", "s1"),
+            makeEvent("e_other", "m2"),
+        )
+        vm.setFilter(ActiveFilter.TopLevel(meta))
+        vm.dayGroups.test {
+            val ids = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().map { it.event.id }
+            assertTrue(ids.contains("e_meta"))
+            assertTrue(ids.contains("e_sub"))
+            assertTrue(ids.none { it == "e_other" })
+        }
+    }
+
+    // @spec EL-UI-011
+    @Test fun `Sub filter shows only SubCategory events`() = runTest {
+        val meta = makeMeta("m1")
+        val sub = makeSub("s1", parent = meta)
+        repo.setCategories(meta, sub)
+        repo.setEvents(makeEvent("e_meta", "m1"), makeEvent("e_sub", "s1"))
+        vm.setFilter(ActiveFilter.Sub(meta, sub))
+        vm.dayGroups.test {
+            val ids = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().map { it.event.id }
+            assertEquals(listOf("e_sub"), ids)
+        }
+    }
+
+    // @spec EL-UI-011
+    @Test fun `active TopLevel filter shows only events from that MetaCategory and its children`() = runTest {
         val cat1 = makeCategory("c1")
         val cat2 = makeCategory("c2")
         repo.setCategories(cat1, cat2)
         repo.setEvents(makeEvent("e1", "c1"), makeEvent("e2", "c2"))
-        vm.setFilter(cat1)
+        vm.setFilter(ActiveFilter.TopLevel(cat1))
         vm.dayGroups.test {
             val groups = awaitItem()
             val allEntries = groups.flatMap { it.events }.filterIsInstance<DayEntry.Entry>()
@@ -93,36 +133,57 @@ class HomeViewModelTest {
         val cat2 = makeCategory("c2")
         repo.setCategories(cat1, cat2)
         repo.setEvents(makeEvent("e1", "c1"), makeEvent("e2", "c2"))
-        vm.setFilter(cat1)
-        vm.setFilter(null)
-        assertNull(vm.activeFilter.value)
+        vm.setFilter(ActiveFilter.TopLevel(cat1))
+        vm.setFilter(ActiveFilter.All)
+        assertEquals(ActiveFilter.All, vm.activeFilter.value)
         val allEntries = vm.dayGroups.value.flatMap { it.events }.filterIsInstance<DayEntry.Entry>()
         assertEquals(listOf("e1", "e2"), allEntries.map { it.event.id })
     }
 
     // @spec EL-UI-013b
-    @Test fun `active filter cleared when its category is deleted`() = runTest {
+    @Test fun `TopLevel filter cleared to All when MetaCategory is deleted`() = runTest {
         val cat = makeCategory("c1")
         repo.setCategories(cat)
-        vm.setFilter(cat)
+        vm.setFilter(ActiveFilter.TopLevel(cat))
         repo.deleteCategory("c1")
-        vm.activeFilter.test { assertNull(awaitItem()) }
+        vm.activeFilter.test { assertEquals(ActiveFilter.All, awaitItem()) }
+    }
+
+    // @spec EL-UI-013b
+    @Test fun `Sub filter cleared to All when SubCategory is deleted`() = runTest {
+        val meta = makeMeta("m1")
+        val sub = makeSub("s1", parent = meta)
+        repo.setCategories(meta, sub)
+        vm.setFilter(ActiveFilter.Sub(meta, sub))
+        repo.deleteCategory("s1")
+        vm.activeFilter.test { assertEquals(ActiveFilter.All, awaitItem()) }
+    }
+
+    // @spec EL-UI-013b
+    @Test fun `Sub filter promoted to TopLevel when parent MetaCategory is deleted`() = runTest {
+        val meta = makeMeta("m1")
+        val sub = makeSub("s1", parent = meta)
+        repo.setCategories(meta, sub)
+        vm.setFilter(ActiveFilter.Sub(meta, sub))
+        // Simulate UI flow: sub promoted to MetaCategory first, then parent deleted
+        repo.saveCategory(makeMeta("s1"))
+        repo.deleteCategory("m1")
+        vm.activeFilter.test {
+            val filter = awaitItem()
+            assertTrue(filter is ActiveFilter.TopLevel && filter.category.id == "s1")
+        }
     }
 
     // @spec EL-UI-017
     @Test fun `pre-filter position recorded on first filter apply`() = runTest {
         val cat = makeCategory("c1")
         repo.setCategories(cat)
-        vm.setFilter(cat)
-        // preFilterTopDay should be set (value may be today or null if no events — implementation decides)
-        // The key behavior: it is recorded on the transition from null→filter
-        // We verify it is non-null after first filter apply with events present
+        vm.setFilter(ActiveFilter.TopLevel(cat))
         repo.setEvents(makeEvent("e1", "c1"))
-        vm.setFilter(null)
-        vm.setFilter(cat)
+        vm.setFilter(ActiveFilter.All)
+        vm.setFilter(ActiveFilter.TopLevel(cat))
         vm.preFilterTopDay.test {
             val recorded = awaitItem()
-            // recorded should be set when filter applied from unfiltered state
             assertTrue(recorded != null || vm.dayGroups.value.isEmpty())
         }
     }
@@ -133,9 +194,9 @@ class HomeViewModelTest {
         val cat2 = makeCategory("c2")
         repo.setCategories(cat1, cat2)
         repo.setEvents(makeEvent("e1", "c1", timestamp = anchor), makeEvent("e2", "c2", timestamp = anchor))
-        vm.setFilter(cat1)
+        vm.setFilter(ActiveFilter.TopLevel(cat1))
         val recordedAfterFirst = vm.preFilterTopDay.value
-        vm.setFilter(cat2)
+        vm.setFilter(ActiveFilter.TopLevel(cat2))
         assertEquals("switching filters must not update pre-filter record", recordedAfterFirst, vm.preFilterTopDay.value)
     }
 
@@ -144,7 +205,7 @@ class HomeViewModelTest {
         val cat = makeCategory("c1")
         repo.setCategories(cat)
         repo.setEvents(makeEvent("e1", "c1"))
-        vm.setFilter(cat)
+        vm.setFilter(ActiveFilter.TopLevel(cat))
         vm.onUserScrolled()
         assertNull(vm.preFilterTopDay.value)
     }
@@ -154,10 +215,8 @@ class HomeViewModelTest {
         val cat = makeCategory("c1")
         repo.setCategories(cat)
         repo.setEvents(makeEvent("e1", "c1"))
-        vm.setFilter(cat)
-        val recorded = vm.preFilterTopDay.value
-        vm.setFilter(null)
-        // After clearing, preFilterTopDay should be null (consumed) and scroll restored
+        vm.setFilter(ActiveFilter.TopLevel(cat))
+        vm.setFilter(ActiveFilter.All)
         assertNull(vm.preFilterTopDay.value)
     }
 
@@ -279,20 +338,19 @@ class HomeViewModelTest {
     }
 
     // @spec EL-UI-002
-    @Test fun `DayEntry Entry has null category for orphaned event`() = runTest {
-        repo.setEvents(makeEvent("e1", "c1"))
+    @Test fun `event with no matching category is omitted from dayGroups`() = runTest {
+        repo.setEvents(makeEvent("e1", "nonexistent"))
         vm.dayGroups.test {
-            val groups = awaitItem()
-            val entry = groups.flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
-            assertNull(entry.category)
+            val entries = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>()
+            assertTrue(entries.isEmpty())
         }
     }
 
     // @spec EL-UI-061
     @Test fun `DayEntry Entry hasMismatch is true when event value does not match category type`() = runTest {
-        val cat = Category(
+        val cat = Category.MetaCategory(
             id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
-            valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
+            valueType = ValueType.Scale, defaultValue = null, allowEmptyText = true, sortOrder = 0,
         )
         repo.setCategories(cat)
         val event = Event(
@@ -309,9 +367,9 @@ class HomeViewModelTest {
 
     // @spec EL-UI-061
     @Test fun `DayEntry Entry hasMismatch is false when value matches category type`() = runTest {
-        val cat = Category(
+        val cat = Category.MetaCategory(
             id = "c1", name = "Scale Cat", emoji = "📌", color = 0xFFE53935L,
-            valueType = ValueType.Scale, unit = null, allowEmptyText = true, sortOrder = 0,
+            valueType = ValueType.Scale, defaultValue = null, allowEmptyText = true, sortOrder = 0,
         )
         repo.setCategories(cat)
         val event = Event(
@@ -328,9 +386,9 @@ class HomeViewModelTest {
 
     // @spec EL-UI-061
     @Test fun `DayEntry Entry hasMismatch is false when ErrorValue inferredType matches Unknown category`() = runTest {
-        val cat = Category(
+        val cat = Category.MetaCategory(
             id = "c1", name = "Future Cat", emoji = "📌", color = 0xFFE53935L,
-            valueType = ValueType.Unknown("future_type"), unit = null, allowEmptyText = true, sortOrder = 0,
+            valueType = ValueType.Unknown("future_type"), defaultValue = null, allowEmptyText = true, sortOrder = 0,
         )
         repo.setCategories(cat)
         val event = Event(
@@ -345,17 +403,4 @@ class HomeViewModelTest {
         }
     }
 
-    // @spec EL-UI-061
-    @Test fun `DayEntry Entry hasMismatch is false for orphaned event with no category`() = runTest {
-        val event = Event(
-            id = "e1", categoryId = "nonexistent", timestamp = anchor,
-            value = EventValue.Scale(7),
-            notes = null, imagePaths = emptyList(), createdAt = anchor,
-        )
-        repo.setEvents(event)
-        vm.dayGroups.test {
-            val entry = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
-            assertFalse(entry.hasMismatch)
-        }
-    }
 }

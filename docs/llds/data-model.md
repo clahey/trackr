@@ -155,19 +155,70 @@ The converter lives in the `local-storage` segment (it's a Room concern) but con
 
 ## Domain Models
 
-These are plain Kotlin data classes with no framework dependencies.
+These are plain Kotlin domain types with no framework dependencies.
+
+`Category` is a sealed class with two variants. `MetaCategory` is a top-level category whose emoji, color, and valueType are always explicitly set. `SubCategory` is a child of a `MetaCategory`; its emoji, color, and valueType are nullable — null means inherit from the parent.
 
 ```kotlin
-data class Category(
-    val id: String,              // UUID string
-    val name: String,
-    val emoji: String,           // single emoji character
-    val color: Long,             // ARGB packed as Long (matches Compose Color's internal rep)
-    val valueType: ValueType,
-    val unit: String?,           // only meaningful when valueType == NUMBER
-    val allowEmptyText: Boolean, // only meaningful when valueType == TEXT; read by event UI to gate submission
-    val sortOrder: Int,          // ascending; lower = higher in list; new categories get currentMin - 1
-)
+sealed class Category {
+    abstract val id: String
+    abstract val name: String
+    abstract val defaultValue: EventValue?
+    abstract val allowEmptyText: Boolean
+    abstract val sortOrder: Int
+    abstract val resolvedEmoji: String
+    abstract val resolvedColor: Long
+    abstract val resolvedValueType: ValueType
+    abstract val resolvedDefaultValue: EventValue?
+
+    data class MetaCategory(
+        override val id: String,
+        override val name: String,
+        val emoji: String,               // always non-null
+        val color: Long,                 // ARGB packed as Long; always non-null
+        val valueType: ValueType,        // always non-null
+        override val defaultValue: EventValue?,
+        override val allowEmptyText: Boolean,
+        override val sortOrder: Int,     // ascending within the top-level list
+    ) : Category() {
+        override val resolvedEmoji get() = emoji
+        override val resolvedColor get() = color
+        override val resolvedValueType get() = valueType
+        override val resolvedDefaultValue get() = defaultValue
+    }
+
+    data class SubCategory(
+        override val id: String,
+        override val name: String,
+        val emoji: String?,              // null = inherit from parent
+        val color: Long?,               // null = inherit from parent
+        val valueType: ValueType?,       // null = inherit from parent
+        override val defaultValue: EventValue?,  // null = inherit from parent
+        override val allowEmptyText: Boolean,
+        override val sortOrder: Int,     // ascending within the parent's subcategory list
+        val parent: MetaCategory,        // always non-null; populated at repository layer
+    ) : Category() {
+        override val resolvedEmoji get() = emoji ?: parent.emoji
+        override val resolvedColor get() = color ?: parent.color
+        override val resolvedValueType get() = valueType ?: parent.valueType
+        override val resolvedDefaultValue get() = defaultValue ?: parent.defaultValue
+    }
+}
+```
+
+The resolved properties require no null-assertion operators — the type system guarantees `MetaCategory` fields are non-null and `SubCategory` always has a non-null parent. All UI and ViewModel code uses `resolvedEmoji`, `resolvedColor`, `resolvedValueType` for display and behaviour. The raw nullable fields are inspected only to determine whether a subcategory overrides a specific field.
+
+**DB entity** (`CategoryEntity`) remains a flat table with `parentId: String?` column; the sealed class variants are assembled in the repository layer. `getCategories()` and `getCategoryById()` use a LEFT JOIN:
+
+```sql
+SELECT c.*, p.* FROM categories c
+LEFT JOIN categories p ON c.parentId = p.id
+WHERE [condition]
+```
+
+The repository builds a `MetaCategory` for every row where `parentId IS NULL` and a `SubCategory` for every row where `parentId IS NOT NULL`, attaching the parent instance directly. No persistent category cache is needed — the parent map is built fresh per query emission.
+
+**Two-level constraint:** no `MetaCategory` has a non-null `parentId` (encoded in the type — `MetaCategory` has no `parentId` field). No `SubCategory` may have children; this is enforced by the repository (throws on attempt) and prevented in the UI (the create-subcategory action is not shown for a category that already has children, and the add-to-group action is not shown for a category that already has children).
 
 data class Event(
     val id: String,                  // UUID string
@@ -198,11 +249,23 @@ When two events share the same `timestamp`, the canonical sort order is `created
 
 `Category.allowEmptyText` controls whether empty strings may be submitted for `TEXT`-type events. This is a domain field read by the event logging UI — the UI gates submission on it, but the domain model itself does not reject `TextValue("")`. The MVP category editor does not expose this setting; all UI-created categories are initialized with `allowEmptyText = true`.
 
-### Unit: category default vs. event snapshot
+### Default value: category default vs. event snapshot
 
-`Category.unit` is the default unit presented to the user when logging a new event. At log time, `NumberValue.unit` is populated from `Category.unit` — each event stores its own copy. This means historical events retain the unit that was in effect when they were logged, even if the category's unit is later changed. `Category.unit` and `NumberValue.unit` may therefore diverge for historical records; this is correct behavior, not an inconsistency.
+`Category.defaultValue` is the default `EventValue` presented to the user when logging a new event for this category. At log time, the default seeds the initial `ValueUIState` — each event then stores its own copy of the value, which the user may edit before saving. Historical events retain the value that was entered at log time; changing `Category.defaultValue` does not retroactively update existing events.
 
-When `valueType != NUMBER`, `Category.unit` is ignored. It is not an error for it to be non-null.
+`defaultValue` should be consistent with `resolvedValueType` (e.g., a `NumberValue` for a Number category). If they diverge (e.g., due to a valueType change), callers treat `defaultValue` as null. The category editor always constructs `defaultValue` from the current form state based on the active `valueType`, so divergence can only arise from direct DB writes or future migrations.
+
+For **Number** categories, `defaultValue` is always a `NumberValue(0.0, unit)` where `unit` is the user-supplied unit string (null if blank). For **Exercise** categories, `defaultValue` is always an `ExerciseValue(sets, reps)`. For all other types, `defaultValue` is null unless explicitly set by a future feature.
+
+### Category hierarchy: inheritance and constraints
+
+The two-level hierarchy is enforced entirely at the repository and UI layers; the domain types themselves carry no runtime checks.
+
+**Inheritance:** a `SubCategory` field is inherited when its value is null. The resolved value is always the non-null fallback from the parent (guaranteed non-null by the `MetaCategory` type). `defaultValue` is inheritable — `SubCategory.defaultValue = null` means inherit the parent's `defaultValue`. `allowEmptyText` is not inheritable — it is always set explicitly on both MetaCategory and SubCategory.
+
+**Reparenting an existing category into a group:** all current explicit field values are kept as overrides regardless of whether they match the new parent's values. The caller is responsible for providing the correct field values; the repository performs no automatic field-merging on reparent.
+
+**Un-nesting (removing from group):** any null field on the SubCategory is set to the parent's current value at the time the operation is committed, then `parentId` is cleared and the record becomes a MetaCategory.
 
 ### Value type mismatch helpers
 
@@ -218,6 +281,8 @@ All four live in `domain/ValueTypeConversion.kt` alongside `convertEventValue`.
 ### ValueType change on a Category
 
 Changing a category's `valueType` is permitted and handled at the repository layer — the domain model does not prevent it. When a type change is saved, `TrackrRepository.saveCategoryAndMigrateEvents(category, fromType)` runs an atomic transaction: it upserts the category and migrates all historical events by calling `convertEventValue(event.value, category.valueType)` on each one.
+
+For a `MetaCategory`, the migration also covers events belonging to any `SubCategory` whose `valueType` is null (inheriting the parent's type) — those subcategories' effective type changes alongside the parent's. SubCategories with an explicit `valueType` override are excluded from the migration pass and keep their own type unchanged.
 
 `convertEventValue` performs best-effort conversion — e.g., `Scale(7)` → `NumberValue(7.0, null)` when changing Scale → Number, or `TextValue("7")` → `Scale(7)` when changing Text → Scale. When no conversion path exists (e.g., `DurationValue` → `Scale`), the original value is returned unchanged, leaving the event with a mismatched value in the database.
 
@@ -236,6 +301,8 @@ Mismatches can also arise when reading data written by a newer app version (an `
 | Image storage | File paths in `imagePaths: List<String>` | Blob in DB; separate images table | File paths keep the DB row small; blobs bloat SQLite and slow queries; separate table adds join overhead for a simple ordered list |
 | Image path type | Absolute path string | URI string; relative path | Absolute paths are unambiguous at read time; URI strings require resolution context; relative paths need a known root |
 | Empty text policy | `Category.allowEmptyText` field; enforced in event UI | Domain-layer rejection; hardcoded UI rule | Storing the policy on Category makes it inspectable and extensible without code changes; UI enforcement (not domain) keeps the domain model simple |
+| Category hierarchy | `Category` sealed class (`MetaCategory` / `SubCategory`); nullable inheritable fields on SubCategory | Single `data class` with nullable fields + `!!` operators; separate `ResolvedCategory` wrapper type | Sealed class encodes invariants in the type system: MetaCategory fields are provably non-null, SubCategory parent is provably non-null, no `!!` needed anywhere; a `ResolvedCategory` wrapper adds an extra type to thread through every call site |
+| Category assembly from DB | LEFT JOIN in a single query; parent assembled in repository layer | Two queries in a transaction; always-eager join via Room `@Relation` | Single JOIN is atomic by nature (one read), simpler than a two-query transaction, and more explicit than `@Relation` about what is being loaded |
 
 ## Open Questions & Future Decisions
 

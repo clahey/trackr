@@ -1,5 +1,7 @@
 package com.trackr.app.ui.theme
 
+val DEFAULT_CATEGORY_COLOR: Long get() = categoryColorPalette[0]
+
 val categoryColorPalette: List<Long> = listOf(
     0xFFE53935L, // Red
     0xFFFB8C00L, // Orange

@@ -11,6 +11,7 @@ import com.trackr.app.domain.Category
 import com.trackr.app.domain.Event
 import com.trackr.app.domain.ValueType
 import com.trackr.app.domain.convertEventValue
+import com.trackr.app.ui.theme.DEFAULT_CATEGORY_COLOR
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -29,23 +30,46 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     private val nextColorKey = intPreferencesKey("next_category_color_index")
 
+    // @spec CAT-UI-001
     override fun getCategories(): Flow<List<Category>> =
-        categoryDao.getAll().map { it.map { e -> e.toDomain() } }
+        categoryDao.getAll().map { entities ->
+            entities.toDomainList().sortedWith(compareBy(
+                { cat -> if (cat is Category.SubCategory) cat.parent.sortOrder else cat.sortOrder },
+                { it is Category.SubCategory },
+                { it.sortOrder },
+            ))
+        }
 
     override fun getCategoryById(id: String): Flow<Category?> =
-        categoryDao.getById(id).map { it?.toDomain() }
+        categoryDao.getByIdWithParent(id).map { it?.toDomain() }
 
+    // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
-        categoryDao.upsert(category.toEntity())
+        db.withTransaction {
+            if (category is Category.SubCategory) {
+                val childCount = categoryDao.countByParentIdOnce(category.id)
+                require(childCount == 0) {
+                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
+                }
+            }
+            categoryDao.upsert(category.toEntity())
+        }
     }
 
-    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035
+    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021, DM-DATA-028
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
+        val targetType = category.resolvedValueType
         db.withTransaction {
+            if (category is Category.SubCategory) {
+                val childCount = categoryDao.countByParentIdOnce(category.id)
+                require(childCount == 0) {
+                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
+                }
+            }
             categoryDao.upsert(category.toEntity())
-            eventDao.getByCategoryOnce(category.id).forEach { entity ->
+            eventDao.getByCategoryIncludingChildrenWithNullTypeOnce(category.id).forEach { entity ->
                 val event = entity.toDomain()
-                val newValue = convertEventValue(event.value, category.valueType)
+                val newValue = convertEventValue(event.value, targetType)
                 if (newValue != event.value) {
                     eventDao.upsert(event.copy(value = newValue).toEntity())
                 }
@@ -54,9 +78,23 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     }
 
     // @spec LS-BE-031
+    // @spec CAT-UI-006
     override suspend fun deleteCategory(id: String) {
-        val imagePaths = eventDao.getByCategoryOnce(id).flatMap { it.imagePaths() }
-        categoryDao.deleteById(id)
+        var imagePaths: List<String> = emptyList()
+        db.withTransaction {
+            val parent = categoryDao.getByIdOnce(id)
+            val children = categoryDao.getChildrenByParentIdOnce(id)
+            for (child in children) {
+                categoryDao.upsert(child.copy(
+                    parentId = null,
+                    emoji = child.emoji ?: parent?.emoji ?: "",
+                    color = child.color ?: parent?.color ?: DEFAULT_CATEGORY_COLOR,
+                    valueType = child.valueType ?: parent?.valueType ?: "none",
+                ))
+            }
+            imagePaths = eventDao.getByCategoryOnce(id).flatMap { it.imagePaths() }
+            categoryDao.deleteById(id)  // Room CASCADE deletes the category's own events
+        }
         imagePaths.forEach { imageStore.delete(it) }
     }
 
@@ -64,8 +102,14 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         categoryDao.updateSortOrders(orderedIds)
     }
 
-    override fun getEventCountForCategory(categoryId: String): Flow<Int> =
-        eventDao.countByCategory(categoryId)
+    override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> =
+        if (includeSubCategoriesWithNullType)
+            eventDao.countByCategoryIncludingChildrenWithNullType(categoryId)
+        else
+            eventDao.countByCategory(categoryId)
+
+    override fun getSubCategoryCount(categoryId: String): Flow<Int> =
+        categoryDao.countByParentId(categoryId)
 
     override fun getEvents(start: Instant?, end: Instant?): Flow<List<Event>> {
         val startMs = start?.toEpochMilli()
@@ -82,6 +126,10 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getEventsByCategory(categoryId: String): Flow<List<Event>> =
         eventDao.getByCategory(categoryId).map { it.map { e -> e.toDomain() } }
 
+    // @spec EL-UI-011
+    override fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>> =
+        eventDao.getByCategoryIncludingChildren(id).map { it.map { e -> e.toDomain() } }
+
     override fun getEventById(id: String): Flow<Event?> =
         eventDao.getById(id).map { it?.toDomain() }
 
@@ -95,8 +143,10 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     // @spec LS-BE-030
     override suspend fun deleteEvent(id: String) {
-        val imagePaths = eventDao.getByIdOnce(id)?.imagePaths() ?: emptyList()
         eventDao.deleteById(id)
+    }
+
+    override suspend fun deleteEventFiles(imagePaths: List<String>) {
         imagePaths.forEach { imageStore.delete(it) }
     }
 

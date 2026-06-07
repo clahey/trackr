@@ -10,28 +10,63 @@ The segment owns two screens (category list and category edit), their ViewModels
 
 ### Category List Screen
 
-Displays all categories ordered by `sortOrder ASC` (user-defined). Each row shows the category emoji, name, and value type. Supports:
+Displays all categories ordered by `sortOrder ASC` (user-defined). MetaCategories appear as top-level rows; their SubCategories are displayed visually nested beneath them (indented or grouped). Each row shows the category's resolved emoji, name, and resolved value type. Supports:
 
 - Navigate to **Category Edit** for a new category (FAB, primary action)
 - Navigate to **Category Edit** for an existing category (tap row)
 - Delete a category (long-press row → context menu)
-- Reorder categories (drag handle on each row; calls `repository.reorderCategories()` on drop)
+- Reorder categories (drag handle on each row; calls `repository.reorderCategories()` on drop; SubCategories can only be reordered within their parent's group)
+- Group operations (long-press row → context menu, items depend on category type):
 
-**Delete confirmation:** before deleting, query the event count for that category. If count > 0, show a confirmation dialog stating how many events will be permanently deleted. If count = 0, delete immediately without confirmation.
+| Category type | Long-press group actions |
+|---|---|
+| `MetaCategory` with SubCategories | *(no group operations — cannot be nested while it has children)* |
+| `MetaCategory` with no SubCategories | **"Add to group"** — open group picker to select a parent |
+| `SubCategory` | **"Move to another group"**; **"Remove from group"** |
+
+The **group picker** (used by "Add to group" and "Move to another group") lists all eligible MetaCategories (excluding the current parent for "Move to another group"). It always includes a **"Create new group"** option that creates a new MetaCategory and immediately sets it as the parent — this is why "Move to another group" is always available for SubCategories even when no other MetaCategory currently exists. When reparenting, all current explicit field values are preserved as overrides.
+
+**Delete confirmation and child promotion:** when a MetaCategory is deleted, its SubCategories are **promoted to top-level MetaCategories** rather than deleted. Any null (inherited) fields on each SubCategory are resolved to the parent's current values at the time of deletion before the parent is removed. The delete operation is atomic: promotion of all children and deletion of the parent happen in a single transaction.
+
+Because children are promoted (not deleted), the event count shown in the delete confirmation covers only the category's **own** events (for a MetaCategory, not its children's). The confirmation dialog renders two optional sentences: (1) if `ownEventCount > 0`, state the number of events that will be permanently deleted; (2) if `subCategoryCount > 0`, state the number of SubCategories that will be promoted to top-level categories. At least one sentence is always shown when a dialog appears. Silent deletion (no dialog) is allowed when `ownEventCount == 0 && subCategoryCount == 0`. `DeleteConfirmation` carries `ownEventCount` and `subCategoryCount` only — no `isMetaCategory`. Both ViewModels' `confirmDelete()` call `repository.deleteCategory(id)` unconditionally; the repository handles promotion internally. The dialog implementation is extracted as a shared `DeleteCategoryDialog` composable used by both the list and edit screens.
 
 ### Category Edit Screen
 
-Used for both create and edit. Toolbar contains a **Delete** action (visible only when editing an existing category). Fields:
+Used for both create and edit. Toolbar contains a **Delete** action (visible only when editing an existing category). For a MetaCategory, the toolbar also contains a **"Create subcategory"** action.
 
-| Field | Input | Shown when |
-|---|---|---|
-| Name | Text field | Always |
-| Emoji | Single-character text field (system emoji keyboard) | Always |
-| Color | Preset color palette picker; out-of-palette swatch if current color is not in palette | Always |
-| Value type | Segmented picker / dropdown | Always |
-| Unit | Text field | `valueType == Number` only |
+**Live preview card** — always visible on the edit screen. Renders the shared `EventRow` composable (from `ui/components/EventRow.kt`) with a synthetic `Category` built from current VM state and a placeholder `Event` whose fields are: `notes = "Notes"`, `onClick = {}`, `hasMismatch = false`, and a type-appropriate sample value:
+
+| Effective value type | Placeholder event value |
+|---|---|
+| None | `null` |
+| Number | `NumberValue(42.0, unit)` where `unit` is the current unit field value (null if blank) |
+| Scale | `ScaleValue(7)` |
+| Boolean | `BooleanValue(true)` |
+| Text | `TextValue("Sample")` |
+| Duration | `DurationValue(90s)` |
+| Exercise | `ExerciseValue(sets=3, reps=15)` |
+
+`onClick = null` (non-interactive). Timestamp fixed at noon local time so the time-of-day column always reads "12:00". Updates reactively as any field changes.
+
+**Fields:**
+
+| Field | Input | Shown when | SubCategory inherit option |
+|---|---|---|---|
+| Name | Text field | Always | N/A — name is never inherited |
+| Emoji | Single-character text field (system emoji keyboard) | Always | SubCategory only: "Inherit" checkbox to the left of the text field. When checked (inheriting), the field is non-editable and shows the parent's emoji. When unchecked (custom), the field is editable. Custom value is preserved in `EmojiUIState` across mode switches. |
+| Color | Preset color palette picker; out-of-palette swatch if current color is not in palette | Always | Extra circle in the palette row showing the parent's color with a small label; selecting it sets `color = null` (inherit) |
+| Value type | Segmented picker / dropdown | Always | Extra "Same as [ParentName] ([TypeName])" row in the picker (e.g., "Same as Running (Exercise)"); selecting it sets `valueType = null` (inherit) |
+| Default value | Type-dependent sub-fields (see below) | effective `valueType == Number` or `Exercise` | N/A (not shown for other inherited types) |
+
+For a **MetaCategory**, none of the "inherit" options are shown (there is no parent). For a **SubCategory**, each inheritable field shows its inherit option. The inherit option for each field is shown first / in a visually distinct position so it is clearly a different kind of choice.
+
+**Default value fields** (shown only when the effective `valueType` is `Number` or `Exercise`):
+- **Number**: a single "Unit (optional)" text field. The stored `defaultValue` is always `NumberValue(0.0, unit)` where `unit` is null when the field is blank. The number component is fixed at 0 — the user edits the unit only.
+- **Exercise**: two integer fields labeled "Default sets" and "Default reps", initialized to 3 and 15. Both must be ≥ 1 to save. The stored `defaultValue` is `ExerciseValue(sets, reps)`.
 
 `allowEmptyText` is not exposed in the MVP editor; always written as `true` for new categories.
+
+**Creating a subcategory:** tapping "Create subcategory" opens a new Category Edit screen with `parentId` set to the current MetaCategory. All inheritable fields open in the inherited state (null) so the subcategory tracks the parent by default. The live preview immediately reflects the inherited values. The user may override any field before saving.
 
 **ValueType change warning and migration:** when saving a category edit with a changed `valueType`, the system migrates all existing event values using the conversion table below. Conversions listed as **fully safe** are silent — no inline warning is shown while editing. All other conversions show an inline warning below the value type picker while the changed type is selected; the warning disappears if the user reverts the type. Event values that cannot be converted per the table are left unchanged.
 
@@ -77,20 +112,30 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 
 ### CategoryEditViewModel
 
-- Accepts an optional `categoryId`; loads existing category on init if provided
+- Accepts an optional `categoryId` and an optional `parentId` (set when creating a subcategory from a parent's edit screen); loads existing category on init if `categoryId` is provided
 - **Stale category guard:** if `getCategoryById` returns null on init (edit mode only), sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The category list screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
-- Exposes form field state as individual `StateFlow`s (or a single `FormState` data class)
-- `save()`: validates all fields, constructs a `Category` with a new UUID (create) or existing id (edit), calls `repository.saveCategory()`
+- `parent: StateFlow<Category.MetaCategory?>` — loaded when `parentId` is non-null; drives the inherit/override UI and effective value resolution
+- **Per-field form state for inheritable fields** (SubCategory mode only): `emojiUIState: MutableStateFlow<EmojiUIState>`, `colorState: MutableStateFlow<Long?>`, `valueTypeState: MutableStateFlow<ValueType?>`. `EmojiUIState(mode: EmojiMode, customValue: String)` where `mode` ∈ {INHERIT, CUSTOM}; `customValue` is always preserved across mode switches so switching back to Custom restores the previous entry. `colorState` and `valueTypeState` remain null = inherit. For MetaCategory, `emojiUIState` is always CUSTOM.
+- **Default value form state**: `numberDefaultUnit: MutableStateFlow<String>` (used when effective `valueType == Number`); `exerciseDefaultSets: MutableStateFlow<String>` and `exerciseDefaultReps: MutableStateFlow<String>` (used when effective `valueType == Exercise`), initialized to "3" and "15".
+  - **On load (edit mode)**: `numberDefaultUnit` is seeded from `(storedDefaultValue as? NumberValue)?.unit ?: ""`; `exerciseDefaultSets`/`Reps` from `(storedDefaultValue as? ExerciseValue)?.sets/reps` or the "3"/"15" fallback.
+  - **On load (SubCategory create mode)**: pre-populate `numberDefaultUnit` and `exerciseDefaultSets`/`Reps` from the parent's `resolvedDefaultValue` (same pattern as `emojiUIState.customValue`); the stored `defaultValue` starts as null (inherit). A `defaultValueDirty: Boolean` flag (false on open) tracks whether the user has edited any default field; it is set to true on any edit.
+  - **On save**: for Number and Exercise, compose and save the default value only if `defaultValueDirty` is true (or if in edit mode, where there is no inherited state to preserve). In SubCategory create mode with `defaultValueDirty == false`, save `defaultValue = null` (inherit). For Number (when saving), compose `NumberValue(existingStoredDefault?.value ?: 0.0, newUnit)` — the existing numeric value is preserved; only the unit is updated. For Exercise, compose `ExerciseValue(sets, reps)`. For all other types, leave `defaultValue` completely unchanged (do not overwrite it with null, even if the category editor does not show default fields). This ensures that unexpected or future-typed defaults are preserved.
+- **Effective values** (derived `StateFlow`s): `effectiveEmoji: StateFlow<String?>`, `effectiveColor: StateFlow<Long?>`, `effectiveValueType: StateFlow<ValueType?>` — each combines the corresponding state field with `parent` to resolve null to the parent's value; used by the live preview and validation
+- `isEmojiInherited`, `isColorInherited`, `isValueTypeInherited` — `StateFlow<Boolean>` derived from whether the corresponding state is null; drive the inherit-option selection state in the UI
+- `save()`: validates all fields using effective values; for a MetaCategory, validates that emoji/color/valueType are non-null (always true since there's no parent); for a SubCategory, the effective values are guaranteed non-null via parent fallback; constructs the appropriate `Category` sealed class variant
 - Exposes `saveResult: StateFlow<SaveResult>` (`Idle`, `Success`, `ValidationError`)
-- `eventCount: StateFlow<Int>` — live count from `repository.getEventCountForCategory()`; drives delete button visibility and ValueType change warning (both trigger when count > 0)
-- `valueTypeWarning: StateFlow<ValueTypeWarningTier?>` — null when no warning (conversion is reversible, `eventCount == 0`, or `valueType == originalValueType`); otherwise one of three tiers derived from the conversion table:
+- `ownEventCount: StateFlow<Int>` — live count of events belonging directly to this category, from `repository.getEventCountForCategory(categoryId, includeSubCategories = false)`; used with `subCategoryCount` to determine whether a confirmation dialog is needed before deletion
+- `subCategoryCount: StateFlow<Int>` — live count of SubCategories whose `parentId` equals this category's id; zero for SubCategories and new categories; used alongside `ownEventCount` to gate the silent-delete path
+- `affectedEventCount: StateFlow<Int>` — live count from `repository.getEventCountForCategory(categoryId, includeSubCategoriesWithNullType = true)`, covering the category's own events plus events of SubCategories whose `valueType` is null (inheriting the parent's type); for a SubCategory (which has no children), this equals its own event count; drives the ValueType change warning (a MetaCategory type change migrates inheriting children too)
+- `valueTypeWarning: StateFlow<ValueTypeWarningTier?>` — null when no warning (conversion is reversible, `affectedEventCount == 0`, or effective `valueType == originalValueType`); otherwise one of three tiers derived from the conversion table:
   - `IrreversibleSafe`: conversion is fully safe but not reversible (e.g. None→Number, Duration→Text); message: *"Existing events will be converted. This change cannot be reversed by switching back."*
   - `Partial`: conversion migrates what it can but some events may not convert (e.g. Text→Number, Text→Boolean); message: *"Some existing events may not be convertible and will display incorrectly."*
   - `Unsafe`: no migration is performed — all other pairs (e.g. Number→None); message: *"Existing events cannot be converted and will display incorrectly."*
-- `originalValueType` is set at load time; null for new categories, so `valueTypeWarning` is always null in create mode
-- `save()`: when `valueType != originalValueType` (edit mode only), calls `repository.saveCategoryAndMigrateEvents(category, originalType)` to persist the category and migrate events atomically; otherwise calls `repository.saveCategory(category)`
-- New categories are assigned `sortOrder = currentMin - 1` (placing them at the top); the repository provides the current minimum via `CategoryDao.getMinSortOrder()`
-- New categories pre-populate `color` on init via `repository.getAndIncrementNextCategoryColorIndex()`, which returns `index % paletteSize` mapped to the preset palette; the counter is monotonically increasing and unaffected by deletions. The user may override the pre-selected color in the picker before saving. `save()` always uses `color.value` for both new and existing categories.
+- `originalValueType` is set at load time to the **effective** valueType: for a MetaCategory it is `category.valueType`; for a SubCategory with a non-null override it is the override; for a SubCategory with null valueType (inheriting) it is `parent.valueType`. Null only for new categories, so `valueTypeWarning` is always null in create mode
+- `save()`: when effective `valueType != originalValueType` (edit mode only), calls `repository.saveCategoryAndMigrateEvents(category, originalType)` to persist the category and migrate events atomically (including inheriting SubCategory events); otherwise calls `repository.saveCategory(category)`
+- New categories are assigned `sortOrder = (min sortOrder across all categories) - 1`; using a global minimum avoids collisions when categories are reparented or promoted
+- New MetaCategories pre-populate `color` on init via `repository.getAndIncrementNextCategoryColorIndex()`. New SubCategories open with all inheritable fields null (inheriting). `save()` always uses the current state values.
+- The live preview uses `resolvedDefaultValue` when non-null as the `previewEventValue`; when null, falls back to the hardcoded type sample (e.g., `Scale(7)`, `BooleanValue(true)`). This makes the preview reflect the actual defaults for Number and Exercise categories.
 
 ### Value Type Migration
 
@@ -98,37 +143,53 @@ The conversion function `convertEventValue(value, to)` lives in the domain layer
 
 `TrackrRepository.saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)` runs the category upsert and all event value updates inside a single Room transaction, ensuring the database is never left in a partially-migrated state.
 
-### Event Count Query
+### Event Count Queries
 
-`CategoryEditViewModel` observes a live event count to drive both the delete button visibility and the ValueType change warning. Add to `TrackrRepository`:
+`CategoryEditViewModel` observes live counts to drive the delete confirmation gate and the ValueType change warning. Add to `TrackrRepository`:
 
 ```kotlin
-fun getEventCountForCategory(categoryId: String): Flow<Int>
+fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int>
+fun getSubCategoryCount(categoryId: String): Flow<Int>
 ```
 
-A `Flow` is required because the count affects visible UI state (delete button, change warning) that must stay current if events are added or removed while the edit screen is open.
+- `getEventCountForCategory(id, includeSubCategoriesWithNullType = false)` — own events only; used for `ownEventCount` (delete gate) and SubCategory event counts.
+- `getEventCountForCategory(id, includeSubCategoriesWithNullType = true)` — own events plus events of SubCategories whose `valueType` is null (inheriting the parent's type); used for `affectedEventCount` (ValueType warning).
+- `getSubCategoryCount(id)` — count of SubCategories with this parentId; used for `subCategoryCount` (delete gate for MetaCategories).
+
+All three return `Flow<Int>` so the UI stays current if events or subcategories change while the edit screen is open.
 
 ## Navigation
 
 ```
 Categories (list)
-    ├── [FAB]              → Category Edit (new)
-    ├── [tap row]          → Category Edit (existing)
-    └── [long-press row]   → context menu → Delete (with confirmation if events exist)
+    ├── [FAB]                    → Category Edit (new MetaCategory)
+    ├── [tap row]                → Category Edit (existing)
+    └── [long-press row]         → context menu
+            ├── Delete           → confirmation → delete (with confirmation if events exist)
+            ├── Add to group     → group picker → [pick or create parent] → reparent
+            ├── Move to group    → group picker → [pick or create parent] → reparent  (SubCategory only)
+            └── Remove from group → promote to MetaCategory  (SubCategory only)
 
 Category Edit
-    ├── [toolbar: Delete]  → confirmation → delete → back to list  (edit mode only)
-    ├── [save]             → back to list
-    └── [cancel/back]      → back to list
+    ├── [toolbar: Create subcategory] → Category Edit (new SubCategory, parentId set)  (MetaCategory only)
+    ├── [toolbar: Delete]        → confirmation → delete → back to list  (edit mode only)
+    ├── [save]                   → back to list
+    └── [cancel/back]            → back to list
 ```
 
 Deletion can be initiated from either the list (long-press) or the edit screen (toolbar). Both paths go through the same confirmation and deletion logic.
+
+The group picker is a shared UI component used by "Add to group", "Move to another group" (from list and from edit screen), and "Create new group" within the picker itself.
 
 ## Color Selection
 
 Preset palette for v1. The palette is a fixed list of ARGB `Long` values defined in the UI layer. The domain model accepts any `Long` — the constraint is purely in the picker UI. Full color wheel deferred to a future version.
 
-**Out-of-palette colors:** if an existing category's color is not in the preset palette (e.g., set by a future app version with a custom picker), the editor displays the current color as a distinct "current color" swatch above the preset palette. It is pre-selected. The user may keep it (no change) or tap any preset to replace it. The out-of-palette swatch is only shown when editing an existing category whose color is not in the palette — it is never shown when creating a new category.
+**Layout:** the palette is displayed as an adaptive grid of rounded-rectangle swatches (`RoundedCornerShape(8.dp)`). On screens narrower than 480dp the grid is 6 columns × 2 rows; on screens 480dp and wider it is 12 columns × 1 row. Each swatch is sized to fill its cell (equal width, 44dp tall). A selected swatch is indicated by a 3dp white border.
+
+**Out-of-palette colors:** if an existing category's color is not in the preset palette (e.g., set by a future app version with a custom picker), a "Custom" swatch is shown labeled with the word "Custom", 3 cells wide. The user may keep it (it is pre-selected with a white border) or tap any preset to replace it. The Custom swatch is only shown when editing an existing category whose color is not in the palette — it is never shown when creating a new category.
+
+**SubCategory color inherit option:** for a SubCategory, the color picker includes an "Inherited" swatch showing the parent's resolved color, labeled "Inherited", 3 cells wide. Selecting it sets `color = null`. The Inherited swatch appears on its own row above the palette grid, with the Custom swatch (if present) to its right on the same row. When the SubCategory's `color` is null, the Inherited swatch is pre-selected (white border); when `color` is non-null, the Inherited swatch is unselected and the current color (palette swatch or Custom swatch) is pre-selected. The Inherited swatch and the Custom swatch may coexist when the SubCategory has an explicit out-of-palette color.
 
 ## Emoji Input
 
@@ -152,8 +213,11 @@ Free-form single-character text field; the system emoji keyboard is used for inp
 ### Deferred
 
 1. **Preset color palette values** — specific colors TBD; defined in the UI layer, not the domain. Resolved when theme LLD is drafted.
-3. **`allowEmptyText` editor exposure** — field is present on the domain model; exposing it in the editor is a UI decision deferred past MVP.
-4. **Archiving vs. deletion** — soft-delete (archive) would preserve historical events without showing the category in the active list. Deferred to v2.
+2. **`allowEmptyText` editor exposure** — field is present on the domain model; exposing it in the editor is a UI decision deferred past MVP.
+3. **Archiving vs. deletion** — soft-delete (archive) would preserve historical events without showing the category in the active list. Deferred to v2.
+5. ~~**Inherit swatch iconography in the color picker**~~ — resolved. The swatch is now a labeled rounded rectangle reading "Inherited" rather than a circle with a "↑" character.
+
+4. **"Move to another group" / "Remove from group" from the edit screen (CAT-UI-058, CAT-NAV-011)** — the group picker is already implemented on the list screen. The open question is what happens to unsaved form edits when the user reparents or promotes from within the edit screen. Options: (a) navigate back discarding unsaved changes (matches delete/removeFromGroup behavior but may surprise users); (b) save current form state atomically with the parent change; (c) prevent the action if there are unsaved changes. Deferred until the right UX is clear.
 
 ## References
 

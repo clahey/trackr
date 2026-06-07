@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import com.trackr.app.FakeImageStore
 import com.trackr.app.FakeTrackrRepository
 import com.trackr.app.domain.Category
-import com.trackr.app.domain.ConversionOutcome
 import com.trackr.app.domain.ErrorKind
 import com.trackr.app.domain.EventValue
 import com.trackr.app.domain.ValueType
@@ -25,6 +24,7 @@ import org.junit.Before
 import org.junit.Test
 import java.time.Instant
 import com.trackr.app.domain.Event
+import com.trackr.app.ui.components.ValueUIState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventEditViewModelTest {
@@ -41,9 +41,9 @@ class EventEditViewModelTest {
     private fun makeCategory(
         id: String,
         valueType: ValueType = ValueType.Scale,
-    ) = Category(
+    ) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,
-        valueType = valueType, unit = null, allowEmptyText = true, sortOrder = 0,
+        valueType = valueType, defaultValue = null, allowEmptyText = true, sortOrder = 0,
     )
 
     private fun makeEvent(
@@ -88,33 +88,6 @@ class EventEditViewModelTest {
         assertEquals(listOf("/img/a.jpg", "/img/b.jpg"), vm.imagePaths.value)
     }
 
-    // @spec EL-UI-043
-    @Test fun `event with ErrorValue has isValueEditable false`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.ErrorValue(ErrorKind.UNPARSABLE, "bad"))
-        repo.setCategories(makeCategory("c1"))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertFalse(vm.isValueEditable.value)
-    }
-
-    // @spec EL-UI-043
-    @Test fun `event with normal value has isValueEditable true`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.Scale(7))
-        repo.setCategories(makeCategory("c1"))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertTrue(vm.isValueEditable.value)
-    }
-
-    // @spec EL-UI-043
-    @Test fun `category with Unknown valueType has isValueEditable false`() = runTest {
-        val event = makeEvent("e1", "c1")
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Unknown("future_type")))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertFalse(vm.isValueEditable.value)
-    }
-
     // @spec EL-UI-042
     @Test fun `requestDelete sets pendingDelete true`() = runTest {
         repo.setCategories(makeCategory("c1"))
@@ -155,6 +128,35 @@ class EventEditViewModelTest {
         assertTrue(vm.saveResult.value is SaveResult.Success)
         val saved = repo.getEventById("e1").first()
         assertEquals("new note", saved?.notes)
+    }
+
+    // @spec EL-UI-057
+    @Test fun `save blocked when Boolean value is unset`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Boolean))
+        repo.saveEvent(makeEvent("e1", "c1", value = null))
+        vm = makeVm("e1")
+        // loaded as Bool(null) via EL-UI-067
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+    }
+
+    // @spec EL-UI-057
+    @Test fun `save blocked when Number text is empty`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1", value = null))
+        vm = makeVm("e1")
+        // loaded as Number("", "") via EL-UI-067
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.ValidationError)
+    }
+
+    // @spec EL-UI-057
+    @Test fun `save succeeds when Scale value is loaded`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = EventValue.Scale(7)))
+        vm = makeVm("e1")
+        vm.save()
+        assertTrue(vm.saveResult.value is SaveResult.Success)
     }
 
     // @spec EL-UI-044
@@ -224,159 +226,78 @@ class EventEditViewModelTest {
         assertNull(vm.category.value)
     }
 
-    // region Value action banner (EL-UI-062 through EL-UI-067)
-
-    // @spec EL-UI-062
-    @Test fun `banner shown when value does not match category type`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.TextValue("hello"))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
+    // @spec EL-UI-044a
+    @Test fun `createImageFile creates a file tracked by imageStore`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
         vm = makeVm("e1")
-        assertNotNull(vm.conversionOutcome.value)
+        val path = vm.createImageFile()
+        assertTrue(imageStore.allStoredPaths().contains(path))
     }
 
     // @spec EL-UI-062
-    @Test fun `banner not shown when value matches category type`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.Scale(7))
+    @Test fun `value initialized as matched UIState when stored value matches category type`() = runTest {
         repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
+        repo.saveEvent(makeEvent("e1", "c1", value = EventValue.Scale(7)))
         vm = makeVm("e1")
-        assertNull(vm.conversionOutcome.value)
+        assertEquals(ValueUIState.Scale(7), vm.value.value)
     }
 
     // @spec EL-UI-062
-    @Test fun `banner not shown when value is null and category is None type`() = runTest {
-        val event = makeEvent("e1", "c1", value = null)
-        repo.setCategories(makeCategory("c1", valueType = ValueType.None))
-        repo.saveEvent(event)
+    @Test fun `value initialized as Mismatched when stored value type does not match category type`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = EventValue.BooleanValue(true)))
         vm = makeVm("e1")
-        assertNull(vm.conversionOutcome.value)
+        assertTrue(vm.value.value is ValueUIState.Mismatched)
     }
 
     // @spec EL-UI-062
-    @Test fun `banner shown for ErrorValue on concrete category type`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.ErrorValue(ErrorKind.UNPARSABLE, "bad"))
+    @Test fun `value Mismatched carries the original stored EventValue`() = runTest {
+        val storedValue = EventValue.BooleanValue(true)
         repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
+        repo.saveEvent(makeEvent("e1", "c1", value = storedValue))
         vm = makeVm("e1")
-        assertNotNull(vm.conversionOutcome.value)
-    }
-
-    // @spec EL-UI-062
-    @Test fun `banner not shown when ErrorValue inferredType matches Unknown category`() = runTest {
-        val error = EventValue.ErrorValue(ErrorKind.UNRECOGNIZED_TYPE, """{"type":"future_type"}""", inferredType = "future_type")
-        val event = makeEvent("e1", "c1", value = error)
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Unknown("future_type")))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertNull(vm.conversionOutcome.value)
-    }
-
-    // @spec EL-UI-063
-    @Test fun `conversionOutcome is Converted when value is genuinely convertible`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.TextValue("7"))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertTrue(vm.conversionOutcome.value is ConversionOutcome.Converted)
-        assertEquals(EventValue.Scale(7), (vm.conversionOutcome.value as ConversionOutcome.Converted).value)
-    }
-
-    // @spec EL-UI-064
-    @Test fun `conversionOutcome is UsedDefault when value is not convertible`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.TextValue("not-a-number"))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertTrue(vm.conversionOutcome.value is ConversionOutcome.UsedDefault)
-        assertEquals(EventValue.Scale(5), (vm.conversionOutcome.value as ConversionOutcome.UsedDefault).value)
-    }
-
-    // @spec EL-UI-064
-    @Test fun `conversionOutcome is UsedDefault for ErrorValue on concrete category type`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.ErrorValue(ErrorKind.UNPARSABLE, "bad"))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        val outcome = vm.conversionOutcome.value
-        assertTrue(outcome is ConversionOutcome.UsedDefault)
-        assertEquals(EventValue.Scale(5), (outcome as ConversionOutcome.UsedDefault).value)
-    }
-
-    // @spec EL-UI-065
-    @Test fun `conversionOutcome is Discard when non-null value stored against None-type category`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.Scale(7))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.None))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertEquals(ConversionOutcome.Discard, vm.conversionOutcome.value)
-    }
-
-    // @spec EL-UI-065
-    @Test fun `conversionOutcome is null when no banner is shown`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.Scale(7))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        assertNull(vm.conversionOutcome.value)
-    }
-
-    // @spec EL-UI-066
-    @Test fun `applyConversion sets value to converted result and clears banner`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.TextValue("7"))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        vm.applyConversion()
-        assertEquals(EventValue.Scale(7), vm.value.value)
-        assertNull(vm.conversionOutcome.value)
-    }
-
-    // @spec EL-UI-066
-    @Test fun `applyConversion with UsedDefault sets value to default and clears banner`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.TextValue("not-a-number"))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        vm.applyConversion()
-        assertEquals(EventValue.Scale(5), vm.value.value)
-        assertNull(vm.conversionOutcome.value)
-    }
-
-    // @spec EL-UI-066
-    @Test fun `applyConversion with UsedDefault from ErrorValue sets value to default and makes field editable`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.ErrorValue(ErrorKind.UNPARSABLE, "bad"))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        vm.applyConversion()
-        assertEquals(EventValue.Scale(5), vm.value.value)
-        assertNull(vm.conversionOutcome.value)
-        assertTrue(vm.isValueEditable.value)
-    }
-
-    // @spec EL-UI-066
-    @Test fun `applyConversion with Discard sets value to null and clears banner`() = runTest {
-        // Non-null value stored against a None-type category triggers Discard
-        val event = makeEvent("e1", "c1", value = EventValue.Scale(7))
-        repo.setCategories(makeCategory("c1", valueType = ValueType.None))
-        repo.saveEvent(event)
-        vm = makeVm("e1")
-        vm.applyConversion()
-        assertNull(vm.value.value)
-        assertNull(vm.conversionOutcome.value)
+        val mismatched = vm.value.value as ValueUIState.Mismatched
+        assertEquals(storedValue, mismatched.originalValue)
     }
 
     // @spec EL-UI-067
-    @Test fun `banner clears reactively when value changes to matching type`() = runTest {
-        val event = makeEvent("e1", "c1", value = EventValue.TextValue("hello"))
+    @Test fun `null stored value with non-None category type initializes to default editable state`() = runTest {
         repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
-        repo.saveEvent(event)
+        repo.saveEvent(makeEvent("e1", "c1", value = null))
         vm = makeVm("e1")
-        assertNotNull(vm.conversionOutcome.value)
-        vm.value.value = EventValue.Scale(7)
-        assertNull(vm.conversionOutcome.value)
+        assertEquals(ValueUIState.Scale(5), vm.value.value)
     }
 
-    // endregion
+    // @spec EL-UI-043, EL-UI-062
+    @Test fun `ErrorValue produces Mismatched with null editableState`() = runTest {
+        val errorValue = EventValue.ErrorValue(ErrorKind.UNPARSABLE, "bad")
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", value = errorValue))
+        vm = makeVm("e1")
+        val mismatched = vm.value.value as ValueUIState.Mismatched
+        assertNull(mismatched.editableState)
+    }
+
+    // @spec EL-UI-044a
+    @Test fun `cancelImage deletes the given file`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        val path = vm.createImageFile()
+        vm.cancelImage(path)
+        assertTrue(imageStore.wasDeleted(path))
+    }
+
+    // @spec EL-PROC-002
+    @Test fun `cancel deletes a file created but not committed via createImageFile`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        val path = vm.createImageFile()
+        vm.addImage(path)
+        vm.cancel()
+        assertTrue(imageStore.wasDeleted(path))
+    }
+
 }

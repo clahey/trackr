@@ -33,11 +33,41 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE categoryId = :categoryId")
     suspend fun getByCategoryOnce(categoryId: String): List<EventEntity>
 
+    // @spec EL-UI-011
+    @Query("""
+        SELECT * FROM events
+        WHERE categoryId = :categoryId
+           OR categoryId IN (
+               SELECT id FROM categories WHERE parentId = :categoryId
+           )
+        ORDER BY timestamp DESC, createdAt DESC, id ASC
+    """)
+    fun getByCategoryIncludingChildren(categoryId: String): Flow<List<EventEntity>>
+
+    // @spec DM-PROC-021
+    @Query("""
+        SELECT * FROM events
+        WHERE categoryId = :categoryId
+           OR categoryId IN (
+               SELECT id FROM categories WHERE parentId = :categoryId AND valueType IS NULL
+           )
+    """)
+    suspend fun getByCategoryIncludingChildrenWithNullTypeOnce(categoryId: String): List<EventEntity>
+
     @Query("SELECT * FROM events")
     suspend fun getAllOnce(): List<EventEntity>
 
     @Query("SELECT COUNT(*) FROM events WHERE categoryId = :categoryId")
     fun countByCategory(categoryId: String): Flow<Int>
+
+    @Query("""
+        SELECT COUNT(*) FROM events
+        WHERE categoryId = :categoryId
+           OR categoryId IN (
+               SELECT id FROM categories WHERE parentId = :categoryId AND valueType IS NULL
+           )
+    """)
+    fun countByCategoryIncludingChildrenWithNullType(categoryId: String): Flow<Int>
 
     @Upsert
     suspend fun upsert(entity: EventEntity)

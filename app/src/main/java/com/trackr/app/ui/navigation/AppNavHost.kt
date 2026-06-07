@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.trackr.app.R
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -29,11 +31,12 @@ object Routes {
     const val TIMELINE = "timeline"
     const val CATEGORY_LIST = "categoryList"
     const val EVENT_EDIT = "eventEdit/{eventId}"
-    const val CATEGORY_EDIT = "categoryEdit?categoryId={categoryId}"
+    const val CATEGORY_EDIT = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
 
     fun eventEdit(eventId: String) = "eventEdit/$eventId"
     fun categoryEdit(categoryId: String?) =
         if (categoryId != null) "categoryEdit?categoryId=$categoryId" else "categoryEdit"
+    fun categoryEditNewSubCategory(parentId: String) = "categoryEdit?parentId=$parentId"
 }
 
 // @spec APP-NAV-001, APP-NAV-002, APP-UI-001, APP-UI-002, APP-UI-003, APP-UI-004, APP-UI-005
@@ -57,8 +60,8 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
                                 }
                             }
                         },
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Timeline") },
-                        label = { Text("Timeline") },
+                        icon = { Icon(Icons.Default.Home, contentDescription = stringResource(R.string.nav_timeline)) },
+                        label = { Text(stringResource(R.string.nav_timeline)) },
                     )
                     NavigationBarItem(
                         selected = currentRoute == Routes.CATEGORY_LIST,
@@ -69,8 +72,8 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
                                 }
                             }
                         },
-                        icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Categories") },
-                        label = { Text("Categories") },
+                        icon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = stringResource(R.string.nav_categories)) },
+                        label = { Text(stringResource(R.string.nav_categories)) },
                     )
                 }
             }
@@ -131,11 +134,18 @@ fun AppNavHost(
         }
         composable(
             route = Routes.CATEGORY_EDIT,
-            arguments = listOf(navArgument("categoryId") {
-                type = NavType.StringType
-                nullable = true
-                defaultValue = null
-            }),
+            arguments = listOf(
+                navArgument("categoryId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("parentId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
         ) {
             CategoryEditScreen(
                 onNavigateBack = { errorMessage ->
@@ -145,6 +155,10 @@ fun AppNavHost(
                             ?.set("snackbar_message", errorMessage)
                     }
                     navController.popBackStack()
+                },
+                // @spec CAT-NAV-010
+                onNavigateToCreateSubCategory = { parentId ->
+                    navController.navigate(Routes.categoryEditNewSubCategory(parentId))
                 },
             )
         }

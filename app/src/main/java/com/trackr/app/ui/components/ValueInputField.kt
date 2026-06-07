@@ -4,11 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -16,137 +23,252 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.trackr.app.R
+import com.trackr.app.domain.ConversionOutcome
 import com.trackr.app.domain.EventValue
-import com.trackr.app.domain.ValueType
-import kotlin.time.Duration.Companion.seconds
 
-// @spec EL-UI-058, EL-UI-059, EL-UI-060
+// @spec DM-PROC-011, EL-UI-050, EL-UI-051, EL-UI-051b, EL-UI-052, EL-UI-052c, EL-UI-053,
+// EL-UI-055, EL-UI-055c, EL-UI-055d, EL-UI-056, EL-UI-058, EL-UI-059, EL-UI-059b,
+// EL-UI-062, EL-UI-063, EL-UI-064, EL-UI-065, EL-UI-066
 @Composable
 fun ValueInputField(
-    value: EventValue?,
-    onValueChange: (EventValue?) -> Unit,
-    valueType: ValueType? = null,
+    uiState: ValueUIState,
+    onStateChange: (ValueUIState) -> Unit,
     autoFocus: Boolean = false,
+    onDone: (() -> Unit)? = null,
 ) {
-    when {
-        value is EventValue.Scale || valueType == ValueType.Scale -> {
-            val scale = (value as? EventValue.Scale ?: EventValue.Scale()).value
-            Column {
-                Text("Scale: $scale")
-                Slider(
-                    value = scale.toFloat(),
-                    onValueChange = { onValueChange(EventValue.Scale(it.toInt())) },
-                    valueRange = 1f..10f,
-                    steps = 8,
-                )
-            }
+    when (uiState) {
+        ValueUIState.None -> {}
+        is ValueUIState.Scale -> ScaleInput(uiState, onStateChange)
+        is ValueUIState.Bool -> BoolInput(uiState, onStateChange)
+        is ValueUIState.Number -> NumberInput(uiState, onStateChange, autoFocus, onDone)
+        is ValueUIState.Text -> TextInput(uiState, onStateChange, autoFocus)
+        is ValueUIState.Duration -> DurationInput(uiState, onStateChange, autoFocus, onDone)
+        is ValueUIState.Exercise -> ExerciseInput(uiState, onStateChange, autoFocus, onDone)
+        is ValueUIState.ReadOnly -> ReadOnlyDisplay(uiState)
+        is ValueUIState.Mismatched -> MismatchedInput(uiState, onStateChange, autoFocus)
+    }
+}
+
+@Composable
+private fun ScaleInput(uiState: ValueUIState.Scale, onStateChange: (ValueUIState) -> Unit) {
+    Column {
+        Text(stringResource(R.string.value_input_scale, uiState.value))
+        Slider(
+            value = uiState.value.toFloat(),
+            onValueChange = { onStateChange(uiState.copy(value = it.toInt())) },
+            valueRange = 1f..10f,
+            steps = 8,
+        )
+    }
+}
+
+// @spec EL-UI-051, EL-UI-051b
+@Composable
+private fun BoolInput(uiState: ValueUIState.Bool, onStateChange: (ValueUIState) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (uiState.selected == true) {
+            Button(
+                onClick = { onStateChange(uiState.copy(selected = true)) },
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.value_input_yes)) }
+        } else {
+            OutlinedButton(
+                onClick = { onStateChange(uiState.copy(selected = true)) },
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.value_input_yes)) }
         }
-        value is EventValue.BooleanValue || valueType == ValueType.Boolean -> {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { onValueChange(EventValue.BooleanValue(true)) },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Yes") }
-                Button(
-                    onClick = { onValueChange(EventValue.BooleanValue(false)) },
-                    modifier = Modifier.weight(1f),
-                ) { Text("No") }
-            }
+        if (uiState.selected == false) {
+            Button(
+                onClick = { onStateChange(uiState.copy(selected = false)) },
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.value_input_no)) }
+        } else {
+            OutlinedButton(
+                onClick = { onStateChange(uiState.copy(selected = false)) },
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.value_input_no)) }
         }
-        value is EventValue.NumberValue || valueType == ValueType.Number -> {
-            val num = (value as? EventValue.NumberValue)
-            val focusRequester = remember { FocusRequester() }
-            if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
-            OutlinedTextField(
-                value = num?.value?.toString() ?: "",
-                onValueChange = { s ->
-                    val d = s.toDoubleOrNull()
-                    if (d != null) onValueChange(EventValue.NumberValue(d, num?.unit))
-                    else if (s.isEmpty()) onValueChange(null)
-                },
-                label = { Text("Value") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).testTag("value_input_field"),
+    }
+}
+
+// @spec EL-UI-052, EL-UI-052c, EL-UI-058
+@Composable
+private fun NumberInput(
+    uiState: ValueUIState.Number,
+    onStateChange: (ValueUIState) -> Unit,
+    autoFocus: Boolean,
+    onDone: (() -> Unit)? = null,
+) {
+    val focusRequester = remember { FocusRequester() }
+    if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val doneOptions = KeyboardOptions(imeAction = if (onDone != null) ImeAction.Done else ImeAction.Default)
+    val doneActions = KeyboardActions(onDone = { onDone?.invoke() })
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = uiState.text,
+            onValueChange = { onStateChange(uiState.copy(text = it)) },
+            label = { Text(stringResource(R.string.value_input_value)) },
+            keyboardOptions = doneOptions.copy(keyboardType = KeyboardType.Decimal),
+            keyboardActions = doneActions,
+            modifier = Modifier.weight(1f).focusRequester(focusRequester).testTag("value_input_field"),
+        )
+        OutlinedTextField(
+            value = uiState.unit,
+            onValueChange = { onStateChange(uiState.copy(unit = it)) },
+            label = { Text(stringResource(R.string.value_input_unit)) },
+            keyboardOptions = doneOptions,
+            keyboardActions = doneActions,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+// @spec EL-UI-053, EL-UI-058
+@Composable
+private fun TextInput(
+    uiState: ValueUIState.Text,
+    onStateChange: (ValueUIState) -> Unit,
+    autoFocus: Boolean,
+) {
+    val focusRequester = remember { FocusRequester() }
+    if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    OutlinedTextField(
+        value = uiState.text,
+        onValueChange = { onStateChange(uiState.copy(text = it)) },
+        label = { Text(stringResource(R.string.value_input_value)) },
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).testTag("value_input_field"),
+        minLines = 2,
+    )
+}
+
+// @spec EL-UI-055, EL-UI-055c, EL-UI-055d, EL-UI-058
+@Composable
+private fun DurationInput(
+    uiState: ValueUIState.Duration,
+    onStateChange: (ValueUIState) -> Unit,
+    autoFocus: Boolean,
+    onDone: (() -> Unit)? = null,
+) {
+    val hoursFocus = remember { FocusRequester() }
+    val minutesFocus = remember { FocusRequester() }
+    val secondsFocus = remember { FocusRequester() }
+    if (autoFocus) LaunchedEffect(Unit) { hoursFocus.requestFocus() }
+    val numberNext = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+    val doneActions = KeyboardActions(onDone = { onDone?.invoke() })
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = uiState.hoursText,
+            onValueChange = { onStateChange(uiState.copy(hoursText = it)) },
+            label = { Text(stringResource(R.string.value_input_hours)) },
+            keyboardOptions = numberNext,
+            keyboardActions = KeyboardActions(onNext = { minutesFocus.requestFocus() }),
+            modifier = Modifier.weight(1f).focusRequester(hoursFocus).testTag("value_duration_h"),
+        )
+        OutlinedTextField(
+            value = uiState.minutesText,
+            onValueChange = { onStateChange(uiState.copy(minutesText = it)) },
+            label = { Text(stringResource(R.string.value_input_minutes)) },
+            keyboardOptions = numberNext,
+            keyboardActions = KeyboardActions(onNext = { secondsFocus.requestFocus() }),
+            modifier = Modifier.weight(1f).focusRequester(minutesFocus),
+        )
+        OutlinedTextField(
+            value = uiState.secondsText,
+            onValueChange = { onStateChange(uiState.copy(secondsText = it)) },
+            label = { Text(stringResource(R.string.value_input_seconds)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = if (onDone != null) ImeAction.Done else ImeAction.Default),
+            keyboardActions = doneActions,
+            modifier = Modifier.weight(1f).focusRequester(secondsFocus),
+        )
+    }
+}
+
+// @spec EL-UI-059, EL-UI-059b
+@Composable
+private fun ExerciseInput(
+    uiState: ValueUIState.Exercise,
+    onStateChange: (ValueUIState) -> Unit,
+    autoFocus: Boolean = false,
+    onDone: (() -> Unit)? = null,
+) {
+    val setsFocus = remember { FocusRequester() }
+    val repsFocus = remember { FocusRequester() }
+    if (autoFocus) LaunchedEffect(Unit) { setsFocus.requestFocus() }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = uiState.setsText,
+            onValueChange = { onStateChange(uiState.copy(setsText = it)) },
+            label = { Text(stringResource(R.string.value_input_sets)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { repsFocus.requestFocus() }),
+            modifier = Modifier.weight(1f).focusRequester(setsFocus),
+        )
+        OutlinedTextField(
+            value = uiState.repsText,
+            onValueChange = { onStateChange(uiState.copy(repsText = it)) },
+            label = { Text(stringResource(R.string.value_input_reps)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = if (onDone != null) ImeAction.Done else ImeAction.Default),
+            keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
+            modifier = Modifier.weight(1f).focusRequester(repsFocus),
+        )
+    }
+}
+
+// @spec EL-UI-056
+@Composable
+private fun ReadOnlyDisplay(uiState: ValueUIState.ReadOnly) {
+    Text(
+        text = uiState.displayText,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+// @spec EL-UI-062, EL-UI-063, EL-UI-064, EL-UI-065, EL-UI-066
+@Composable
+private fun MismatchedInput(
+    uiState: ValueUIState.Mismatched,
+    onStateChange: (ValueUIState) -> Unit,
+    autoFocus: Boolean,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.mismatch_message),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
             )
-        }
-        value is EventValue.TextValue || valueType == ValueType.Text -> {
-            val focusRequester = remember { FocusRequester() }
-            if (autoFocus) LaunchedEffect(Unit) { focusRequester.requestFocus() }
-            OutlinedTextField(
-                value = (value as? EventValue.TextValue)?.text ?: "",
-                onValueChange = { onValueChange(EventValue.TextValue(it)) },
-                label = { Text("Value") },
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).testTag("value_input_field"),
-                minLines = 2,
-            )
-        }
-        value is EventValue.ExerciseValue || valueType == ValueType.Exercise -> {
-            val ex = value as? EventValue.ExerciseValue ?: EventValue.ExerciseValue()
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = ex.sets.toString(),
-                    onValueChange = { s ->
-                        val sets = s.toIntOrNull() ?: return@OutlinedTextField
-                        onValueChange(EventValue.ExerciseValue(sets, ex.reps))
-                    },
-                    label = { Text("Sets") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedTextField(
-                    value = ex.reps.toString(),
-                    onValueChange = { r ->
-                        val reps = r.toIntOrNull() ?: return@OutlinedTextField
-                        onValueChange(EventValue.ExerciseValue(ex.sets, reps))
-                    },
-                    label = { Text("Reps") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                )
+            val buttonLabel = when (val outcome = uiState.outcome) {
+                is ConversionOutcome.Converted -> stringResource(R.string.mismatch_convert, describeValue(outcome.value))
+                is ConversionOutcome.UsedDefault -> stringResource(R.string.mismatch_replace_default, describeValue(outcome.value))
+                ConversionOutcome.Discard -> stringResource(R.string.mismatch_discard)
             }
-        }
-        value is EventValue.DurationValue || valueType == ValueType.Duration -> {
-            val dur = (value as? EventValue.DurationValue ?: EventValue.DurationValue()).duration
-            val hoursFocusRequester = remember { FocusRequester() }
-            if (autoFocus) LaunchedEffect(Unit) { hoursFocusRequester.requestFocus() }
-            dur.toComponents { hours, minutes, seconds, _ ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = hours.toString(),
-                        onValueChange = { h ->
-                            val hrs = h.toLongOrNull() ?: 0L
-                            onValueChange(EventValue.DurationValue((hrs * 3600 + minutes * 60 + seconds).seconds))
-                        },
-                        label = { Text("H") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f).focusRequester(hoursFocusRequester).testTag("value_duration_h"),
-                    )
-                    OutlinedTextField(
-                        value = minutes.toString(),
-                        onValueChange = { m ->
-                            val mins = m.toIntOrNull() ?: 0
-                            onValueChange(EventValue.DurationValue((hours * 3600 + mins * 60 + seconds).seconds))
-                        },
-                        label = { Text("M") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = seconds.toString(),
-                        onValueChange = { s ->
-                            val secs = s.toIntOrNull() ?: 0
-                            onValueChange(EventValue.DurationValue((hours * 3600 + minutes * 60 + secs).seconds))
-                        },
-                        label = { Text("S") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
+            TextButton(onClick = {
+                val newState = when (val outcome = uiState.outcome) {
+                    is ConversionOutcome.Converted -> outcome.value.toValueUIState()
+                    is ConversionOutcome.UsedDefault -> outcome.value.toValueUIState()
+                    ConversionOutcome.Discard -> ValueUIState.None
                 }
-            }
+                onStateChange(newState)
+            }) { Text(buttonLabel) }
         }
-        else -> {}
+    }
+
+    val editableState = uiState.editableState
+    if (editableState != null) {
+        ValueInputField(
+            uiState = editableState,
+            onStateChange = { newSub -> onStateChange(uiState.copy(editableState = newSub)) },
+            autoFocus = autoFocus,
+        )
     }
 }
 

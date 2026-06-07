@@ -86,10 +86,11 @@ private val darkScheme = darkColorScheme(
     surfaceContainerHighest = surfaceContainerHighestDark,
 )
 
+// @spec THEME-UI-001, THEME-UI-002, THEME-UI-003, THEME-UI-004, THEME-UI-005
 @Composable
 fun TrackrTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {

@@ -6,22 +6,23 @@ LLD: `docs/llds/category-management.md`
 
 ## Category List
 
-- [x] **CAT-UI-001**: The system shall display all categories on the list screen ordered by `sortOrder` ascending, showing emoji, name, and value type for each row.
-- [ ] **CAT-UI-002**: The category list screen shall display a drag handle on each row; when the user drops a row after dragging, the system shall persist the new order via `reorderCategories`.
-- [x] **CAT-UI-003**: When the user long-presses a category row, the system shall present a context menu containing a delete action.
-- [x] **CAT-UI-004**: When the user initiates deletion of a category that has zero events, the system shall delete it immediately without a confirmation dialog.
-- [x] **CAT-UI-005**: When the user initiates deletion of a category that has one or more events, the system shall show a confirmation dialog stating the number of events that will be permanently deleted.
-- [ ] **CAT-UI-006**: When the user confirms deletion of a category (from either the list context menu or the edit screen toolbar), the system shall delete the category and all its associated events.
+- [x] **CAT-UI-001**: The system shall display all categories on the list screen in hierarchical sort order: MetaCategories sorted by their own `sortOrder` ascending, with each MetaCategory's SubCategories appearing immediately after their parent sorted by their own `sortOrder` ascending before the next MetaCategory. Each row shows resolved emoji, name, and resolved value type; SubCategory rows are visually indented.
+- [ ] **CAT-UI-002**: The category list screen shall display a drag handle on each row; when the user drops a row after dragging, the system shall persist the new order via `reorderCategories`; SubCategories may only be reordered within their parent's group, and MetaCategories may only be reordered within the top-level list.
+- [x] **CAT-UI-003**: When the user long-presses a category row, the system shall present a context menu; all rows include Delete; a MetaCategory with no SubCategories additionally includes "Add to group"; a SubCategory additionally includes "Move to another group" and "Remove from group".
+- [x] **CAT-UI-004**: When the user initiates deletion of a category that has zero of its own events and zero SubCategories, the system shall delete it immediately without a confirmation dialog.
+- [x] **CAT-UI-005**: When the user initiates deletion of a category that does not qualify for immediate deletion (per CAT-UI-004), the system shall show a confirmation dialog; if `ownEventCount > 0` the dialog shall include a sentence stating the number of events that will be permanently deleted, beginning with that count; if `subCategoryCount > 0` the dialog shall include a sentence stating the number of SubCategories that will be promoted to top-level categories; at least one sentence is always shown.
+- [x] **CAT-UI-006**: When the user confirms deletion of a category, the system shall call `deleteCategory`, which within a single database transaction promotes any SubCategories to top-level MetaCategories (resolving null fields to the parent's values at deletion time) and then deletes the category and all its own associated events; promoted SubCategories and all their events are preserved.
 
 ## Category Edit — Display
 
 - [ ] **CAT-UI-010**: The category edit screen shall display input fields for name, emoji, color, and value type.
-- [ ] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
-- [ ] **CAT-UI-011**: While value type is Number, the category edit screen shall display a unit input field; for all other value types the unit field shall be hidden.
-- [ ] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
-- [ ] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
-- [ ] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
-- [ ] **CAT-UI-015**: When editing an existing category whose color is not in the preset palette, the color picker shall display the current color as a distinct swatch above the preset palette, pre-selected; the user may keep it or replace it by tapping a preset.
+- [x] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
+- [ ] **CAT-UI-011**: While effective value type is Number, the category edit screen shall display a "Unit (optional)" text field; for all other value types this field shall be hidden. The field is seeded from the category's stored `defaultValue` (as `NumberValue.unit`) on load.
+- [ ] **CAT-UI-011a**: While effective value type is Exercise, the category edit screen shall display two integer input fields labeled "Default sets" and "Default reps"; both must be ≥ 1 to save. The fields are seeded from the category's stored `defaultValue` (as `ExerciseValue.sets`/`.reps`) on load, falling back to 3 and 15 if `defaultValue` is null.
+- [x] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
+- [x] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
+- [x] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
+- [ ] **CAT-UI-015**: When editing an existing category whose color is not in the preset palette, the color picker shall display the current color as a "Custom" swatch (labeled "Custom", 3 cells wide) to the right of the Inherited swatch when a parent is present, or alone on the top row when there is no parent; the Custom swatch is pre-selected; the user may keep it or replace it by tapping a preset.
 - [ ] **CAT-UI-016**: The out-of-palette current color swatch shall not be shown when creating a new category.
 
 ## Category Edit — Validation
@@ -32,7 +33,7 @@ LLD: `docs/llds/category-management.md`
 
 ## Category Edit — ValueType Change Warning and Migration
 
-- [x] **CAT-UI-030**: While the selected value type differs from the category's original value type, the conversion is not reversible (per the conversion table in `docs/llds/category-management.md`), and the category has one or more existing events, the system shall display an inline warning below the value type picker.
+- [x] **CAT-UI-030**: While the selected value type differs from the category's original value type, the conversion is not reversible (per the conversion table in `docs/llds/category-management.md`), and the category has one or more existing events affected by the change, the system shall display an inline warning below the value type picker; for a MetaCategory, the affected event count includes the MetaCategory's own events plus events of SubCategories whose valueType is null (inheriting); for a SubCategory, the affected event count includes only the SubCategory's own events.
 - [x] **CAT-UI-031**: The inline value type warning shall disappear automatically when the user reverts the value type picker back to its original value.
 - [x] **CAT-UI-036**: When the inline warning is shown for a fully-safe but irreversible conversion, the warning shall read: "Existing events will be converted. This change cannot be reversed by switching back."
 - [x] **CAT-UI-037**: When the inline warning is shown for a partially-safe conversion, the warning shall read: "Some existing events may not be convertible and will display incorrectly."
@@ -50,14 +51,44 @@ LLD: `docs/llds/category-management.md`
 ## Category Edit — Save Behavior
 
 - [x] **CAT-UI-040**: When saving a new category, the system shall assign it a new UUID as its identifier.
-- [x] **CAT-UI-041**: When saving a new category, the system shall assign it a `sortOrder` of `currentMin - 1`, placing it at the top of the list.
+- [x] **CAT-UI-041**: When saving a new category, the system shall assign it a `sortOrder` of `(min sortOrder across all categories) - 1`.
 - [x] **CAT-UI-042**: When saving a new category, the system shall set `allowEmptyText` to `true`.
-- [x] **CAT-UI-043**: When the category edit screen loads in create mode, the system shall pre-select a default color by calling `getAndIncrementNextCategoryColorIndex(palette.size)` (LS-BE-081) and using `palette[index]` as the initial value of the color picker; the counter cycles within `[0, palette.size)` and is unaffected by category deletions. The user may override this by selecting any palette color before saving.
+- [x] **CAT-UI-043**: When the category edit screen loads in create mode for a new MetaCategory, the system shall pre-select a default color by calling `getAndIncrementNextCategoryColorIndex(palette.size)` (LS-BE-081) and using `palette[index]` as the initial value of the color picker; the counter cycles within `[0, palette.size)` and is unaffected by category deletions. The user may override this by selecting any palette color before saving. When creating a new SubCategory, the color field opens in the inherit state (null) and the counter is not advanced.
+
+## Category Edit — Default Value
+
+- [ ] **CAT-UI-063**: When saving a Number category, the system shall store `defaultValue = NumberValue(existingValue ?: 0.0, unit)` where `existingValue` is the numeric component of any previously stored `defaultValue` and `unit` is null when the unit field is blank; the numeric component is never altered by the editor.
+- [ ] **CAT-UI-064**: When saving an Exercise category, the system shall store `defaultValue = ExerciseValue(sets, reps)` using the current values of the default sets and reps fields.
+- [ ] **CAT-UI-065**: When saving a category whose effective value type is neither Number nor Exercise, the system shall leave `defaultValue` unchanged; it shall not be cleared or overwritten.
+- [ ] **CAT-UI-066**: When the category edit screen opens in SubCategory create mode, the system shall pre-populate the default value fields from the parent's `resolvedDefaultValue` only if its type matches the SubCategory's effective value type; if the types do not match or `resolvedDefaultValue` is null, the fields shall be pre-populated with the type default (3 and 15 for Exercise; blank for Number). When saving any category and `defaultValueDirty` is false, the system shall store the previously stored `defaultValue` unchanged (null for a new category, preserving any existing value in edit mode); CAT-UI-063 and CAT-UI-064 apply only when `defaultValueDirty` is true.
+
+## Category Hierarchy
+
+### Category List — Color and Group Operations
+
+- [ ] **CAT-UI-050**: Each category row in the category list shall display the resolved category color as a visual indicator (e.g., colored swatch or avatar).
+- [x] **CAT-UI-051**: The group picker (used for "Add to group" and "Move to another group") shall list all MetaCategories eligible to become the new parent (excluding the category's current parent in the "Move" case) and shall always include a "Create new group" option; tapping it shall open a name-entry dialog with a blank text field; the user enters the group name and confirms to create the MetaCategory and immediately set it as the parent.
+- [x] **CAT-UI-052**: When the user selects "Add to group" or "Move to another group" for a category, the system shall preserve all of the category's current explicit field values as overrides (per DM-PROC-020).
+
+### Category Edit — Subcategory Creation and Inheritance
+
+- [x] **CAT-UI-053**: While editing a MetaCategory, the category edit screen shall display a "Create subcategory" action.
+- [x] **CAT-UI-054**: When the user initiates subcategory creation, the system shall open the category edit screen in create mode with the parentId set to the MetaCategory's id and all inheritable fields (emoji, color, valueType) initialized as null.
+- [x] **CAT-UI-055**: While editing a SubCategory, the emoji field shall display an "Inherit" checkbox to the left of the text field; when checked, the field is non-editable and shows the parent's emoji; when unchecked, the field is editable and shows the stored custom value.
+- [x] **CAT-UI-056**: While editing a SubCategory, the color picker shall display an "Inherited" swatch (labeled "Inherited", 3 cells wide) on its own row above the palette grid showing the parent's resolved color; when `color` is null the Inherited swatch shall be pre-selected; when `color` is non-null the Inherited swatch shall be unselected and the current color (palette or Custom swatch) shall be pre-selected; tapping the Inherited swatch shall set `color` to null; the Inherited swatch and the Custom swatch (CAT-UI-015) may coexist when the SubCategory has an explicit out-of-palette color, appearing side by side on the top row.
+- [x] **CAT-UI-057**: While editing a SubCategory, the value type picker shall include a "Same as [ParentName] ([TypeName])" option as an additional selectable row; selecting it sets valueType to null (inherit from parent).
+- [D] **CAT-UI-058**: While editing a SubCategory, the toolbar overflow menu shall contain "Remove from group" and "Move to another group".
+- [x] **CAT-UI-059**: The category edit screen shall display a live preview card rendered using the shared `EventRow` composable with a synthetic category (current effective name, emoji, color, and value type) and a placeholder event (`notes = "Notes"`, value = a type-appropriate sample per the conversion table in `docs/llds/category-management.md § Live preview card`).
+- [x] **CAT-UI-060**: The live preview card shall update reactively as any field on the edit screen changes.
+- [x] **CAT-UI-061**: When the user switches the emoji field to Inherit mode, the previously entered custom value shall be preserved in the UI state and restored when the user switches back to Custom mode.
+- [x] **CAT-UI-062**: When the emoji field is opened in Inherit mode (SubCategory create, or loading a SubCategory with `emoji = null`), `customValue` shall be pre-populated with the parent's emoji so that switching to Custom pre-fills the field.
 
 ## Navigation
 
-- [ ] **CAT-NAV-001**: When the user taps the FAB on the category list screen, the system shall navigate to the category edit screen in create mode.
+- [ ] **CAT-NAV-001**: When the user taps the FAB on the category list screen, the system shall navigate to the category edit screen in create mode for a new MetaCategory.
 - [ ] **CAT-NAV-002**: When the user taps a category row on the category list screen, the system shall navigate to the category edit screen in edit mode for that category.
 - [ ] **CAT-NAV-003**: When the user saves a category on the edit screen, the system shall navigate back to the category list.
 - [ ] **CAT-NAV-004**: When the user taps back or cancel on the category edit screen without saving, the system shall navigate back to the category list without persisting any changes.
-- [ ] **CAT-NAV-005**: When the user confirms deletion of a category from the edit screen toolbar, the system shall delete the category and navigate back to the category list.
+- [x] **CAT-NAV-005**: When the user confirms deletion of a category from the edit screen toolbar, the system shall delete the category and navigate back to the category list.
+- [x] **CAT-NAV-010**: When the user taps "Create subcategory" on a MetaCategory edit screen, the system shall navigate to the category edit screen in create mode with the parentId set to the MetaCategory's id.
+- [D] **CAT-NAV-011**: When the user confirms "Remove from group" on a SubCategory edit screen, the system shall promote the SubCategory to a MetaCategory (per DM-PROC-019) and navigate back to the category list.

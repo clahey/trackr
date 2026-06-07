@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "linked-intent-dev@jszmajda-lid": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew testDebugUnitTest)",
+      "Bash(./gradlew :app:testDebugUnitTest)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(./gradlew test)"
+    ]
+  }
+}

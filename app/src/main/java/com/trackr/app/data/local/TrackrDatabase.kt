@@ -8,7 +8,7 @@ import com.trackr.app.data.local.converters.InstantConverter
 import com.trackr.app.data.local.converters.StringListConverter
 import com.trackr.app.data.local.converters.ValueTypeConverter
 
-@Database(entities = [CategoryEntity::class, EventEntity::class], version = 1, exportSchema = true)
+@Database(entities = [CategoryEntity::class, EventEntity::class], version = 3, exportSchema = true)
 @TypeConverters(EventValueConverter::class, InstantConverter::class, StringListConverter::class, ValueTypeConverter::class)
 abstract class TrackrDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao

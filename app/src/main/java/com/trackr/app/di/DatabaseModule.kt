@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import com.trackr.app.data.local.CategoryDao
 import com.trackr.app.data.local.EventDao
+import com.trackr.app.data.local.MIGRATION_1_2
+import com.trackr.app.data.local.MIGRATION_2_3
 import com.trackr.app.data.local.TrackrDatabase
 import dagger.Module
 import dagger.Provides
@@ -20,7 +22,9 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): TrackrDatabase =
-        Room.databaseBuilder(context, TrackrDatabase::class.java, "trackr.db").build()
+        Room.databaseBuilder(context, TrackrDatabase::class.java, "trackr.db")
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .build()
 
     @Provides
     fun provideCategoryDao(db: TrackrDatabase): CategoryDao = db.categoryDao()

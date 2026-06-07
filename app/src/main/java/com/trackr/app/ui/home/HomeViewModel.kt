@@ -18,12 +18,18 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 
+sealed class ActiveFilter {
+    data object All : ActiveFilter()
+    data class TopLevel(val category: Category.MetaCategory) : ActiveFilter()
+    data class Sub(val parent: Category.MetaCategory, val sub: Category.SubCategory) : ActiveFilter()
+}
+
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 
 sealed class DayEntry {
     // @spec EL-UI-061
-    data class Entry(val event: Event, val category: Category?) : DayEntry() {
-        val hasMismatch: Boolean = category != null && !matchesValueType(event.value, category.valueType)
+    data class Entry(val event: Event, val category: Category) : DayEntry() {
+        val hasMismatch: Boolean = category != null && !matchesValueType(event.value, category.resolvedValueType)
     }
     data class UndoPlaceholder(val event: Event) : DayEntry()
 }
@@ -33,8 +39,8 @@ sealed class DayEntry {
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(private val repository: TrackrRepository) : ViewModel() {
-    private val _activeFilter = MutableStateFlow<Category?>(null)
-    val activeFilter: StateFlow<Category?> = _activeFilter.asStateFlow()
+    private val _activeFilter = MutableStateFlow<ActiveFilter>(ActiveFilter.All)
+    val activeFilter: StateFlow<ActiveFilter> = _activeFilter.asStateFlow()
 
     private val _dayGroups = MutableStateFlow<List<DayGroup>>(emptyList())
     val dayGroups: StateFlow<List<DayGroup>> = _dayGroups.asStateFlow()
@@ -50,53 +56,73 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
 
     init {
         viewModelScope.launch {
-            _activeFilter
-                .flatMapLatest { filter ->
-                    if (filter != null) repository.getEventsByCategory(filter.id)
-                    else repository.getEvents()
-                }
-                .combine(repository.getCategories()) { events, categories -> events to categories }
-                .combine(_pendingDelete) { (events, categories), pending ->
-                    Triple(events, categories, pending)
-                }
-                .collect { (events, categories, pending) ->
-                    currentEvents = events
-                    if (pending != null) {
-                        val newIds = events.map { it.id }.toSet() - deleteSnapshot
-                        if (newIds.isNotEmpty()) {
-                            _pendingDelete.value = null
-                            return@collect
-                        }
+            combine(
+                _activeFilter.flatMapLatest { filter ->
+                    when (filter) {
+                        is ActiveFilter.All -> repository.getEvents()
+                        is ActiveFilter.TopLevel -> repository.getEventsByCategoryIdIncludingChildren(filter.category.id)
+                        is ActiveFilter.Sub -> repository.getEventsByCategoryIdIncludingChildren(filter.sub.id)
                     }
-                    _dayGroups.value = buildDayGroups(events, pending, categories)
+                },
+                repository.getCategories(),
+                _pendingDelete,
+            ) { events, categories, pending ->
+                Triple(events, categories, pending)
+            }
+            .collect { (events, categories, pending) ->
+                currentEvents = events
+                if (pending != null) {
+                    val newIds = events.map { it.id }.toSet() - deleteSnapshot
+                    if (newIds.isNotEmpty()) {
+                        _pendingDelete.value = null
+                        return@collect
+                    }
                 }
+                _dayGroups.value = buildDayGroups(events, pending, categories)
+            }
         }
 
         viewModelScope.launch {
-            repository.getCategories().collect { categories ->
-                val categoryIds = categories.map { it.id }.toSet()
-                val filter = _activeFilter.value
-                if (filter != null && filter.id !in categoryIds) {
-                    _activeFilter.value = null
+            repository.getCategories().collect { cats ->
+                val catIds = cats.map { it.id }.toSet()
+                when (val filter = _activeFilter.value) {
+                    is ActiveFilter.TopLevel -> {
+                        if (filter.category.id !in catIds) _activeFilter.value = ActiveFilter.All
+                    }
+                    is ActiveFilter.Sub -> {
+                        val subExists = cats.any { it.id == filter.sub.id }
+                        val parentExists = cats.any { it.id == filter.parent.id }
+                        when {
+                            !subExists -> _activeFilter.value = ActiveFilter.All
+                            !parentExists -> {
+                                val promoted = cats.filterIsInstance<Category.MetaCategory>()
+                                    .find { it.id == filter.sub.id }
+                                _activeFilter.value = if (promoted != null)
+                                    ActiveFilter.TopLevel(promoted)
+                                else
+                                    ActiveFilter.All
+                            }
+                        }
+                    }
+                    is ActiveFilter.All -> {}
                 }
                 val pending = _pendingDelete.value
-                if (pending != null && pending.categoryId !in categoryIds) {
+                if (pending != null && pending.categoryId !in catIds) {
                     _pendingDelete.value = null
                 }
             }
         }
     }
 
-    fun setFilter(category: Category?) {
-        val wasFiltered = _activeFilter.value != null
-        if (!wasFiltered && category != null) {
+    // @spec EL-UI-012, EL-UI-014, EL-UI-017, EL-UI-018, EL-UI-019b
+    fun setFilter(filter: ActiveFilter) {
+        val wasAll = _activeFilter.value is ActiveFilter.All
+        if (wasAll && filter !is ActiveFilter.All) {
             _preFilterTopDay.value = currentEvents.firstOrNull()
                 ?.timestamp?.atZone(ZoneId.systemDefault())?.toLocalDate()
         }
-        if (category == null) {
-            _preFilterTopDay.value = null
-        }
-        _activeFilter.value = category
+        if (filter is ActiveFilter.All) _preFilterTopDay.value = null
+        _activeFilter.value = filter
     }
 
     fun onUserScrolled() {
@@ -105,8 +131,10 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
 
     fun swipeDelete(event: Event) {
         deleteSnapshot = currentEvents.map { it.id }.toSet()
+        val prev = _pendingDelete.value
         _pendingDelete.value = null
         viewModelScope.launch {
+            if (prev != null) repository.deleteEventFiles(prev.imagePaths)
             repository.deleteEvent(event.id)
             _pendingDelete.value = event
         }
@@ -121,7 +149,11 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
     }
 
     fun clearPendingDelete() {
+        val prev = _pendingDelete.value
         _pendingDelete.value = null
+        if (prev != null) {
+            viewModelScope.launch { repository.deleteEventFiles(prev.imagePaths) }
+        }
     }
 
     private fun buildDayGroups(events: List<Event>, pending: Event?, categories: List<Category>): List<DayGroup> {
@@ -142,9 +174,9 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
             .map { (date, items) ->
                 DayGroup(
                     date = date,
-                    events = items.map { (event, isPlaceholder) ->
+                    events = items.mapNotNull { (event, isPlaceholder) ->
                         if (isPlaceholder) DayEntry.UndoPlaceholder(event)
-                        else DayEntry.Entry(event, categoryMap[event.categoryId])
+                        else categoryMap[event.categoryId]?.let { DayEntry.Entry(event, it) }
                     }
                 )
             }

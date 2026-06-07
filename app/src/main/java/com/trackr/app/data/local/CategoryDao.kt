@@ -13,8 +13,11 @@ abstract class CategoryDao {
     @Query("SELECT * FROM categories ORDER BY sortOrder ASC")
     abstract fun getAll(): Flow<List<CategoryEntity>>
 
+    @Query("SELECT * FROM categories ORDER BY sortOrder ASC")
+    abstract suspend fun getAllOnce(): List<CategoryEntity>
+
     @Query("SELECT * FROM categories WHERE id = :id")
-    abstract fun getById(id: String): Flow<CategoryEntity?>
+    abstract suspend fun getByIdOnce(id: String): CategoryEntity?
 
     @Query("SELECT MIN(sortOrder) FROM categories")
     abstract suspend fun getMinSortOrder(): Int?
@@ -32,4 +35,17 @@ abstract class CategoryDao {
 
     @Query("DELETE FROM categories WHERE id = :id")
     abstract suspend fun deleteById(id: String)
+
+    @Query("SELECT COUNT(*) FROM categories WHERE parentId = :parentId")
+    abstract fun countByParentId(parentId: String): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM categories WHERE parentId = :parentId")
+    abstract suspend fun countByParentIdOnce(parentId: String): Int
+
+    @Query("SELECT * FROM categories WHERE parentId = :parentId")
+    abstract suspend fun getChildrenByParentIdOnce(parentId: String): List<CategoryEntity>
+
+    @Transaction
+    @Query("SELECT * FROM categories WHERE id = :id")
+    abstract fun getByIdWithParent(id: String): Flow<CategoryWithParent?>
 }
