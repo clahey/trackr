@@ -4,13 +4,22 @@
 
 This segment is the connective tissue of the app. It owns no domain logic — it wires the Hilt DI graph, hosts the Compose `NavHost`, renders the bottom navigation bar, and triggers startup work. Every other segment depends on it compiling correctly, but none depends on it for behavior.
 
+## App Identity
+
+| Field | Value | Notes |
+|---|---|---|
+| `applicationId` | `net.clahey.trackr` | Permanent Play Store identity; **cannot be changed after first publish** |
+| `namespace` | `net.clahey.trackr` | Kotlin package root; matches `applicationId` by convention |
+| FileProvider authority | `${applicationId}.fileprovider` | Resolved to `net.clahey.trackr.fileprovider` at build time; used for camera capture URIs |
+| Auto Backup key | tied to `applicationId` | Backup/restore is scoped to this identity; changing `applicationId` severs continuity with existing backups |
+
 ## Application Class
 
 `TrackrApplication` is annotated `@HiltAndroidApp` and declared in `AndroidManifest.xml` via `android:name=".TrackrApplication"`. Its `onCreate` calls `LocalTrackrRepository.onStartup()` for the orphan image scan (see LS-BE-040).
 
 ## Hilt Modules
 
-All modules live in `com.trackr.app.di`.
+All modules live in `net.clahey.trackr.di`.
 
 ### DatabaseModule (`@Module`, `@InstallIn(SingletonComponent::class)`)
 
@@ -124,6 +133,7 @@ The repository is injected into `TrackrApplication` via field injection (`@Injec
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
+| `applicationId` | `net.clahey.trackr` | `com.trackr.app` (initial placeholder) | Reverse domain under owner's control; placeholder could not be used for Play Store publish |
 | Top-level navigation | Bottom nav bar, two tabs | Toolbar icon; navigation drawer | Two tabs is exactly the right count for bottom nav; always one tap away; no discoverability problem |
 | Quick-log sheet | `ModalBottomSheet` inside timeline composable | Separate nav destination | Avoids nav animation jank; timeline state (scroll position, filter) stays alive beneath the sheet |
 | ViewModel arguments | `SavedStateHandle` | `@AssistedInject` | Idiomatic Hilt + Navigation pattern; survives process death and back-stack restoration automatically |

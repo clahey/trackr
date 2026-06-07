@@ -1,5 +1,11 @@
 # App Shell Specs
 
+## App Identity
+
+- [x] **APP-ID-001**: The application shall use `applicationId = "net.clahey.trackr"` as its permanent Play Store identity; this value shall not be changed after first publish.
+- [x] **APP-ID-002**: The Kotlin `namespace` shall match the `applicationId` (`net.clahey.trackr`).
+- [x] **APP-ID-003**: The FileProvider authority shall be declared as `${applicationId}.fileprovider`, resolved to `net.clahey.trackr.fileprovider` at build time.
+
 ## Dependency Injection
 
 - [x] **APP-DI-001**: The application class shall be annotated `@HiltAndroidApp`; `MainActivity` shall be annotated `@AndroidEntryPoint`; all ViewModels shall be annotated `@HiltViewModel`.

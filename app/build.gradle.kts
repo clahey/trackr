@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "com.trackr.app"
+    namespace = "net.clahey.trackr"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.trackr.app"
+        applicationId = "net.clahey.trackr"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
