@@ -195,7 +195,7 @@ Mismatch detection occurs at the ViewModel layer (not inside `ValueInputField`).
 ### HomeViewModel
 
 - `activeFilter: StateFlow<ActiveFilter>` — current filter state (`All`, `TopLevel`, or `Sub`); see sealed class above
-- `dayGroups: StateFlow<List<DayGroup>>` — derived from `repository.getEventsByCategoryIdIncludingChildren(id)` when a filter is active (`TopLevel` uses MetaCategory id, `Sub` uses SubCategory id), `repository.getEvents()` otherwise; grouped by calendar day of `timestamp` in local timezone
+- `dayGroups: StateFlow<List<DayGroup>>` — derived from `repository.getEventsByCategoryIdIncludingChildren(id)` when a filter is active (`TopLevel` uses MetaCategory id, `Sub` uses SubCategory id), `repository.getEvents()` otherwise; grouped by calendar day of `timestamp` in local timezone; events with no matching category in the current category list are omitted (handles the brief `combine()` window where the two flows are out of sync after a deletion)
 - `preFilterTopDay: StateFlow<LocalDate?>` — the calendar day that was at the top of the timeline when a filter was first applied (transition from no filter); null if no filter is active or if the user has manually scrolled since the filter was first applied. Not updated when switching between active filters.
 - `setFilter(filter: ActiveFilter)` — sets `activeFilter`; records the current top day in `preFilterTopDay` only when transitioning from `All` to a non-`All` filter; switching between two non-`All` filters preserves the existing `preFilterTopDay`; `All` clears the filter
 - `onUserScrolled()` — called by the UI when the user manually scrolls; clears `preFilterTopDay`
@@ -218,7 +218,7 @@ The DB delete fires immediately on swipe — undo is a restore (`saveEvent`) not
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 
 sealed class DayEntry {
-    data class Entry(val event: Event, val category: Category?) : DayEntry()
+    data class Entry(val event: Event, val category: Category) : DayEntry()
     data class UndoPlaceholder(val event: Event) : DayEntry()
 }
 ```

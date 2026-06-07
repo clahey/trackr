@@ -35,7 +35,7 @@ import java.time.format.DateTimeFormatter
 
 // @spec EL-UI-002, EL-UI-004, EL-UI-005, EL-UI-061, EL-UI-079, THEME-UI-011
 @Composable
-fun EventRow(event: Event, category: Category?, hasMismatch: Boolean, onClick: (() -> Unit)?) {
+fun EventRow(event: Event, category: Category, hasMismatch: Boolean, onClick: (() -> Unit)?) {
     val modifier = Modifier
         .fillMaxWidth()
         .padding(vertical = 2.dp)
@@ -47,7 +47,7 @@ fun EventRow(event: Event, category: Category?, hasMismatch: Boolean, onClick: (
 }
 
 @Composable
-private fun EventRowContent(event: Event, category: Category?, hasMismatch: Boolean) {
+private fun EventRowContent(event: Event, category: Category, hasMismatch: Boolean) {
     Row(
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -57,21 +57,20 @@ private fun EventRowContent(event: Event, category: Category?, hasMismatch: Bool
             modifier = Modifier
                 .size(48.dp)
                 .background(
-                    color = category?.let { Color(it.resolvedColor) } ?: MaterialTheme.colorScheme.primaryContainer,
+                    color = Color(category.resolvedColor),
                     shape = CircleShape,
                 ),
         ) {
             Text(
-                text = category?.resolvedEmoji ?: "",
+                text = category.resolvedEmoji,
                 style = MaterialTheme.typography.titleLarge,
-                color = category?.let { Color(foregroundColorForBackground(it.resolvedColor)) }
-                    ?: MaterialTheme.colorScheme.onPrimaryContainer,
+                color = Color(foregroundColorForBackground(category.resolvedColor)),
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = category?.name ?: "",
+                text = category.name,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

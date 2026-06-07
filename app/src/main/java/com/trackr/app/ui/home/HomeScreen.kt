@@ -321,7 +321,7 @@ fun HomeScreen(
 @Composable
 private fun SwipeableEventRow(
     event: Event,
-    category: com.trackr.app.domain.Category?,
+    category: com.trackr.app.domain.Category,
     hasMismatch: Boolean,
     onSwipeDelete: () -> Unit,
     onClick: () -> Unit,

@@ -338,12 +338,11 @@ class HomeViewModelTest {
     }
 
     // @spec EL-UI-002
-    @Test fun `DayEntry Entry has null category for orphaned event`() = runTest {
-        repo.setEvents(makeEvent("e1", "c1"))
+    @Test fun `event with no matching category is omitted from dayGroups`() = runTest {
+        repo.setEvents(makeEvent("e1", "nonexistent"))
         vm.dayGroups.test {
-            val groups = awaitItem()
-            val entry = groups.flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
-            assertNull(entry.category)
+            val entries = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>()
+            assertTrue(entries.isEmpty())
         }
     }
 
@@ -404,17 +403,4 @@ class HomeViewModelTest {
         }
     }
 
-    // @spec EL-UI-061
-    @Test fun `DayEntry Entry hasMismatch is false for orphaned event with no category`() = runTest {
-        val event = Event(
-            id = "e1", categoryId = "nonexistent", timestamp = anchor,
-            value = EventValue.Scale(7),
-            notes = null, imagePaths = emptyList(), createdAt = anchor,
-        )
-        repo.setEvents(event)
-        vm.dayGroups.test {
-            val entry = awaitItem().flatMap { it.events }.filterIsInstance<DayEntry.Entry>().first()
-            assertFalse(entry.hasMismatch)
-        }
-    }
 }

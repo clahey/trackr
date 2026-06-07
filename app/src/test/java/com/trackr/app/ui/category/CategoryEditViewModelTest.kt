@@ -861,7 +861,7 @@ class CategoryEditViewModelTest {
     @Test fun `saving Number category stores NumberValue with unit`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
         vm = editVm("c1")
-        vm.numberDefaultUnit.value = "kg"
+        vm.updateNumberDefaultUnit("kg")
         vm.name.value = "c1"
         vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
         vm.save()
@@ -873,7 +873,7 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number,
             defaultValue = EventValue.NumberValue(42.0, "kg")))
         vm = editVm("c1")
-        vm.numberDefaultUnit.value = "lbs"
+        vm.updateNumberDefaultUnit("lbs")
         vm.name.value = "c1"
         vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
         vm.save()
@@ -884,7 +884,7 @@ class CategoryEditViewModelTest {
     @Test fun `saving Number category with blank unit stores NumberValue with null unit`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
         vm = editVm("c1")
-        vm.numberDefaultUnit.value = ""
+        vm.updateNumberDefaultUnit("")
         vm.name.value = "c1"
         vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
         vm.save()
@@ -912,8 +912,8 @@ class CategoryEditViewModelTest {
     @Test fun `saving Exercise category stores ExerciseValue from sets and reps fields`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise, defaultValue = null))
         vm = editVm("c1")
-        vm.exerciseDefaultSets.value = "5"
-        vm.exerciseDefaultReps.value = "10"
+        vm.updateExerciseDefaultSets("5")
+        vm.updateExerciseDefaultReps("10")
         vm.name.value = "c1"
         vm.emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "📌")
         vm.save()

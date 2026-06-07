@@ -214,12 +214,12 @@ class QuickLogViewModelTest {
     }
 
     // @spec EL-UI-073
-    @Test fun `selectCategory clears expandedMetaCategoryId`() = runTest {
+    @Test fun `selectCategory preserves expandedMetaCategoryId for drill-down back navigation`() = runTest {
         val cat = makeCategory("c1")
         repo.setCategories(cat)
         vm.expandMetaCategory("c1")
         vm.selectCategory(cat)
-        assertNull(vm.expandedMetaCategoryId.value)
+        assertEquals("c1", vm.expandedMetaCategoryId.value)
     }
 
     // @spec EL-NAV-002b

@@ -183,7 +183,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Number, defaultValue = null)
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        vm.numberDefaultUnit.value = "lbs"
+        vm.updateNumberDefaultUnit("lbs")
         vm.name.value = "child"
         vm.save()
         val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory

@@ -28,7 +28,7 @@ data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 
 sealed class DayEntry {
     // @spec EL-UI-061
-    data class Entry(val event: Event, val category: Category?) : DayEntry() {
+    data class Entry(val event: Event, val category: Category) : DayEntry() {
         val hasMismatch: Boolean = category != null && !matchesValueType(event.value, category.resolvedValueType)
     }
     data class UndoPlaceholder(val event: Event) : DayEntry()
@@ -174,9 +174,9 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
             .map { (date, items) ->
                 DayGroup(
                     date = date,
-                    events = items.map { (event, isPlaceholder) ->
+                    events = items.mapNotNull { (event, isPlaceholder) ->
                         if (isPlaceholder) DayEntry.UndoPlaceholder(event)
-                        else DayEntry.Entry(event, categoryMap[event.categoryId])
+                        else categoryMap[event.categoryId]?.let { DayEntry.Entry(event, it) }
                     }
                 )
             }
