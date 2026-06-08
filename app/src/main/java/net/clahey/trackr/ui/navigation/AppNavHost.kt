@@ -30,10 +30,12 @@ import net.clahey.trackr.ui.home.HomeScreen
 object Routes {
     const val TIMELINE = "timeline"
     const val CATEGORY_LIST = "categoryList"
-    const val EVENT_EDIT = "eventEdit/{eventId}"
+    const val EVENT_EDIT = "eventEdit/{eventId}?filterCategoryId={filterCategoryId}"
     const val CATEGORY_EDIT = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
 
-    fun eventEdit(eventId: String) = "eventEdit/$eventId"
+    fun eventEdit(eventId: String, filterCategoryId: String? = null) =
+        if (filterCategoryId != null) "eventEdit/$eventId?filterCategoryId=$filterCategoryId"
+        else "eventEdit/$eventId"
     fun categoryEdit(categoryId: String?) =
         if (categoryId != null) "categoryEdit?categoryId=$categoryId" else "categoryEdit"
     fun categoryEditNewSubCategory(parentId: String) = "categoryEdit?parentId=$parentId"
@@ -95,8 +97,8 @@ fun AppNavHost(
     ) {
         composable(Routes.TIMELINE) { entry ->
             HomeScreen(
-                onNavigateToEventEdit = { eventId ->
-                    navController.navigate(Routes.eventEdit(eventId))
+                onNavigateToEventEdit = { eventId, filterCategoryId ->
+                    navController.navigate(Routes.eventEdit(eventId, filterCategoryId))
                 },
                 pendingSnackbarMessage = entry.savedStateHandle
                     .getStateFlow<String?>("snackbar_message", null),
@@ -107,7 +109,14 @@ fun AppNavHost(
         }
         composable(
             route = Routes.EVENT_EDIT,
-            arguments = listOf(navArgument("eventId") { type = NavType.StringType }),
+            arguments = listOf(
+                navArgument("eventId") { type = NavType.StringType },
+                navArgument("filterCategoryId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
         ) {
             EventEditScreen(
                 onNavigateBack = { errorMessage ->

@@ -65,10 +65,10 @@ Routes are `String` constants in a `Routes` object:
 object Routes {
     const val TIMELINE       = "timeline"
     const val CATEGORY_LIST  = "categoryList"
-    const val EVENT_EDIT     = "eventEdit/{eventId}"
+    const val EVENT_EDIT     = "eventEdit/{eventId}?filterCategoryId={filterCategoryId}"
     const val CATEGORY_EDIT  = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
 
-    fun eventEdit(eventId: String)     = "eventEdit/$eventId"
+    fun eventEdit(eventId: String, filterCategoryId: String? = null) = ...
     fun categoryEdit(categoryId: String?, parentId: String? = null) = buildString {
         append("categoryEdit")
         if (categoryId != null) append("?categoryId=$categoryId")
@@ -83,8 +83,8 @@ Full graph:
 AppNavHost (startDestination = timeline)
 ├── timeline
 │       ├── [FAB]            → quickLog (bottom sheet overlay)
-│       └── [tap event row]  → eventEdit/{eventId}
-├── eventEdit/{eventId}
+│       └── [tap event row]  → eventEdit/{eventId}?filterCategoryId={filterCategoryId}
+├── eventEdit/{eventId}?filterCategoryId={filterCategoryId}
 │       ├── [save]           → popBackStack
 │       ├── [delete]         → popBackStack
 │       └── [back]           → popBackStack
@@ -119,6 +119,7 @@ ViewModels that need navigation arguments inject `SavedStateHandle`:
 | ViewModel | Key | Type | Default |
 |---|---|---|---|
 | `EventEditViewModel` | `"eventId"` | `String` | (required) |
+| `EventEditViewModel` | `"filterCategoryId"` | `String?` | null (= no filter, show all events) |
 | `CategoryEditViewModel` | `"categoryId"` | `String?` | null (= create mode) |
 
 All five ViewModels are annotated `@HiltViewModel`.

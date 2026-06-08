@@ -86,6 +86,15 @@ Editable fields:
 
 Save navigates back to timeline. Delete shows a confirmation dialog, then deletes and navigates back.
 
+**Swipe navigation:** the event edit screen is a `HorizontalPager` whose pages are the events matching the filter active when the screen was opened (timestamp DESC, createdAt DESC, id ASC — same order as the timeline). Swiping left moves to the next older event; swiping right moves to the next newer event. At the list edges, the pager rubber-bands with a dark background visible beyond the edge.
+
+The filter context (`filterCategoryId: String?`) is passed as an optional navigation argument:
+- `null` → all events (`getEvents()`)
+- MetaCategory id → `getEventsByCategoryIdIncludingChildren(id)` (TopLevel filter)
+- SubCategory id → `getEventsByCategoryIdIncludingChildren(id)` (Sub filter, consistent with HomeViewModel)
+
+**Unsaved changes on swipe:** `EventEditViewModel` tracks an `isDirty` flag set whenever any field is edited. When `isDirty` is true, `pageCount` is set to 1 so the pager rubber-bands naturally on any swipe attempt. When the user releases, a prompt offers Save / Discard / Cancel. Both Save and Discard resolve the changes in place without navigating — `isDirty` clears and `pageCount` returns to N, leaving the user free to swipe afterward. Discard runs the same newly-captured-image cleanup as EL-PROC-002.
+
 ## Value Input by ValueType
 
 | ValueType | Input widget | Notes |
@@ -247,12 +256,21 @@ sealed class DayEntry {
 ### EventEditViewModel
 
 - Loads event by ID via `repository.getEventById()`; also loads its category via `repository.getCategoryById()` for value type context and to populate `category: StateFlow<Category?>`
-- Full form state mirroring `Event` fields; `value: MutableStateFlow<ValueUIState>`
-- On load: initializes `value` by calling `event.value.toValueUIState(category.resolvedValueType)`, which produces `ValueUIState.Mismatched` when the stored value does not match the category type.
-- `save()`: calls `validateValueForSave(value.value, category)` (category may be null if not yet loaded — treat as no validation required); if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, diffs image paths, calls `repository.saveEvent()`, emits `SaveResult.Success`.
-- `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()` (DB row) followed immediately by `repository.deleteEventFiles(imagePaths)` (no undo path here)
+- Form state (`timestamp`, `value`, `notes`, `imagePaths`) is exposed as read-only `StateFlow`s backed by private `MutableStateFlow`s. Mutations go through `setValue(ValueUIState)`, `setNotes(String)`, `addImage(path)`, and `removeImage(path)` — each sets `isDirty` automatically. `isDirty: StateFlow<Boolean>` is cleared by save and discard operations.
+- On load: initializes `value` by calling `event.value.toValueUIState(category.resolvedValueType)`, which produces `ValueUIState.Mismatched` when the stored value does not match the category type. Stores `originalEvent` and `originalImagePaths` for discard and cleanup.
+- `save()`: delegates to `performSave()`; on success emits `SaveResult.Success` to trigger navigate-back.
+- `saveInPlace()`: delegates to `performSave()` without emitting `SaveResult.Success`; clears `showDiscardDialog`; used when saving from the unsaved-changes swipe dialog so changes are committed without navigating.
+- `performSave()` (private): calls `validateValueForSave(value.value, category)` (category may be null — treat as no validation); if invalid, emits `SaveResult.ValidationError` and returns false. Otherwise calls `repository.saveEvent()`, updates `originalEvent` and `originalImagePaths`, clears `isDirty`, returns true.
+- `discardInPlace()`: deletes any images added during this edit session (present in `imagePaths.value` but not in `originalImagePaths`); calls `restoreFormFields(originalEvent)` to revert all form fields; clears `isDirty` and `showDiscardDialog`.
+- `restoreFormFields(event: Event)` (private): synchronously restores `_timestamp`, `_notes`, `_imagePaths`, and `_value` from the given event, using the already-loaded `_category` for value type resolution. Used by both `loadEventData` and `discardInPlace` to avoid duplication.
+- `showDiscardDialog: StateFlow<Boolean>` — set by `scrollEnded()` when dirty; cleared by `saveInPlace()`, `discardInPlace()`, and `dismissDiscardDialog()`. Owned by the ViewModel so the dirty check happens against live state with no stale-closure risk.
+- `scrollEnded()`: called by the screen when a pager scroll ends; sets `showDiscardDialog` if `isDirty`.
+- `pageSettled(page: Int)`: called by the screen when the pager settles on a new page; if not dirty, computes `delta = page - currentIndex.value` and calls `navigateToAdjacent(delta)`.
+- `dismissDiscardDialog()`: clears `showDiscardDialog` (Cancel action).
+- `deleteEvent()`: confirmation via `pendingDelete: StateFlow<Boolean>`, then `repository.deleteEvent()` (DB row) followed by `repository.deleteEventFiles(imagePaths)` (no undo path here)
 - **Stale event guard:** if `getEventById` returns null on init, emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`; the UI layer invokes `onNavigateBack(errorMessage)` with a non-null message, which the caller (timeline) displays as a snackbar.
 - Mismatch detection is owned by `EventEditViewModel` (embedded in `ValueUIState.Mismatched` on load); `ValueInputField` renders the banner and calls `onStateChange` to resolve it. The ViewModel does not expose a separate `conversionOutcome` or `applyConversion()` method.
+- **Swipe navigation:** `filterCategoryId: String?` (from nav arg) scopes the event list. `_events: StateFlow<List<Event>>` (private) is the source of truth — populated from `getEvents()` (no filter) or `getEventsByCategoryIdIncludingChildren(id)` (filtered), ordered timestamp DESC. `eventIds: StateFlow<List<String>>` and `currentIndex: StateFlow<Int>` derive from `_events`. `prevEventState: StateFlow<EventDisplayState?>` and `nextEventState: StateFlow<EventDisplayState?>` index directly into `_events` for the adjacent event objects and fetch only their categories — no per-event re-fetch. `navigateToAdjacent(delta: Int)` reads `_events.value[newIndex]` directly.
 
 ## Image Handling
 
@@ -286,9 +304,11 @@ Home (timeline)
     │       ├── [back in step 2]           → step 1 (selectedCategory = null; expandedMetaCategoryId preserved → drill-down if present)
     │       └── [back in step 1 drill-down] → top-level grid (expandedMetaCategoryId = null)
     └── [tap event]        → Event Edit
-            ├── [save]     → back to Home
-            ├── [delete]   → confirm → back to Home
-            └── [back]     → cancel, clean up unsaved captures
+            ├── [save]                        → back to Home
+            ├── [delete]                      → confirm → back to Home
+            ├── [back]                        → cancel, clean up unsaved captures
+            ├── [swipe, clean state]          → adjacent event (slide animation)
+            └── [swipe attempt, dirty state]  → rubber-band → Save / Discard / Cancel dialog (resolves in place, no navigation)
 ```
 
 System back and edge swipe are intercepted by `BackHandler` within the sheet: step 2 intercepts first (returns to step 1), then drill-down (returns to top-level grid); step 1 top-level lets the sheet's native dismiss handler take over.

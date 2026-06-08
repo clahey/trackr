@@ -67,7 +67,10 @@ class EventEditViewModelTest {
 
     @After fun tearDown() { Dispatchers.resetMain() }
 
-    private fun makeVm(eventId: String) = EventEditViewModel(repo, imageStore, SavedStateHandle(mapOf("eventId" to eventId)))
+    private fun makeVm(eventId: String, filterCategoryId: String? = null) = EventEditViewModel(
+        repo, imageStore,
+        SavedStateHandle(mapOf("eventId" to eventId, "filterCategoryId" to filterCategoryId)),
+    )
 
     // @spec EL-UI-040
     @Test fun `form fields initialized from loaded event`() = runTest {
@@ -123,7 +126,7 @@ class EventEditViewModelTest {
         repo.setCategories(makeCategory("c1"))
         repo.saveEvent(makeEvent("e1", "c1", notes = "old note"))
         vm = makeVm("e1")
-        vm.notes.value = "new note"
+        vm.setNotes("new note")
         vm.save()
         assertTrue(vm.saveResult.value is SaveResult.Success)
         val saved = repo.getEventById("e1").first()
@@ -298,6 +301,282 @@ class EventEditViewModelTest {
         vm.addImage(path)
         vm.cancel()
         assertTrue(imageStore.wasDeleted(path))
+    }
+
+    // @spec EL-NAV-008
+    @Test fun `eventIds loads all events in order when no filter`() = runTest {
+        repo.setCategories(makeCategory("c1"), makeCategory("c2"))
+        repo.saveEvent(makeEvent("e1", "c1", timestamp = anchor.plusSeconds(2)))
+        repo.saveEvent(makeEvent("e2", "c2", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e3", "c1", timestamp = anchor))
+        vm = makeVm("e1")
+        assertEquals(listOf("e1", "e2", "e3"), vm.eventIds.first())
+        assertEquals(0, vm.currentIndex.first())
+    }
+
+    // @spec EL-NAV-008
+    @Test fun `eventIds filtered by category when filterCategoryId set`() = runTest {
+        repo.setCategories(makeCategory("c1"), makeCategory("c2"))
+        repo.saveEvent(makeEvent("e1", "c1", timestamp = anchor.plusSeconds(2)))
+        repo.saveEvent(makeEvent("e2", "c2", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e3", "c1", timestamp = anchor))
+        vm = makeVm("e1", filterCategoryId = "c1")
+        assertEquals(listOf("e1", "e3"), vm.eventIds.first())
+        assertEquals(0, vm.currentIndex.first())
+    }
+
+    // @spec EL-NAV-008
+    @Test fun `currentIndex reflects initial event position in list`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e2", "c1", timestamp = anchor))
+        vm = makeVm("e2")
+        assertEquals(1, vm.currentIndex.first())
+    }
+
+    // @spec EL-NAV-009
+    @Test fun `navigateToAdjacent 1 moves to older event and loads its data`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "newer", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e2", "c1", notes = "older", timestamp = anchor))
+        vm = makeVm("e1")
+        vm.navigateToAdjacent(1)
+        assertEquals(1, vm.currentIndex.first())
+        assertEquals("older", vm.notes.value)
+    }
+
+    // @spec EL-NAV-009
+    @Test fun `navigateToAdjacent -1 moves to newer event and loads its data`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "newer", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e2", "c1", notes = "older", timestamp = anchor))
+        vm = makeVm("e2")
+        vm.navigateToAdjacent(-1)
+        assertEquals(0, vm.currentIndex.first())
+        assertEquals("newer", vm.notes.value)
+    }
+
+    // @spec EL-NAV-009
+    @Test fun `navigateToAdjacent at oldest event is no-op`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e2", "c1", timestamp = anchor))
+        vm = makeVm("e2")
+        vm.navigateToAdjacent(1)
+        assertEquals(1, vm.currentIndex.first())
+    }
+
+    // @spec EL-NAV-009
+    @Test fun `navigateToAdjacent at newest event is no-op`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e2", "c1", timestamp = anchor))
+        vm = makeVm("e1")
+        vm.navigateToAdjacent(-1)
+        assertEquals(0, vm.currentIndex.first())
+    }
+
+    // @spec EL-NAV-008
+    @Test fun `eventIds includes events from subcategories when filtering by parent`() = runTest {
+        val parent = makeCategory("parent")
+        val child = Category.SubCategory(
+            id = "child", name = "child", emoji = null, color = null,
+            valueType = null, defaultValue = null, allowEmptyText = true,
+            sortOrder = 0, parent = parent,
+        )
+        val other = makeCategory("other")
+        repo.setCategories(parent, child, other)
+        repo.saveEvent(makeEvent("e1", "parent", timestamp = anchor.plusSeconds(2)))
+        repo.saveEvent(makeEvent("e2", "child", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e3", "other", timestamp = anchor))
+        vm = makeVm("e1", filterCategoryId = "parent")
+        assertEquals(listOf("e1", "e2"), vm.eventIds.first())
+    }
+
+    // @spec EL-NAV-011
+    @Test fun `navigation stays within filter scope`() = runTest {
+        repo.setCategories(makeCategory("c1"), makeCategory("c2"))
+        repo.saveEvent(makeEvent("e1", "c1", timestamp = anchor.plusSeconds(2)))
+        repo.saveEvent(makeEvent("e2", "c2", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e3", "c1", timestamp = anchor))
+        vm = makeVm("e1", filterCategoryId = "c1")
+        vm.navigateToAdjacent(1)
+        assertEquals("e3", vm.eventIds.first()[vm.currentIndex.first()])
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `isDirty is false on load`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        assertFalse(vm.isDirty.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `editing notes sets isDirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.setNotes("changed")
+        assertTrue(vm.isDirty.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `setValue sets isDirty`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.setValue(ValueUIState.Scale(3))
+        assertTrue(vm.isDirty.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `addImage sets isDirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.addImage("/img/new.jpg")
+        assertTrue(vm.isDirty.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `removeImage sets isDirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", imagePaths = listOf("/img/a.jpg")))
+        vm = makeVm("e1")
+        vm.removeImage("/img/a.jpg")
+        assertTrue(vm.isDirty.first())
+    }
+
+
+    // @spec EL-NAV-012
+    @Test fun `saveInPlace persists changes and clears isDirty without emitting SaveResult Success`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "old"))
+        vm = makeVm("e1")
+        vm.setNotes("new")
+        vm.saveInPlace()
+        val saved = repo.getEventById("e1").first()
+        assertEquals("new", saved?.notes)
+        assertFalse(vm.isDirty.first())
+        assertTrue(vm.saveResult.value is SaveResult.Idle)
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `saveInPlace updates originalEvent so subsequent discard reverts to saved state`() = runTest {
+        repo.setCategories(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "original"))
+        vm = makeVm("e1")
+        vm.setNotes("saved-in-place")
+        vm.saveInPlace()
+        // Now edit again and discard — should revert to "saved-in-place", not "original"
+        vm.setNotes("second edit")
+        vm.discardInPlace()
+        assertEquals("saved-in-place", vm.notes.value)
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `discardInPlace reverts notes to original value and clears isDirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "original"))
+        vm = makeVm("e1")
+        vm.setNotes("edited")
+        vm.discardInPlace()
+        assertEquals("original", vm.notes.value)
+        assertFalse(vm.isDirty.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `discardInPlace deletes images added during edit session`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", imagePaths = listOf("/img/original.jpg")))
+        vm = makeVm("e1")
+        vm.addImage("/img/new.jpg")
+        vm.discardInPlace()
+        assertTrue(imageStore.wasDeleted("/img/new.jpg"))
+        assertEquals(listOf("/img/original.jpg"), vm.imagePaths.value)
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `discardInPlace does not delete images that were part of the original event`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", imagePaths = listOf("/img/original.jpg")))
+        vm = makeVm("e1")
+        vm.discardInPlace()
+        assertFalse(imageStore.wasDeleted("/img/original.jpg"))
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `scrollEnded shows dialog when dirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.setNotes("changed")
+        vm.scrollEnded()
+        assertTrue(vm.showDiscardDialog.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `scrollEnded does nothing when not dirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.scrollEnded()
+        assertFalse(vm.showDiscardDialog.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `dismissDiscardDialog clears showDiscardDialog`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.setNotes("changed")
+        vm.scrollEnded()
+        vm.dismissDiscardDialog()
+        assertFalse(vm.showDiscardDialog.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `saveInPlace clears showDiscardDialog`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.setNotes("changed")
+        vm.scrollEnded()
+        vm.saveInPlace()
+        assertFalse(vm.showDiscardDialog.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `discardInPlace clears showDiscardDialog`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        vm.setNotes("changed")
+        vm.scrollEnded()
+        vm.discardInPlace()
+        assertFalse(vm.showDiscardDialog.first())
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `pageSettled navigates when not dirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "newer", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e2", "c1", notes = "older", timestamp = anchor))
+        vm = makeVm("e1")
+        vm.pageSettled(1)
+        assertEquals("older", vm.notes.value)
+    }
+
+    // @spec EL-NAV-012
+    @Test fun `pageSettled does not navigate when dirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1", notes = "newer", timestamp = anchor.plusSeconds(1)))
+        repo.saveEvent(makeEvent("e2", "c1", notes = "older", timestamp = anchor))
+        vm = makeVm("e1")
+        vm.setNotes("edited")
+        vm.pageSettled(1)
+        assertEquals("edited", vm.notes.value)
     }
 
 }

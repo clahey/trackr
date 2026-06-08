@@ -105,7 +105,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToEventEdit: (String) -> Unit,
+    onNavigateToEventEdit: (eventId: String, filterCategoryId: String?) -> Unit,
     pendingSnackbarMessage: StateFlow<String?> = MutableStateFlow(null),
     onSnackbarMessageConsumed: () -> Unit = {},
     homeVm: HomeViewModel = hiltViewModel(),
@@ -273,7 +273,14 @@ fun HomeScreen(
                                 category = entry.category,
                                 hasMismatch = entry.hasMismatch,
                                 onSwipeDelete = { homeVm.swipeDelete(entry.event) },
-                                onClick = { onNavigateToEventEdit(entry.event.id) },
+                                onClick = {
+                                    val filterId = when (val f = activeFilter) {
+                                        is ActiveFilter.All -> null
+                                        is ActiveFilter.TopLevel -> f.category.id
+                                        is ActiveFilter.Sub -> f.sub.id
+                                    }
+                                    onNavigateToEventEdit(entry.event.id, filterId)
+                                },
                             )
                             is DayEntry.UndoPlaceholder -> UndoPlaceholderRow(
                                 event = entry.event,

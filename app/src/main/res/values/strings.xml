@@ -45,8 +45,12 @@
     <string name="mismatch_replace_default">Replace with default: %s</string>
     <string name="mismatch_discard">Discard value</string>
 
+    <string name="action_discard">Discard</string>
+
     <!-- Event edit -->
     <string name="event_edit_title">Edit Event</string>
+    <string name="event_unsaved_changes_title">Unsaved changes</string>
+    <string name="event_unsaved_changes_message">You have unsaved changes.</string>
     <string name="event_not_found">Event not found.</string>
     <string name="event_delete_title">Delete event?</string>
     <string name="event_delete_message">This event will be permanently deleted.</string>
