@@ -86,6 +86,8 @@ Editable fields:
 
 Save navigates back to timeline. Delete shows a confirmation dialog, then deletes and navigates back.
 
+**Back navigation:** both the hardware back button (`BackHandler`) and the navigation icon check `isDirty` before navigating. When dirty, a Save / Discard / Cancel dialog is shown. Save calls `viewModel.save()` (persists and navigates back via `SaveResult.Success`). Discard calls `viewModel.cancel()` (cleans up newly captured images) then `onNavigateBack(null)`. Cancel dismisses the dialog. When not dirty, both navigate back immediately. The dialog state is local to the screen (`showBackDiscardDialog`) because the post-action callback `onNavigateBack` is screen-level.
+
 **Swipe navigation:** the event edit screen is a `HorizontalPager` whose pages are the events matching the filter active when the screen was opened (timestamp DESC, createdAt DESC, id ASC — same order as the timeline). Swiping left moves to the next older event; swiping right moves to the next newer event. At the list edges, the pager rubber-bands with a dark background visible beyond the edge.
 
 The filter context (`filterCategoryId: String?`) is passed as an optional navigation argument:

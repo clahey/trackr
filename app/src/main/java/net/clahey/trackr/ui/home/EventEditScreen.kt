@@ -1,5 +1,6 @@
 package net.clahey.trackr.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -98,6 +99,10 @@ fun EventEditScreen(
 
     var showImageSourceDialog by remember { mutableStateOf(false) }
     var pendingCameraPath by remember { mutableStateOf<String?>(null) }
+    var showBackDiscardDialog by remember { mutableStateOf(false) }
+
+    // @spec EL-NAV-013
+    BackHandler(enabled = isDirty) { showBackDiscardDialog = true }
 
     // pageCount = 1 when dirty so the pager rubber-bands naturally instead of navigating.
     // @spec EL-NAV-009, EL-NAV-010
@@ -200,27 +205,21 @@ fun EventEditScreen(
         )
     }
 
+    // @spec EL-NAV-013
+    if (showBackDiscardDialog) {
+        UnsavedChangesDialog(
+            onSave = { scope.launch { viewModel.save() } },
+            onDiscard = { viewModel.cancel(); onNavigateBack(null) },
+            onCancel = { showBackDiscardDialog = false },
+        )
+    }
+
     // @spec EL-NAV-012
     if (showDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissDiscardDialog() },
-            title = { Text(stringResource(R.string.event_unsaved_changes_title)) },
-            text = { Text(stringResource(R.string.event_unsaved_changes_message)) },
-            confirmButton = {
-                TextButton(onClick = { scope.launch { viewModel.saveInPlace() } }) {
-                    Text(stringResource(R.string.action_save))
-                }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = { viewModel.discardInPlace() }) {
-                        Text(stringResource(R.string.action_discard))
-                    }
-                    TextButton(onClick = { viewModel.dismissDiscardDialog() }) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
-                }
-            },
+        UnsavedChangesDialog(
+            onSave = { scope.launch { viewModel.saveInPlace() } },
+            onDiscard = { viewModel.discardInPlace() },
+            onCancel = { viewModel.dismissDiscardDialog() },
         )
     }
 
@@ -229,9 +228,10 @@ fun EventEditScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.event_edit_title)) },
                 navigationIcon = {
+                    // @spec EL-NAV-013
                     IconButton(onClick = {
-                        viewModel.cancel()
-                        onNavigateBack(null)
+                        if (isDirty) showBackDiscardDialog = true
+                        else { viewModel.cancel(); onNavigateBack(null) }
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
@@ -401,4 +401,26 @@ private fun EventFormContent(
             }
         }
     }
+}
+
+@Composable
+private fun UnsavedChangesDialog(
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.event_unsaved_changes_title)) },
+        text = { Text(stringResource(R.string.event_unsaved_changes_message)) },
+        confirmButton = {
+            TextButton(onClick = onSave) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDiscard) { Text(stringResource(R.string.action_discard)) }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+            }
+        },
+    )
 }
