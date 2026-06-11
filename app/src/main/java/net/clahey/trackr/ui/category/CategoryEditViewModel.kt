@@ -37,7 +37,7 @@ data class EmojiUIState(val mode: EmojiMode, val customValue: String)
 // @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013,
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// CAT-UI-054, CAT-UI-062, CAT-NAV-005, DM-PROC-021, APP-NAV-004
+// CAT-UI-054, CAT-UI-062, CAT-NAV-005, CAT-NAV-006, CAT-UI-067, DM-PROC-021, APP-NAV-004
 @HiltViewModel
 class CategoryEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -49,42 +49,56 @@ class CategoryEditViewModel @Inject constructor(
 
     val isEditMode: Boolean get() = categoryId != null
 
-    val name = MutableStateFlow("")
+    // @spec CAT-UI-067
+    private val _isDirty = MutableStateFlow(categoryId == null)
+    val isDirty: StateFlow<Boolean> = _isDirty.asStateFlow()
+
+    private val _name = MutableStateFlow("")
+    val name: StateFlow<String> = _name.asStateFlow()
+    fun setName(value: String) { _name.value = value; _isDirty.value = true }
 
     // @spec CAT-UI-054
-    val emojiUIState = MutableStateFlow(EmojiUIState(EmojiMode.INHERIT, ""))
-    val colorState = MutableStateFlow<Long?>(null)
-    val valueTypeState = MutableStateFlow<ValueType?>(null)
+    private val _emojiUIState = MutableStateFlow(EmojiUIState(EmojiMode.INHERIT, ""))
+    val emojiUIState: StateFlow<EmojiUIState> = _emojiUIState.asStateFlow()
+    fun setEmojiUIState(value: EmojiUIState) { _emojiUIState.value = value; _isDirty.value = true }
+
+    private val _colorState = MutableStateFlow<Long?>(null)
+    val colorState: StateFlow<Long?> = _colorState.asStateFlow()
+    fun setColorState(value: Long?) { _colorState.value = value; _isDirty.value = true }
+
+    private val _valueTypeState = MutableStateFlow<ValueType?>(null)
+    val valueTypeState: StateFlow<ValueType?> = _valueTypeState.asStateFlow()
+    fun setValueTypeState(value: ValueType?) { _valueTypeState.value = value; _isDirty.value = true }
 
     val numberDefaultUnit = MutableStateFlow("")
     val exerciseDefaultSets = MutableStateFlow("3")
     val exerciseDefaultReps = MutableStateFlow("15")
     private var defaultValueDirty = false
 
-    fun updateNumberDefaultUnit(value: String) { numberDefaultUnit.value = value; defaultValueDirty = true }
-    fun updateExerciseDefaultSets(value: String) { exerciseDefaultSets.value = value; defaultValueDirty = true }
-    fun updateExerciseDefaultReps(value: String) { exerciseDefaultReps.value = value; defaultValueDirty = true }
+    fun updateNumberDefaultUnit(value: String) { numberDefaultUnit.value = value; defaultValueDirty = true; _isDirty.value = true }
+    fun updateExerciseDefaultSets(value: String) { exerciseDefaultSets.value = value; defaultValueDirty = true; _isDirty.value = true }
+    fun updateExerciseDefaultReps(value: String) { exerciseDefaultReps.value = value; defaultValueDirty = true; _isDirty.value = true }
     private var storedDefaultValue: EventValue? = null
 
     private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
     val parentCategory: StateFlow<Category.MetaCategory?> = _parentCategory.asStateFlow()
 
-    val effectiveEmoji: StateFlow<String> = combine(emojiUIState, _parentCategory) { state, parent ->
+    val effectiveEmoji: StateFlow<String> = combine(_emojiUIState, _parentCategory) { state, parent ->
         if (state.mode == EmojiMode.INHERIT) parent?.emoji ?: "" else state.customValue
     }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    val effectiveColor: StateFlow<Long> = combine(colorState, _parentCategory) { c, parent ->
+    val effectiveColor: StateFlow<Long> = combine(_colorState, _parentCategory) { c, parent ->
         c ?: parent?.color ?: DEFAULT_CATEGORY_COLOR
     }.stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_CATEGORY_COLOR)
 
-    val effectiveValueType: StateFlow<ValueType> = combine(valueTypeState, _parentCategory) { v, parent ->
+    val effectiveValueType: StateFlow<ValueType> = combine(_valueTypeState, _parentCategory) { v, parent ->
         v ?: parent?.valueType ?: ValueType.None
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ValueType.None)
 
-    val isColorInherited: StateFlow<Boolean> = colorState.map { it == null }
+    val isColorInherited: StateFlow<Boolean> = _colorState.map { it == null }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    val isValueTypeInherited: StateFlow<Boolean> = valueTypeState.map { it == null }
+    val isValueTypeInherited: StateFlow<Boolean> = _valueTypeState.map { it == null }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     // @spec CAT-UI-059
@@ -177,24 +191,24 @@ class CategoryEditViewModel @Inject constructor(
                 viewModelScope.launch {
                     val cat = repository.getCategoryById(categoryId).first()
                     if (cat == null) { _navigateBack.value = true; return@launch }
-                    name.value = cat.name
+                    _name.value = cat.name
                     storedDefaultValue = cat.defaultValue
                     seedDefaultValueFields(cat.defaultValue, cat.resolvedValueType)
                     when (cat) {
                         is Category.MetaCategory -> {
-                            emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, cat.emoji)
-                            colorState.value = cat.color
-                            valueTypeState.value = cat.valueType
+                            _emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, cat.emoji)
+                            _colorState.value = cat.color
+                            _valueTypeState.value = cat.valueType
                         }
                         is Category.SubCategory -> {
                             // @spec CAT-UI-062
-                            emojiUIState.value = if (cat.emoji != null) {
+                            _emojiUIState.value = if (cat.emoji != null) {
                                 EmojiUIState(EmojiMode.CUSTOM, cat.emoji)
                             } else {
                                 EmojiUIState(EmojiMode.INHERIT, cat.parent.emoji)
                             }
-                            colorState.value = cat.color
-                            valueTypeState.value = cat.valueType
+                            _colorState.value = cat.color
+                            _valueTypeState.value = cat.valueType
                             _parentCategory.value = cat.parent
                         }
                     }
@@ -209,7 +223,7 @@ class CategoryEditViewModel @Inject constructor(
                     if (parent is Category.MetaCategory) {
                         _parentCategory.value = parent
                         // @spec CAT-UI-062
-                        emojiUIState.value = EmojiUIState(EmojiMode.INHERIT, parent.emoji)
+                        _emojiUIState.value = EmojiUIState(EmojiMode.INHERIT, parent.emoji)
                         // @spec CAT-UI-066 — pre-populate from parent's resolved default; don't mark dirty
                         seedDefaultValueFields(parent.resolvedDefaultValue, parent.resolvedValueType)
                     } else {
@@ -220,11 +234,11 @@ class CategoryEditViewModel @Inject constructor(
 
             else -> {
                 // MetaCategory create mode.
-                emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "")
-                valueTypeState.value = ValueType.None
+                _emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "")
+                _valueTypeState.value = ValueType.None
                 // @spec CAT-UI-043
                 viewModelScope.launch {
-                    colorState.value = categoryColorForIndex(
+                    _colorState.value = categoryColorForIndex(
                         repository.getAndIncrementNextCategoryColorIndex(categoryColorPalette.size)
                     )
                 }
@@ -233,11 +247,11 @@ class CategoryEditViewModel @Inject constructor(
     }
 
     suspend fun save() {
-        val nameVal = name.value.trim()
+        val nameVal = _name.value.trim()
         if (nameVal.isEmpty()) { _saveResult.value = SaveResult.ValidationError("name"); return }
 
         val parent = _parentCategory.value
-        val emojiStateVal = emojiUIState.value
+        val emojiStateVal = _emojiUIState.value
         val emojiToSave: String? = if (parent != null && emojiStateVal.mode == EmojiMode.INHERIT) null else emojiStateVal.customValue
         if (emojiToSave != null) {
             if (emojiToSave.isEmpty()) { _saveResult.value = SaveResult.ValidationError("emoji"); return }
@@ -272,8 +286,8 @@ class CategoryEditViewModel @Inject constructor(
                 id = categoryId ?: UUID.randomUUID().toString(),
                 name = nameVal,
                 emoji = emojiToSave,
-                color = colorState.value,
-                valueType = valueTypeState.value,
+                color = _colorState.value,
+                valueType = _valueTypeState.value,
                 defaultValue = defaultValueToSave,
                 allowEmptyText = true,
                 sortOrder = sortOrder,
@@ -284,8 +298,8 @@ class CategoryEditViewModel @Inject constructor(
                 id = categoryId ?: UUID.randomUUID().toString(),
                 name = nameVal,
                 emoji = emojiToSave ?: "",
-                color = colorState.value ?: DEFAULT_CATEGORY_COLOR,
-                valueType = valueTypeState.value ?: ValueType.None,
+                color = _colorState.value ?: DEFAULT_CATEGORY_COLOR,
+                valueType = _valueTypeState.value ?: ValueType.None,
                 defaultValue = defaultValueToSave,
                 allowEmptyText = true,
                 sortOrder = sortOrder,
@@ -299,6 +313,7 @@ class CategoryEditViewModel @Inject constructor(
         } else {
             repository.saveCategory(category)
         }
+        _isDirty.value = false
         _saveResult.value = SaveResult.Success
     }
 

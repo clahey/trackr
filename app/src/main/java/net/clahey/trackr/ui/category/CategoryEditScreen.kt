@@ -1,5 +1,6 @@
- package net.clahey.trackr.ui.category
+package net.clahey.trackr.ui.category
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +60,7 @@ import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
+import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.theme.categoryColorPalette
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.launch
@@ -68,7 +69,7 @@ import kotlinx.coroutines.launch
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
 // CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057,
-// CAT-UI-059, CAT-UI-060, CAT-UI-061, CAT-NAV-005, CAT-NAV-010, APP-NAV-004
+// CAT-UI-059, CAT-UI-060, CAT-UI-061, CAT-UI-067, CAT-NAV-005, CAT-NAV-006, CAT-NAV-010, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditScreen(
@@ -93,9 +94,14 @@ fun CategoryEditScreen(
     val previewCategory by viewModel.previewCategory.collectAsState()
     val previewEvent by viewModel.previewEvent.collectAsState()
     val isEditMode = viewModel.isEditMode
+    val isDirty by viewModel.isDirty.collectAsState()
 
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
+    var showBackDiscardDialog by remember { mutableStateOf(false) }
+
+    // @spec CAT-NAV-006
+    BackHandler(enabled = isDirty) { showBackDiscardDialog = true }
 
     val categoryNotFound = stringResource(R.string.category_not_found)
     LaunchedEffect(navigateBack) {
@@ -114,12 +120,25 @@ fun CategoryEditScreen(
         )
     }
 
+    // @spec CAT-NAV-006
+    if (showBackDiscardDialog) {
+        UnsavedChangesDialog(
+            onSave = { scope.launch { viewModel.save() } },
+            onDiscard = { onNavigateBack(null) },
+            onCancel = { showBackDiscardDialog = false },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(if (isEditMode) R.string.category_edit_title else R.string.category_new_title)) },
                 navigationIcon = {
-                    IconButton(onClick = { onNavigateBack(null) }) {
+                    // @spec CAT-NAV-006
+                    IconButton(onClick = {
+                        if (isDirty) showBackDiscardDialog = true
+                        else onNavigateBack(null)
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
@@ -156,7 +175,7 @@ fun CategoryEditScreen(
 
             OutlinedTextField(
                 value = name,
-                onValueChange = { viewModel.name.value = it },
+                onValueChange = { viewModel.setName(it) },
                 label = { Text(stringResource(R.string.category_field_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 isError = saveResult is SaveResult.ValidationError &&
@@ -168,7 +187,7 @@ fun CategoryEditScreen(
                 parentEmoji = parentCategory?.emoji,
                 isError = saveResult is SaveResult.ValidationError &&
                         (saveResult as SaveResult.ValidationError).field == "emoji",
-                onUIStateChange = { viewModel.emojiUIState.value = it },
+                onUIStateChange = { viewModel.setEmojiUIState(it) },
             )
 
             Text(stringResource(R.string.category_field_color), style = MaterialTheme.typography.labelMedium)
@@ -178,7 +197,7 @@ fun CategoryEditScreen(
                 parentCategory = parentCategory,
                 effectiveColor = effectiveColor,
                 isColorInherited = isColorInherited,
-                onSelectColor = { viewModel.colorState.value = it },
+                onSelectColor = { viewModel.setColorState(it) },
             )
 
             // @spec CAT-UI-057
@@ -186,8 +205,8 @@ fun CategoryEditScreen(
                 selected = effectiveValueType,
                 isValueTypeInherited = isValueTypeInherited,
                 parentCategory = parentCategory,
-                onSelect = { viewModel.valueTypeState.value = it },
-                onSelectInherit = { viewModel.valueTypeState.value = null },
+                onSelect = { viewModel.setValueTypeState(it) },
+                onSelectInherit = { viewModel.setValueTypeState(null) },
             )
 
             valueTypeWarning?.let { tier ->
@@ -232,13 +251,15 @@ fun CategoryEditScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = { scope.launch { viewModel.save() } },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.action_save))
+            // @spec CAT-UI-067
+            if (isDirty) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { scope.launch { viewModel.save() } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.action_save))
+                }
             }
         }
     }

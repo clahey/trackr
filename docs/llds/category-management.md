@@ -115,7 +115,8 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
 - Accepts an optional `categoryId` and an optional `parentId` (set when creating a subcategory from a parent's edit screen); loads existing category on init if `categoryId` is provided
 - **Stale category guard:** if `getCategoryById` returns null on init (edit mode only), sets `"snackbar_message"` on the previous back stack entry's `SavedStateHandle` and emits a navigate-back signal via `navigateBack: StateFlow<Boolean>`. The category list screen observes `"snackbar_message"` on its own back stack entry and shows a snackbar on resume.
 - `parent: StateFlow<Category.MetaCategory?>` — loaded when `parentId` is non-null; drives the inherit/override UI and effective value resolution
-- **Per-field form state for inheritable fields** (SubCategory mode only): `emojiUIState: MutableStateFlow<EmojiUIState>`, `colorState: MutableStateFlow<Long?>`, `valueTypeState: MutableStateFlow<ValueType?>`. `EmojiUIState(mode: EmojiMode, customValue: String)` where `mode` ∈ {INHERIT, CUSTOM}; `customValue` is always preserved across mode switches so switching back to Custom restores the previous entry. `colorState` and `valueTypeState` remain null = inherit. For MetaCategory, `emojiUIState` is always CUSTOM.
+- **Dirty tracking:** `isDirty: StateFlow<Boolean>` starts false; set to true by any user-initiated field mutation. The init block writes fields directly (no dirty side-effect). The Save button is visible only when `isDirty` is true. When `isDirty` is true, attempting to navigate back (hardware back button or navigation icon) shows an UnsavedChangesDialog (Save / Discard / Cancel); Save calls `save()` which navigates back via `SaveResult.Success`; Discard navigates back without persisting; Cancel dismisses the dialog. `UnsavedChangesDialog` is a shared composable in `ui/components/`.
+- **Per-field form state for inheritable fields** (SubCategory mode only): `name`, `emojiUIState`, `colorState`, `valueTypeState` are private `MutableStateFlow`s exposed as read-only `StateFlow`s with public setter functions (`setName`, `setEmojiUIState`, `setColorState`, `setValueTypeState`) that set `isDirty = true`. `EmojiUIState(mode: EmojiMode, customValue: String)` where `mode` ∈ {INHERIT, CUSTOM}; `customValue` is always preserved across mode switches so switching back to Custom restores the previous entry. `colorState` and `valueTypeState` remain null = inherit. For MetaCategory, `emojiUIState` is always CUSTOM.
 - **Default value form state**: `numberDefaultUnit: MutableStateFlow<String>` (used when effective `valueType == Number`); `exerciseDefaultSets: MutableStateFlow<String>` and `exerciseDefaultReps: MutableStateFlow<String>` (used when effective `valueType == Exercise`), initialized to "3" and "15".
   - **On load (edit mode)**: `numberDefaultUnit` is seeded from `(storedDefaultValue as? NumberValue)?.unit ?: ""`; `exerciseDefaultSets`/`Reps` from `(storedDefaultValue as? ExerciseValue)?.sets/reps` or the "3"/"15" fallback.
   - **On load (SubCategory create mode)**: pre-populate `numberDefaultUnit` and `exerciseDefaultSets`/`Reps` from the parent's `resolvedDefaultValue` (same pattern as `emojiUIState.customValue`); the stored `defaultValue` starts as null (inherit). A `defaultValueDirty: Boolean` flag (false on open) tracks whether the user has edited any default field; it is set to true on any edit.
@@ -173,8 +174,9 @@ Categories (list)
 Category Edit
     ├── [toolbar: Create subcategory] → Category Edit (new SubCategory, parentId set)  (MetaCategory only)
     ├── [toolbar: Delete]        → confirmation → delete → back to list  (edit mode only)
-    ├── [save]                   → back to list
-    └── [cancel/back]            → back to list
+    ├── [save]                   → back to list  (button only visible when dirty)
+    ├── [back, clean]            → back to list
+    └── [back, dirty]            → UnsavedChangesDialog → Save / Discard / Cancel
 ```
 
 Deletion can be initiated from either the list (long-press) or the edit screen (toolbar). Both paths go through the same confirmation and deletion logic.

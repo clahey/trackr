@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,6 +61,7 @@ import kotlinx.coroutines.withContext
 import net.clahey.trackr.R
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.ui.SaveResult
+import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.components.ValueInputField
 import net.clahey.trackr.ui.components.ValueUIState
 import java.time.ZoneId
@@ -403,24 +403,3 @@ private fun EventFormContent(
     }
 }
 
-@Composable
-private fun UnsavedChangesDialog(
-    onSave: () -> Unit,
-    onDiscard: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(stringResource(R.string.event_unsaved_changes_title)) },
-        text = { Text(stringResource(R.string.event_unsaved_changes_message)) },
-        confirmButton = {
-            TextButton(onClick = onSave) { Text(stringResource(R.string.action_save)) }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onDiscard) { Text(stringResource(R.string.action_discard)) }
-                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
-            }
-        },
-    )
-}

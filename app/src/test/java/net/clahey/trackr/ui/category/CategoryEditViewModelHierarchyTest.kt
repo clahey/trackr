@@ -46,7 +46,7 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(child)
         repo.saveEvent(makeEvent("e1", "child")) // inheriting SubCategory event
         val vm = editVm("parent")
-        vm.valueTypeState.value = ValueType.Number // non-reversible; count > 0 → warning
+        vm.setValueTypeState(ValueType.Number) // non-reversible; count > 0 → warning
         assertNotNull(vm.valueTypeWarning.value)
     }
 
@@ -58,7 +58,7 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(child)
         repo.saveEvent(makeEvent("e1", "child")) // non-inheriting SubCategory event
         val vm = editVm("parent")
-        vm.valueTypeState.value = ValueType.Number
+        vm.setValueTypeState(ValueType.Number)
         assertNull(vm.valueTypeWarning.value) // child's event not counted
     }
 
@@ -70,7 +70,7 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(child)
         repo.saveEvent(makeEvent("e1", "parent")) // parent's event — must not count for child
         val vm = editVm("child")
-        vm.valueTypeState.value = ValueType.Number
+        vm.setValueTypeState(ValueType.Number)
         assertNull(vm.valueTypeWarning.value) // child has zero own events
     }
 
@@ -82,9 +82,9 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(child)
         repo.saveEvent(makeEvent("e1", "child"))
         val vm = editVm("child")
-        vm.valueTypeState.value = ValueType.None // Scale→None is Unsafe; event exists → warning
+        vm.setValueTypeState(ValueType.None) // Scale→None is Unsafe; event exists → warning
         assertNotNull(vm.valueTypeWarning.value)
-        vm.valueTypeState.value = null // revert to inherit → effectiveValueType = Scale = original
+        vm.setValueTypeState(null) // revert to inherit → effectiveValueType = Scale = original
         assertNull(vm.valueTypeWarning.value) // back to original (CAT-UI-031)
     }
 
@@ -112,7 +112,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent", sortOrder = 5)
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        vm.name.value = "child"
+        vm.setName("child")
         vm.save()
         assertEquals(SaveResult.Success, vm.saveResult.value)
         val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory
@@ -127,7 +127,7 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(child)
         repo.saveEvent(makeEvent("e1", "child", null)) // None-type event on inheriting child
         val vm = editVm("parent")
-        vm.valueTypeState.value = ValueType.Number
+        vm.setValueTypeState(ValueType.Number)
         vm.save()
         val childEvent = repo.getEventsByCategory("child").first().first()
         assertEquals(EventValue.NumberValue(0.0, null), childEvent.value)
@@ -141,7 +141,7 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(child)
         repo.saveEvent(makeEvent("e1", "child", EventValue.TextValue("hello")))
         val vm = editVm("parent")
-        vm.valueTypeState.value = ValueType.Number
+        vm.setValueTypeState(ValueType.Number)
         vm.save()
         val childEvent = repo.getEventsByCategory("child").first().first()
         assertEquals(EventValue.TextValue("hello"), childEvent.value) // not migrated
@@ -172,7 +172,7 @@ class CategoryEditViewModelHierarchyTest {
             defaultValue = EventValue.NumberValue(0.0, "kg"))
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        vm.name.value = "child"
+        vm.setName("child")
         vm.save()
         val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory
         assertNull(saved.defaultValue)
@@ -184,7 +184,7 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
         vm.updateNumberDefaultUnit("lbs")
-        vm.name.value = "child"
+        vm.setName("child")
         vm.save()
         val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory
         assertEquals(EventValue.NumberValue(0.0, "lbs"), saved.defaultValue)
@@ -196,7 +196,7 @@ class CategoryEditViewModelHierarchyTest {
             defaultValue = EventValue.NumberValue(0.0, "kg"))
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        vm.valueTypeState.value = ValueType.Exercise
+        vm.setValueTypeState(ValueType.Exercise)
         assertEquals("3", vm.exerciseDefaultSets.value)
         assertEquals("15", vm.exerciseDefaultReps.value)
     }
