@@ -53,7 +53,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 | Field | Input | Shown when | SubCategory inherit option |
 |---|---|---|---|
 | Name | Text field | Always | N/A — name is never inherited |
-| Emoji | Single-character text field (system emoji keyboard) | Always | SubCategory only: "Inherit" checkbox to the left of the text field. When checked (inheriting), the field is non-editable and shows the parent's emoji. When unchecked (custom), the field is editable. Custom value is preserved in `EmojiUIState` across mode switches. |
+| Emoji | Single-character text field (system emoji keyboard) | Always | SubCategory only: "Inherit" toggle (Switch) to the left of the text field. Tapping anywhere in the toggle row (toggle or label) flips the state. When on (inheriting), the field is non-editable and shows the parent's emoji. When off (custom), the field is editable. Custom value is preserved in `EmojiUIState` across mode switches. |
 | Color | Preset color palette picker; out-of-palette swatch if current color is not in palette | Always | Extra circle in the palette row showing the parent's color with a small label; selecting it sets `color = null` (inherit) |
 | Value type | Segmented picker / dropdown | Always | Extra "Same as [ParentName] ([TypeName])" row in the picker (e.g., "Same as Running (Exercise)"); selecting it sets `valueType = null` (inherit) |
 | Default value | Type-dependent sub-fields (see below) | effective `valueType == Number` or `Exercise` | N/A (not shown for other inherited types) |

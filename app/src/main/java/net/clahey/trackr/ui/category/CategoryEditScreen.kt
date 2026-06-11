@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +26,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -36,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -280,19 +281,23 @@ private fun EmojiField(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (parentEmoji != null) {
+            // @spec CAT-UI-055
             Row(
+                modifier = Modifier
+                    .toggleable(
+                        value = isInherited,
+                        onValueChange = { checked ->
+                            onUIStateChange(emojiUIState.copy(
+                                mode = if (checked) EmojiMode.INHERIT else EmojiMode.CUSTOM,
+                            ))
+                        },
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Checkbox(
-                    checked = isInherited,
-                    onCheckedChange = { checked ->
-                        onUIStateChange(emojiUIState.copy(
-                            mode = if (checked) EmojiMode.INHERIT else EmojiMode.CUSTOM,
-                        ))
-                    },
-                )
                 Text(stringResource(R.string.category_emoji_inherit))
+                Switch(checked = isInherited, onCheckedChange = null)
             }
         }
         OutlinedTextField(
