@@ -218,7 +218,6 @@ fun CategoryEditScreen(
                 isValueTypeInherited = isValueTypeInherited,
                 parentCategory = parentCategory,
                 onSelect = { viewModel.setValueTypeState(it) },
-                onSelectInherit = { viewModel.setValueTypeState(null) },
             )
 
             valueTypeWarning?.let { tier ->
@@ -497,8 +496,7 @@ private fun ValueTypeSelector(
     selected: ValueType,
     isValueTypeInherited: Boolean,
     parentCategory: Category.MetaCategory?,
-    onSelect: (ValueType) -> Unit,
-    onSelectInherit: () -> Unit,
+    onSelect: (ValueType?) -> Unit,
 ) {
     val types = listOf(
         ValueType.None,
@@ -530,7 +528,7 @@ private fun ValueTypeSelector(
             if (inheritLabel != null) {
                 DropdownMenuItem(
                     text = { Text(inheritLabel) },
-                    onClick = { onSelectInherit(); expanded = false },
+                    onClick = { onSelect(null); expanded = false },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )
             }
