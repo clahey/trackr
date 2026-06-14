@@ -72,6 +72,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.datastore.preferences)
     implementation(libs.coil.compose)
+    implementation(libs.emoji2.emojipicker)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

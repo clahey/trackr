@@ -4,11 +4,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,23 +17,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -49,12 +55,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.R
 import net.clahey.trackr.domain.Category
@@ -70,7 +79,8 @@ import kotlinx.coroutines.launch
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
 // CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057,
-// CAT-UI-059, CAT-UI-060, CAT-UI-061, CAT-UI-067, CAT-NAV-005, CAT-NAV-006, CAT-NAV-010, APP-NAV-004
+// CAT-UI-059, CAT-UI-060, CAT-UI-061, CAT-UI-067, CAT-UI-068, CAT-UI-069, CAT-UI-070,
+// CAT-UI-071, CAT-UI-072, CAT-UI-073, CAT-NAV-005, CAT-NAV-006, CAT-NAV-010, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditScreen(
@@ -183,6 +193,7 @@ fun CategoryEditScreen(
                         (saveResult as SaveResult.ValidationError).field == "name",
             )
 
+            Text(stringResource(R.string.category_field_emoji), style = MaterialTheme.typography.labelMedium)
             EmojiField(
                 emojiUIState = emojiUIState,
                 parentEmoji = parentCategory?.emoji,
@@ -266,7 +277,16 @@ fun CategoryEditScreen(
     }
 }
 
-// @spec CAT-UI-055, CAT-UI-061
+private val QUICK_PICK_EMOJIS = listOf(
+    "🏃", "🏋️", "🚴", "🧘", "💪", "🤸",
+    "💊", "🩺", "🌡️", "🩹",
+    "😴", "💧", "☕", "🍎", "🥗",
+    "😊", "😢", "🧠", "❤️", "🌿",
+    "🌞", "📚", "🎵", "🎮", "🎯",
+)
+
+// @spec CAT-UI-055, CAT-UI-061, CAT-UI-068, CAT-UI-069, CAT-UI-070, CAT-UI-071, CAT-UI-072, CAT-UI-073
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EmojiField(
     emojiUIState: EmojiUIState,
@@ -275,15 +295,25 @@ private fun EmojiField(
     onUIStateChange: (EmojiUIState) -> Unit,
 ) {
     val isInherited = parentEmoji != null && emojiUIState.mode == EmojiMode.INHERIT
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    val currentCustomEmoji = emojiUIState.customValue
+
+    var showPicker by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+    val selectedIndex = remember(currentCustomEmoji, isInherited) {
+        if (!isInherited) QUICK_PICK_EMOJIS.indexOf(currentCustomEmoji).takeIf { it >= 0 }
+        else null
+    }
+    LaunchedEffect(selectedIndex) {
+        selectedIndex?.let { listState.animateScrollToItem(it) }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // @spec CAT-UI-055
         if (parentEmoji != null) {
-            // @spec CAT-UI-055
             Row(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .toggleable(
                         value = isInherited,
                         onValueChange = { checked ->
@@ -297,17 +327,84 @@ private fun EmojiField(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(stringResource(R.string.category_emoji_inherit))
+                Text(
+                    text = parentEmoji,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.alpha(if (isInherited) 1f else 0.38f),
+                )
+                Spacer(modifier = Modifier.weight(1f))
                 Switch(checked = isInherited, onCheckedChange = null)
             }
         }
-        OutlinedTextField(
-            value = if (isInherited) parentEmoji ?: "" else emojiUIState.customValue,
-            onValueChange = { onUIStateChange(emojiUIState.copy(mode = EmojiMode.CUSTOM, customValue = it)) },
-            label = { Text(stringResource(R.string.category_field_emoji)) },
-            modifier = Modifier.weight(1f),
-            enabled = !isInherited,
-            isError = isError,
-        )
+
+        // @spec CAT-UI-068, CAT-UI-069
+        LazyRow(
+            state = listState,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp),
+        ) {
+            items(QUICK_PICK_EMOJIS) { emoji ->
+                val isSelected = !isInherited && emoji == currentCustomEmoji
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (isSelected) Modifier.background(MaterialTheme.colorScheme.primaryContainer)
+                            else Modifier
+                        )
+                        .clickable { onUIStateChange(EmojiUIState(EmojiMode.CUSTOM, emoji)) },
+                ) {
+                    Text(text = emoji, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
+
+        // @spec CAT-UI-070, CAT-UI-073
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(onClick = { showPicker = true }) {
+                Icon(
+                    Icons.Default.EmojiEmotions,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(stringResource(R.string.category_emoji_browse))
+            }
+            if (!isInherited && currentCustomEmoji.isNotEmpty() && currentCustomEmoji !in QUICK_PICK_EMOJIS) {
+                Text(text = currentCustomEmoji, style = MaterialTheme.typography.titleLarge)
+            }
+        }
+
+        if (isError) {
+            Text(
+                text = stringResource(R.string.category_emoji_error),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+
+    // @spec CAT-UI-070, CAT-UI-071
+    if (showPicker) {
+        ModalBottomSheet(onDismissRequest = { showPicker = false }) {
+            AndroidView(
+                factory = { context -> EmojiPickerView(context) },
+                update = { view ->
+                    view.setOnEmojiPickedListener { item ->
+                        onUIStateChange(EmojiUIState(EmojiMode.CUSTOM, item.emoji))
+                        showPicker = false
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(400.dp),
+            )
+        }
     }
 }
 

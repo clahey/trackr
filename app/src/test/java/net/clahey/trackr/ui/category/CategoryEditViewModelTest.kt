@@ -667,6 +667,35 @@ class CategoryEditViewModelTest {
         assertEquals("🎯", saved.emoji)
     }
 
+    // @spec CAT-UI-071
+    @Test fun `picker selection while in Inherit mode switches to Custom mode with selected emoji`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        assertEquals(EmojiMode.INHERIT, vm.emojiUIState.value.mode)
+        vm.setEmojiUIState(EmojiUIState(EmojiMode.CUSTOM, "🌿"))
+        assertEquals(EmojiMode.CUSTOM, vm.emojiUIState.value.mode)
+        assertEquals("🌿", vm.emojiUIState.value.customValue)
+    }
+
+    // @spec CAT-UI-072
+    @Test fun `quick-pick selection while in Inherit mode overwrites preserved customValue`() = runTest {
+        val parent = makeCategory("parent")
+        val child = makeSubCategory("child", parent)
+        repo.saveCategory(parent)
+        repo.saveCategory(child)
+        vm = editVm("child")
+        vm.setEmojiUIState(EmojiUIState(EmojiMode.CUSTOM, "🎯"))
+        vm.setEmojiUIState(vm.emojiUIState.value.copy(mode = EmojiMode.INHERIT))
+        assertEquals(EmojiMode.INHERIT, vm.emojiUIState.value.mode)
+        assertEquals("🎯", vm.emojiUIState.value.customValue)
+        vm.setEmojiUIState(EmojiUIState(EmojiMode.CUSTOM, "💊"))
+        assertEquals(EmojiMode.CUSTOM, vm.emojiUIState.value.mode)
+        assertEquals("💊", vm.emojiUIState.value.customValue)
+    }
+
     // ---------- Preview event value ----------
 
     // @spec CAT-UI-059

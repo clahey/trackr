@@ -77,6 +77,8 @@
     <string name="category_field_name">Name</string>
     <string name="category_field_emoji">Emoji</string>
     <string name="category_emoji_inherit">Inherit</string>
+    <string name="category_emoji_browse">Browse all</string>
+    <string name="category_emoji_error">Please select an emoji</string>
     <string name="category_field_color">Color</string>
     <string name="category_color_inherited">Inherited</string>
     <string name="category_color_custom">Custom</string>

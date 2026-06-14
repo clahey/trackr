@@ -53,7 +53,7 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 | Field | Input | Shown when | SubCategory inherit option |
 |---|---|---|---|
 | Name | Text field | Always | N/A — name is never inherited |
-| Emoji | Single-character text field (system emoji keyboard) | Always | SubCategory only: "Inherit" toggle (Switch) to the left of the text field. Tapping anywhere in the toggle row (toggle or label) flips the state. When on (inheriting), the field is non-editable and shows the parent's emoji. When off (custom), the field is editable. Custom value is preserved in `EmojiUIState` across mode switches. |
+| Emoji | (1) Quick-pick row: horizontally scrollable row of ~25 curated tracking emojis; always visible and tappable; current selection highlighted and scrolled into view when it matches one of the 25. (2) Browse button: opens the emoji2 `EmojiPickerView` in a `ModalBottomSheet`; if the current custom selection is not in the quick-pick set, the selected emoji is displayed to the right of the Browse button. Tapping a quick-pick or the Browse button while in Inherit mode auto-switches to Custom mode. | Always | SubCategory only: Inherit toggle row above the quick-pick row: `[Inherit label] [parent emoji — full opacity when ON, greyed when OFF] ──── [Switch right-justified]`; tapping anywhere in the row flips the state. Custom emoji value is preserved in `EmojiUIState` across Inherit ↔ Custom mode switches. |
 | Color | Preset color palette picker; out-of-palette swatch if current color is not in palette | Always | Extra circle in the palette row showing the parent's color with a small label; selecting it sets `color = null` (inherit) |
 | Value type | Segmented picker / dropdown | Always | Extra "Same as [ParentName] ([TypeName])" row in the picker (e.g., "Same as Running (Exercise)"); selecting it sets `valueType = null` (inherit) |
 | Default value | Type-dependent sub-fields (see below) | effective `valueType == Number` or `Exercise` | N/A (not shown for other inherited types) |
@@ -195,7 +195,17 @@ Preset palette for v1. The palette is a fixed list of ARGB `Long` values defined
 
 ## Emoji Input
 
-Free-form single-character text field; the system emoji keyboard is used for input. Validation enforces a single grapheme cluster (not just a single `Char` — emoji can be multi-codepoint). Invalid input (empty or multi-grapheme) blocks save with an inline error.
+The emoji field has three layers, rendered as a `Column`:
+
+1. **Inherit toggle row** (SubCategory only): a single `Row` that is entirely `toggleable`. Layout: `[Inherit label] [parent emoji] [Spacer weight=1] [Switch]`. The parent emoji is shown at full alpha when Inherit mode is ON (it is the effective value); at reduced alpha when OFF (shown as a passive reference). Tapping anywhere in the row flips the Inherit state.
+
+2. **Quick-pick row**: a horizontally scrollable `LazyRow` of ~25 curated tracking-relevant emoji buttons (defined as a constant in the UI layer). Always visible and tappable regardless of Inherit state. When the current custom selection matches one of the 25, that button is visually highlighted (e.g. a border or filled background) and the row is scrolled so it is visible. When Inherit is ON and the user taps a quick-pick, the system switches to Custom mode and sets the tapped emoji.
+
+3. **Browse row**: a `[Browse all]` button that opens `EmojiPickerView` (from `androidx.emoji2:emoji2-emojipicker`) in a `ModalBottomSheet`. Selecting an emoji from the picker sets the custom value and dismisses the sheet; if Inherit was ON, it switches to Custom mode first. If the current custom selection is **not** in the quick-pick set (and is non-empty), the selected emoji is displayed in a `Text` or styled chip to the right of the Browse button — giving the user visual confirmation of their choice.
+
+For MetaCategory (no parent), the Inherit toggle row is omitted; the field renders only the quick-pick row and Browse row.
+
+**Validation:** empty or multi-grapheme-cluster custom value blocks save with an inline error (CAT-UI-021, CAT-UI-022). The quick-pick row and emoji2 picker both insert exactly one grapheme cluster by construction, so validation failures in practice come only from a stale or never-set state.
 
 ## Decisions & Alternatives
 
@@ -206,7 +216,7 @@ Free-form single-character text field; the system emoji keyboard is used for inp
 | Delete confirmation trigger | Event count > 0 | Always confirm; never confirm | Zero-event categories are safe to delete silently; non-zero warrants explicit user acknowledgment of data loss |
 | ValueType change behavior | Warn, don't block | Block change; silent change | User may intentionally reclassify a category; blocking is paternalistic; silent is dangerous |
 | Color selection | Preset palette (v1) | Full color wheel | Preset covers the common case with minimal UI complexity; wheel deferred until requested |
-| Emoji input | System keyboard, single grapheme validation | Custom emoji picker | System keyboard is zero-code; a picker adds significant UI complexity for marginal benefit |
+| Emoji input | Quick-pick row (~25 curated emojis) + emoji2 `ModalBottomSheet` picker; no text field | System keyboard text field; full custom picker only | Quick-picks cover common tracking emojis without a dependency; emoji2 covers the full Unicode set; removing the text field avoids a confusing affordance (text box implying typed input) |
 | `allowEmptyText` in editor | Hidden, always `true` in MVP | Exposed as a toggle | Not needed for initial use; field exists on the domain model for future exposure without migration |
 | Event count query | Point suspend query on delete intent | Always load counts with list; no count check | Loading counts with the list adds overhead for an operation that rarely happens; always confirming is noisy |
 
