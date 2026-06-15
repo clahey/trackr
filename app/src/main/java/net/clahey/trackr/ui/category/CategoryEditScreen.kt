@@ -93,14 +93,15 @@ fun CategoryEditScreen(
     val colorState by viewModel.colorState.collectAsState()
     val effectiveColor by viewModel.effectiveColor.collectAsState()
     val effectiveValueType by viewModel.effectiveValueType.collectAsState()
+    val valueTypeState by viewModel.valueTypeState.collectAsState()
     val numberDefaultUnit by viewModel.numberDefaultUnit.collectAsState()
     val exerciseDefaultSets by viewModel.exerciseDefaultSets.collectAsState()
     val exerciseDefaultReps by viewModel.exerciseDefaultReps.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
     val navigateBack by viewModel.navigateBack.collectAsState()
-    val isColorInherited by viewModel.isColorInherited.collectAsState()
-    val isValueTypeInherited by viewModel.isValueTypeInherited.collectAsState()
+    val isColorInherited = colorState == null
+    val isValueTypeInherited = valueTypeState == null
     val parentCategory by viewModel.parentCategory.collectAsState()
     val previewCategory by viewModel.previewCategory.collectAsState()
     val previewEvent by viewModel.previewEvent.collectAsState()

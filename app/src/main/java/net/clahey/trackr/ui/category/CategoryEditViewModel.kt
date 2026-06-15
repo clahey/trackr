@@ -101,12 +101,6 @@ class CategoryEditViewModel @Inject constructor(
         v ?: parent?.valueType ?: ValueType.None
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ValueType.None)
 
-    val isColorInherited: StateFlow<Boolean> = _colorState.map { it == null }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    val isValueTypeInherited: StateFlow<Boolean> = _valueTypeState.map { it == null }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
     // @spec CAT-UI-059
     val previewEventValue: StateFlow<EventValue?> = combine(
         effectiveValueType, _numberDefaultUnit, _exerciseDefaultSets, _exerciseDefaultReps,
