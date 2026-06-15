@@ -707,14 +707,14 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-059
     @Test fun `previewEventValue for Number with blank unit produces NumberValue(0, null)`() = runTest {
         vm.setValueTypeState(ValueType.Number)
-        vm.numberDefaultUnit.value = ""
+        vm.updateNumberDefaultUnit("")
         assertEquals(EventValue.NumberValue(0.0, null), vm.previewEventValue.value)
     }
 
     // @spec CAT-UI-059
     @Test fun `previewEventValue for Number with unit produces NumberValue(0, unit)`() = runTest {
         vm.setValueTypeState(ValueType.Number)
-        vm.numberDefaultUnit.value = "kg"
+        vm.updateNumberDefaultUnit("kg")
         assertEquals(EventValue.NumberValue(0.0, "kg"), vm.previewEventValue.value)
     }
 
@@ -972,7 +972,7 @@ class CategoryEditViewModelTest {
     @Test fun `previewEventValue for Number with null defaultValue uses unit field`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
         vm = editVm("c1")
-        vm.numberDefaultUnit.value = "kg"
+        vm.updateNumberDefaultUnit("kg")
         assertEquals(EventValue.NumberValue(0.0, "kg"), vm.previewEventValue.value)
     }
 

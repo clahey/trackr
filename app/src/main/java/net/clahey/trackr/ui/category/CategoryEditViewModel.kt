@@ -70,14 +70,20 @@ class CategoryEditViewModel @Inject constructor(
     val valueTypeState: StateFlow<ValueType?> = _valueTypeState.asStateFlow()
     fun setValueTypeState(value: ValueType?) { _valueTypeState.value = value; _isDirty.value = true }
 
-    val numberDefaultUnit = MutableStateFlow("")
-    val exerciseDefaultSets = MutableStateFlow("3")
-    val exerciseDefaultReps = MutableStateFlow("15")
+    private val _numberDefaultUnit = MutableStateFlow("")
+    val numberDefaultUnit: StateFlow<String> = _numberDefaultUnit.asStateFlow()
+
+    private val _exerciseDefaultSets = MutableStateFlow("3")
+    val exerciseDefaultSets: StateFlow<String> = _exerciseDefaultSets.asStateFlow()
+
+    private val _exerciseDefaultReps = MutableStateFlow("15")
+    val exerciseDefaultReps: StateFlow<String> = _exerciseDefaultReps.asStateFlow()
+
     private var defaultValueDirty = false
 
-    fun updateNumberDefaultUnit(value: String) { numberDefaultUnit.value = value; defaultValueDirty = true; _isDirty.value = true }
-    fun updateExerciseDefaultSets(value: String) { exerciseDefaultSets.value = value; defaultValueDirty = true; _isDirty.value = true }
-    fun updateExerciseDefaultReps(value: String) { exerciseDefaultReps.value = value; defaultValueDirty = true; _isDirty.value = true }
+    fun updateNumberDefaultUnit(value: String) { _numberDefaultUnit.value = value; defaultValueDirty = true; _isDirty.value = true }
+    fun updateExerciseDefaultSets(value: String) { _exerciseDefaultSets.value = value; defaultValueDirty = true; _isDirty.value = true }
+    fun updateExerciseDefaultReps(value: String) { _exerciseDefaultReps.value = value; defaultValueDirty = true; _isDirty.value = true }
     private var storedDefaultValue: EventValue? = null
 
     private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
@@ -103,7 +109,7 @@ class CategoryEditViewModel @Inject constructor(
 
     // @spec CAT-UI-059
     val previewEventValue: StateFlow<EventValue?> = combine(
-        effectiveValueType, numberDefaultUnit, exerciseDefaultSets, exerciseDefaultReps,
+        effectiveValueType, _numberDefaultUnit, _exerciseDefaultSets, _exerciseDefaultReps,
     ) { vt, unit, sets, reps ->
         val liveDefault = when (vt) {
             ValueType.Number -> EventValue.NumberValue(
@@ -270,11 +276,11 @@ class CategoryEditViewModel @Inject constructor(
             !defaultValueDirty -> storedDefaultValue  // CAT-UI-066: preserve unchanged when user hasn't edited fields
             effectiveVt == ValueType.Number -> EventValue.NumberValue(
                 (storedDefaultValue as? EventValue.NumberValue)?.value ?: 0.0,
-                numberDefaultUnit.value.takeIf { it.isNotBlank() },
+                _numberDefaultUnit.value.takeIf { it.isNotBlank() },
             )
             effectiveVt == ValueType.Exercise -> {
-                val sets = exerciseDefaultSets.value.toIntOrNull() ?: 3
-                val reps = exerciseDefaultReps.value.toIntOrNull() ?: 15
+                val sets = _exerciseDefaultSets.value.toIntOrNull() ?: 3
+                val reps = _exerciseDefaultReps.value.toIntOrNull() ?: 15
                 EventValue.ExerciseValue(sets, reps)
             }
             else -> storedDefaultValue  // CAT-UI-065: leave unchanged
@@ -368,12 +374,12 @@ class CategoryEditViewModel @Inject constructor(
     private fun seedDefaultValueFields(dv: EventValue?, effectiveType: ValueType) {
         when {
             effectiveType == ValueType.Number -> {
-                numberDefaultUnit.value = (dv as? EventValue.NumberValue)?.unit ?: ""
+                _numberDefaultUnit.value = (dv as? EventValue.NumberValue)?.unit ?: ""
             }
             effectiveType == ValueType.Exercise -> {
                 val ev = dv as? EventValue.ExerciseValue
-                exerciseDefaultSets.value = ev?.sets?.toString() ?: "3"
-                exerciseDefaultReps.value = ev?.reps?.toString() ?: "15"
+                _exerciseDefaultSets.value = ev?.sets?.toString() ?: "3"
+                _exerciseDefaultReps.value = ev?.reps?.toString() ?: "15"
             }
         }
     }
