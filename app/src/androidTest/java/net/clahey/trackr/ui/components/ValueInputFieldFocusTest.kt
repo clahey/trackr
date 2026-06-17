@@ -5,7 +5,6 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import net.clahey.trackr.domain.ValueType
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,7 +19,7 @@ class ValueInputFieldFocusTest {
     @Test
     fun numberFieldFocusedWhenAutoFocusTrue() {
         composeTestRule.setContent {
-            ValueInputField(value = null, onValueChange = {}, valueType = ValueType.Number, autoFocus = true)
+            ValueInputField(uiState = ValueUIState.Number("", ""), onStateChange = {}, autoFocus = true)
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("value_input_field").assertIsFocused()
@@ -30,7 +29,7 @@ class ValueInputFieldFocusTest {
     @Test
     fun textFieldFocusedWhenAutoFocusTrue() {
         composeTestRule.setContent {
-            ValueInputField(value = null, onValueChange = {}, valueType = ValueType.Text, autoFocus = true)
+            ValueInputField(uiState = ValueUIState.Text(""), onStateChange = {}, autoFocus = true)
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("value_input_field").assertIsFocused()
@@ -40,7 +39,7 @@ class ValueInputFieldFocusTest {
     @Test
     fun durationHoursFieldFocusedWhenAutoFocusTrue() {
         composeTestRule.setContent {
-            ValueInputField(value = null, onValueChange = {}, valueType = ValueType.Duration, autoFocus = true)
+            ValueInputField(uiState = ValueUIState.Duration("", "", "0"), onStateChange = {}, autoFocus = true)
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("value_duration_h").assertIsFocused()
@@ -50,7 +49,7 @@ class ValueInputFieldFocusTest {
     @Test
     fun numberFieldNotFocusedByDefault() {
         composeTestRule.setContent {
-            ValueInputField(value = null, onValueChange = {}, valueType = ValueType.Number)
+            ValueInputField(uiState = ValueUIState.Number("", ""), onStateChange = {})
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("value_input_field").assertIsNotFocused()

@@ -1,5 +1,6 @@
 package net.clahey.trackr.ui.category
 
+import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,6 +70,7 @@ import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
+import net.clahey.trackr.ui.components.OutlinedFieldBox
 import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.theme.categoryColorPalette
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
@@ -80,7 +81,8 @@ import kotlinx.coroutines.launch
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
 // CAT-UI-053, CAT-UI-054, CAT-UI-055, CAT-UI-056, CAT-UI-057,
 // CAT-UI-059, CAT-UI-060, CAT-UI-061, CAT-UI-067, CAT-UI-068, CAT-UI-069, CAT-UI-070,
-// CAT-UI-071, CAT-UI-072, CAT-UI-073, CAT-NAV-005, CAT-NAV-006, CAT-NAV-010, APP-NAV-004
+// CAT-UI-071, CAT-UI-072, CAT-UI-073, CAT-UI-074, CAT-UI-075, CAT-UI-076,
+// CAT-NAV-005, CAT-NAV-006, CAT-NAV-010, APP-NAV-004
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditScreen(
@@ -190,28 +192,30 @@ fun CategoryEditScreen(
                 onValueChange = { viewModel.setName(it) },
                 label = { Text(stringResource(R.string.category_field_name)) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = saveResult is SaveResult.ValidationError &&
-                        (saveResult as SaveResult.ValidationError).field == "name",
+                isError = (saveResult as? SaveResult.ValidationError)?.field == "name",
             )
 
-            Text(stringResource(R.string.category_field_emoji), style = MaterialTheme.typography.labelMedium)
-            EmojiField(
-                emojiUIState = emojiUIState,
-                parentEmoji = parentCategory?.emoji,
-                isError = saveResult is SaveResult.ValidationError &&
-                        (saveResult as SaveResult.ValidationError).field == "emoji",
-                onUIStateChange = { viewModel.setEmojiUIState(it) },
-            )
+            val emojiIsError = (saveResult as? SaveResult.ValidationError)?.field == "emoji"
+            // @spec CAT-UI-074, CAT-UI-076
+            OutlinedFieldBox(label = stringResource(R.string.category_field_emoji), isError = emojiIsError) {
+                EmojiField(
+                    emojiUIState = emojiUIState,
+                    parentEmoji = parentCategory?.emoji,
+                    isError = emojiIsError,
+                    onUIStateChange = { viewModel.setEmojiUIState(it) },
+                )
+            }
 
-            Text(stringResource(R.string.category_field_color), style = MaterialTheme.typography.labelMedium)
-            // @spec CAT-UI-056
-            ColorPicker(
-                colorState = colorState,
-                parentCategory = parentCategory,
-                effectiveColor = effectiveColor,
-                isColorInherited = isColorInherited,
-                onSelectColor = { viewModel.setColorState(it) },
-            )
+            // @spec CAT-UI-056, CAT-UI-075
+            OutlinedFieldBox(label = stringResource(R.string.category_field_color)) {
+                ColorPicker(
+                    colorState = colorState,
+                    parentCategory = parentCategory,
+                    effectiveColor = effectiveColor,
+                    isColorInherited = isColorInherited,
+                    onSelectColor = { viewModel.setColorState(it) },
+                )
+            }
 
             // @spec CAT-UI-057
             ValueTypeSelector(
@@ -321,8 +325,7 @@ private fun EmojiField(
                                 mode = if (checked) EmojiMode.INHERIT else EmojiMode.CUSTOM,
                             ))
                         },
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -341,7 +344,6 @@ private fun EmojiField(
         LazyRow(
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = PaddingValues(horizontal = 4.dp),
         ) {
             items(QUICK_PICK_EMOJIS) { emoji ->
                 val isSelected = !isInherited && emoji == currentCustomEmoji
@@ -436,6 +438,7 @@ private fun Swatch(spec: SwatchSpec, width: Dp, height: Dp, shape: Shape) {
     }
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 private fun ColorPicker(
     colorState: Long?,

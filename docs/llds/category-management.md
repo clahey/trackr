@@ -53,10 +53,10 @@ Used for both create and edit. Toolbar contains a **Delete** action (visible onl
 | Field | Input | Shown when | SubCategory inherit option |
 |---|---|---|---|
 | Name | Text field | Always | N/A — name is never inherited |
-| Emoji | (1) Quick-pick row: horizontally scrollable row of ~25 curated tracking emojis; always visible and tappable; current selection highlighted and scrolled into view when it matches one of the 25. (2) Browse button: opens the emoji2 `EmojiPickerView` in a `ModalBottomSheet`; if the current custom selection is not in the quick-pick set, the selected emoji is displayed to the right of the Browse button. Tapping a quick-pick or the Browse button while in Inherit mode auto-switches to Custom mode. | Always | SubCategory only: Inherit toggle row above the quick-pick row: `[Inherit label] [parent emoji — full opacity when ON, greyed when OFF] ──── [Switch right-justified]`; tapping anywhere in the row flips the state. Custom emoji value is preserved in `EmojiUIState` across Inherit ↔ Custom mode switches. |
-| Color | Preset color palette picker; out-of-palette swatch if current color is not in palette | Always | Extra circle in the palette row showing the parent's color with a small label; selecting it sets `color = null` (inherit) |
-| Value type | Segmented picker / dropdown | Always | Extra "Same as [ParentName] ([TypeName])" row in the picker (e.g., "Same as Running (Exercise)"); selecting it sets `valueType = null` (inherit) |
-| Default value | Type-dependent sub-fields (see below) | effective `valueType == Number` or `Exercise` | N/A (not shown for other inherited types) |
+| Emoji | Wrapped in an `OutlinedFieldBox` (label "Emoji"). (1) Quick-pick row: horizontally scrollable row of ~25 curated tracking emojis; always visible and tappable; current selection highlighted and scrolled into view when it matches one of the 25. (2) Browse button: opens the emoji2 `EmojiPickerView` in a `ModalBottomSheet`; if the current custom selection is not in the quick-pick set, the selected emoji is displayed to the right of the Browse button. Tapping a quick-pick or the Browse button while in Inherit mode auto-switches to Custom mode. | Always | SubCategory only: Inherit toggle row, first item inside the `OutlinedFieldBox`, above the quick-pick row: `[Inherit label] [parent emoji — full opacity when ON, greyed when OFF] ──── [Switch right-justified]`; tapping anywhere in the row flips the state. Custom emoji value is preserved in `EmojiUIState` across Inherit ↔ Custom mode switches. |
+| Color | Wrapped in an `OutlinedFieldBox` (label "Color"). Preset color palette picker; out-of-palette swatch if current color is not in palette | Always | Extra circle in the palette row showing the parent's color with a small label; selecting it sets `color = null` (inherit) |
+| Value type | Segmented picker / dropdown (own `OutlinedTextField` border; not additionally wrapped) | Always | Extra "Same as [ParentName] ([TypeName])" row in the picker (e.g., "Same as Running (Exercise)"); selecting it sets `valueType = null` (inherit) |
+| Default value | Type-dependent sub-fields (see below); each its own `OutlinedTextField`, not wrapped in an outer box | effective `valueType == Number` or `Exercise` | N/A (not shown for other inherited types) |
 
 For a **MetaCategory**, none of the "inherit" options are shown (there is no parent). For a **SubCategory**, each inheritable field shows its inherit option. The inherit option for each field is shown first / in a visually distinct position so it is clearly a different kind of choice.
 
@@ -183,9 +183,13 @@ Deletion can be initiated from either the list (long-press) or the edit screen (
 
 The group picker is a shared UI component used by "Add to group", "Move to another group" (from list and from edit screen), and "Create new group" within the picker itself.
 
+## Field Section Box
+
+`OutlinedFieldBox` (`ui/components/OutlinedFieldBox.kt`) is a shared composable that draws a rounded-rect outline border with its label embedded in a notch at the top — replicating `OutlinedTextField`'s floating-label border style for content that isn't a text field. It takes a `label: String`, an optional `isError: Boolean = false`, and arbitrary `content: @Composable ColumnScope.() -> Unit`. The corner shape is sourced from the M3 theme (`MaterialTheme.shapes.extraSmall`, matching `OutlinedTextField`'s default shape) rather than a hardcoded value, per `theme.md`'s "default M3 shape scale, no overrides" decision. When `isError` is true, the border and label render in `MaterialTheme.colorScheme.error`, matching `OutlinedTextField`'s `isError` styling; the border/label otherwise use `MaterialTheme.colorScheme.outline` / `onSurfaceVariant`. Used to visually group the Emoji and Color sections on the category edit screen, matching the "boxed field" look that `OutlinedTextField` already gives Name and Value type. Name and Value type are not additionally wrapped — they already read as boxed via their own `OutlinedTextField`s, and wrapping them again would nest borders. For the same reason, the Value type section's warning text and default-value sub-fields (Unit / Default sets & reps) are left outside any box; each already has its own `OutlinedTextField` border.
+
 ## Color Selection
 
-Preset palette for v1. The palette is a fixed list of ARGB `Long` values defined in the UI layer. The domain model accepts any `Long` — the constraint is purely in the picker UI. Full color wheel deferred to a future version.
+The color picker is wrapped in an `OutlinedFieldBox` (label "Color"). Preset palette for v1. The palette is a fixed list of ARGB `Long` values defined in the UI layer. The domain model accepts any `Long` — the constraint is purely in the picker UI. Full color wheel deferred to a future version.
 
 **Layout:** the palette is displayed as an adaptive grid of rounded-rectangle swatches (`RoundedCornerShape(8.dp)`). On screens narrower than 480dp the grid is 6 columns × 2 rows; on screens 480dp and wider it is 12 columns × 1 row. Each swatch is sized to fill its cell (equal width, 44dp tall). A selected swatch is indicated by a 3dp white border.
 
@@ -195,7 +199,7 @@ Preset palette for v1. The palette is a fixed list of ARGB `Long` values defined
 
 ## Emoji Input
 
-The emoji field has three layers, rendered as a `Column`:
+The emoji field is wrapped in an `OutlinedFieldBox` (label "Emoji") and has three layers, rendered as a `Column` inside the box:
 
 1. **Inherit toggle row** (SubCategory only): a single `Row` that is entirely `toggleable`. Layout: `[Inherit label] [parent emoji] [Spacer weight=1] [Switch]`. The parent emoji is shown at full alpha when Inherit mode is ON (it is the effective value); at reduced alpha when OFF (shown as a passive reference). Tapping anywhere in the row flips the Inherit state.
 
@@ -217,6 +221,7 @@ For MetaCategory (no parent), the Inherit toggle row is omitted; the field rende
 | ValueType change behavior | Warn, don't block | Block change; silent change | User may intentionally reclassify a category; blocking is paternalistic; silent is dangerous |
 | Color selection | Preset palette (v1) | Full color wheel | Preset covers the common case with minimal UI complexity; wheel deferred until requested |
 | Emoji input | Quick-pick row (~25 curated emojis) + emoji2 `ModalBottomSheet` picker; no text field | System keyboard text field; full custom picker only | Quick-picks cover common tracking emojis without a dependency; emoji2 covers the full Unicode set; removing the text field avoids a confusing affordance (text box implying typed input) |
+| Section visual grouping | Shared `OutlinedFieldBox` composable (notched-label border matching `OutlinedTextField`), applied to Emoji and Color only | Material3 `OutlinedCard` with internal header text; no visual grouping (status quo) | `OutlinedCard` reads as a distinct "card" surface, not a "field" — doesn't visually match `OutlinedTextField`'s border language; Name and Value type already have implicit boxes via their own `OutlinedTextField`s, so wrapping them again would double the border |
 | `allowEmptyText` in editor | Hidden, always `true` in MVP | Exposed as a toggle | Not needed for initial use; field exists on the domain model for future exposure without migration |
 | Event count query | Point suspend query on delete intent | Always load counts with list; no count check | Loading counts with the list adds overhead for an operation that rarely happens; always confirming is noisy |
 
