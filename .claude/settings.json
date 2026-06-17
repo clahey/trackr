@@ -1,7 +1,4 @@
 {
-  "enabledPlugins": {
-    "linked-intent-dev@jszmajda-lid": true
-  },
   "permissions": {
     "allow": [
       "Bash(./gradlew testDebugUnitTest)",
@@ -10,5 +7,10 @@
       "Bash(./gradlew compileDebugKotlin)",
       "Bash(./gradlew test)"
     ]
+  },
+  "enabledPlugins": {
+    "linked-intent-dev@jszmajda-lid": true,
+    "frontend-design@claude-plugins-official": true,
+    "arrow-maintenance@jszmajda-lid": true
   }
 }
