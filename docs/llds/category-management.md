@@ -79,7 +79,8 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
 | None | Boolean | `null` → `Boolean(true)` | Yes | No — Boolean→None is non-safe |
 | None | Text | `null` → `Text("")` | Yes | Yes — Text("")→None via Text→None row |
 | None | Duration | `null` → `Duration(ZERO)` | Yes | No — Duration→None is non-safe |
-| Scale | Number | `Scale(n)` → `Number(n.toDouble(), null)` | Yes | No — Number→Scale is non-safe |
+| Scale | Number | `Scale(n)` → `Number(n.toDouble(), null)` | Yes | Yes — Number→Scale row (Scale's [1,10] integer invariant round-trips losslessly) |
+| Number | Scale | `Number(v, u)` → `Scale(v.toInt())` if `v` is an exact integer in `[1, 10]` and `u` is null/blank; else leave unchanged (a populated unit blocks conversion rather than being silently dropped). | No | Yes — Scale→Number row, for the subset of values that convert |
 | Scale | Text | `Scale(n)` → `Text(n.toString())` | Yes | Yes — Text("n")→Scale via Text→Scale row |
 | Boolean | Text | `Boolean(true)` → `Text("Yes")`, `Boolean(false)` → `Text("No")` | Yes | Yes — Text→Boolean row |
 | Number | Text | `Number(v, u)` → `Text("v u")` or `Text("v")` if u is null | Yes | Yes — Text→Number row (parses unit) |

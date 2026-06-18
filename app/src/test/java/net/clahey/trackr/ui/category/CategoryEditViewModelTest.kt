@@ -193,6 +193,24 @@ class CategoryEditViewModelTest {
         assertEquals(ValueTypeWarningTier.IrreversibleSafe, vm.valueTypeWarning.value)
     }
 
+    // @spec CAT-UI-030, CAT-UI-039
+    @Test fun `scale to number shows no warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Scale))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.Scale(7)))
+        vm = editVm("c1")
+        vm.setValueTypeState(ValueType.Number)
+        assertNull(vm.valueTypeWarning.value)
+    }
+
+    // @spec CAT-UI-030, CAT-UI-039
+    @Test fun `number to scale shows partial warning`() = runTest {
+        repo.saveCategory(makeCategory("c1", valueType = ValueType.Number))
+        repo.saveEvent(makeEvent("e1", "c1", EventValue.NumberValue(3.0, null)))
+        vm = editVm("c1")
+        vm.setValueTypeState(ValueType.Scale)
+        assertEquals(ValueTypeWarningTier.Partial, vm.valueTypeWarning.value)
+    }
+
     // @spec CAT-UI-030, CAT-UI-037
     @Test fun `text to number shows partial warning`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Text))

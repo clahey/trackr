@@ -46,13 +46,17 @@ fun convertOrDefault(value: EventValue, targetType: ValueType): ConversionOutcom
     }
 }
 
-// @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, CAT-UI-044, CAT-UI-045, CAT-UI-046
+// @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, CAT-UI-039, CAT-UI-044, CAT-UI-045, CAT-UI-046
 fun convertEventValue(value: EventValue?, to: ValueType): EventValue? {
     if (matchesValueType(value, to)) return value
     if (value == null) return defaultForType(to)
     return when {
         value is EventValue.Scale && to == ValueType.Number ->
             EventValue.NumberValue(value.value.toDouble(), null)
+        value is EventValue.NumberValue && to == ValueType.Scale -> {
+            val v = value.value
+            if (value.unit.isNullOrBlank() && v % 1.0 == 0.0 && v in 1.0..10.0) EventValue.Scale(v.toInt()) else value
+        }
         value is EventValue.Scale && to == ValueType.Text ->
             EventValue.TextValue(value.value.toString())
         value is EventValue.BooleanValue && to == ValueType.Text ->

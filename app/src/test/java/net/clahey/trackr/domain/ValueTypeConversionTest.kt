@@ -115,6 +115,24 @@ class ValueTypeConversionTest {
         assertEquals(EventValue.NumberValue(3.0, null), (result as ConversionOutcome.Converted).value)
     }
 
+    // @spec CAT-UI-039
+    @Test fun `convertOrDefault returns Converted when in-range integer number converts to scale`() {
+        val result = convertOrDefault(EventValue.NumberValue(7.0, null), ValueType.Scale)
+        assertTrue(result is ConversionOutcome.Converted)
+        assertEquals(EventValue.Scale(7), (result as ConversionOutcome.Converted).value)
+    }
+
+    // @spec CAT-UI-039
+    @Test fun `scale to number to scale round-trips losslessly for all valid scale values`() {
+        for (n in 1..10) {
+            val original = EventValue.Scale(n)
+            val asNumber = (convertOrDefault(original, ValueType.Number) as ConversionOutcome.Converted).value
+            val backToScale = convertOrDefault(asNumber, ValueType.Scale)
+            assertTrue(backToScale is ConversionOutcome.Converted)
+            assertEquals(original, (backToScale as ConversionOutcome.Converted).value)
+        }
+    }
+
     // @spec DM-PROC-015
     @Test fun `convertOrDefault returns Converted when parseable text converts to scale`() {
         val result = convertOrDefault(EventValue.TextValue("7"), ValueType.Scale)
@@ -143,6 +161,27 @@ class ValueTypeConversionTest {
     // @spec DM-PROC-016
     @Test fun `convertOrDefault returns UsedDefault when text is not parseable as scale`() {
         val result = convertOrDefault(EventValue.TextValue("hello"), ValueType.Scale)
+        assertTrue(result is ConversionOutcome.UsedDefault)
+        assertEquals(EventValue.Scale(5), (result as ConversionOutcome.UsedDefault).value)
+    }
+
+    // @spec CAT-UI-039
+    @Test fun `convertOrDefault returns UsedDefault when number is non-integer for scale`() {
+        val result = convertOrDefault(EventValue.NumberValue(3.5, null), ValueType.Scale)
+        assertTrue(result is ConversionOutcome.UsedDefault)
+        assertEquals(EventValue.Scale(5), (result as ConversionOutcome.UsedDefault).value)
+    }
+
+    // @spec CAT-UI-039
+    @Test fun `convertOrDefault returns UsedDefault when in-range integer number has a unit`() {
+        val result = convertOrDefault(EventValue.NumberValue(3.0, "kg"), ValueType.Scale)
+        assertTrue(result is ConversionOutcome.UsedDefault)
+        assertEquals(EventValue.Scale(5), (result as ConversionOutcome.UsedDefault).value)
+    }
+
+    // @spec CAT-UI-039
+    @Test fun `convertOrDefault returns UsedDefault when number is out of range for scale`() {
+        val result = convertOrDefault(EventValue.NumberValue(15.0, null), ValueType.Scale)
         assertTrue(result is ConversionOutcome.UsedDefault)
         assertEquals(EventValue.Scale(5), (result as ConversionOutcome.UsedDefault).value)
     }

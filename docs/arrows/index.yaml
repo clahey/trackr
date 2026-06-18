@@ -64,7 +64,7 @@ arrows:
     blocks: [event-logging]
     blockedBy: [data-model, local-storage, theme]
     detail: category-management.md
-    next: "2 confirmed genuine gaps before MVP: CAT-UI-002 (drag-to-reorder UI), CAT-UI-039 (Number-to-Scale conversion). CAT-UI-050 fixed this session; 13 of the remaining 15 nominally-active-gap specs were verified already implemented — spec file is stale, not the code."
+    next: "1 confirmed genuine gap before MVP: CAT-UI-002 (drag-to-reorder UI). CAT-UI-050 and CAT-UI-039 fixed this session; 13 of the remaining 15 nominally-active-gap specs were verified already implemented — spec file is stale, not the code."
     drift: "Spec checkboxes significantly out of sync with code: 13 active-gap specs (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-011a, CAT-UI-063-066, CAT-UI-015/016) confirmed implemented via direct code read but still marked [ ] (CAT-UI-015/016 corrected 2026-06-17 after initial false-negative grep)"
 
   event-logging:
