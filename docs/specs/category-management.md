@@ -22,8 +22,8 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
 - [x] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
 - [x] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
-- [ ] **CAT-UI-015**: When editing an existing category whose color is not in the preset palette, the color picker shall display the current color as a "Custom" swatch (labeled "Custom", 3 cells wide) to the right of the Inherited swatch when a parent is present, or alone on the top row when there is no parent; the Custom swatch is pre-selected; the user may keep it or replace it by tapping a preset.
-- [ ] **CAT-UI-016**: The out-of-palette current color swatch shall not be shown when creating a new category.
+- [x] **CAT-UI-015**: When editing an existing category whose color is not in the preset palette, the color picker shall display the current color as a "Custom" swatch (labeled "Custom", 3 cells wide) to the right of the Inherited swatch when a parent is present, or alone on the top row when there is no parent; the Custom swatch is pre-selected; the user may keep it or replace it by tapping a preset.
+- [x] **CAT-UI-016**: The out-of-palette current color swatch shall not be shown when creating a new category.
 
 ## Category Edit — Validation
 

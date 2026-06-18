@@ -438,6 +438,7 @@ private fun Swatch(spec: SwatchSpec, width: Dp, height: Dp, shape: Shape) {
     }
 }
 
+// @spec CAT-UI-014, CAT-UI-015, CAT-UI-016
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 private fun ColorPicker(
