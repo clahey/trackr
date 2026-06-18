@@ -4,7 +4,7 @@ Material3 theme, preset color palette, and category-color resolution/application
 
 ## Status
 
-**PARTIAL** — last audited 2026-06-17, updated same day (git SHA `be05346`). 10 of 11 specs implemented; the remaining gap is now scoped to filter chips only (category list rows fixed; CAT-UI-050 landed).
+**OK** — last audited 2026-06-17, updated same day (git SHA `be05346`). 11 of 11 specs implemented. THEME-UI-010 narrowed to the edit-screen palette swatches (now `[x]`); filter-chip color treatment is owned by `event-logging`'s EL-UI-015, now also implemented.
 
 ## References
 
@@ -25,6 +25,7 @@ Material3 theme, preset color palette, and category-color resolution/application
 - app/src/main/java/net/clahey/trackr/ui/theme/Theme.kt
 - app/src/main/java/net/clahey/trackr/ui/components/EventRow.kt
 - app/src/main/java/net/clahey/trackr/ui/category/CategoryListScreen.kt
+- app/src/main/java/net/clahey/trackr/ui/home/HomeScreen.kt (filter chips, `CategoryFilterChip`)
 
 ## Architecture
 
@@ -40,19 +41,19 @@ Material3 theme, preset color palette, and category-color resolution/application
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
 | Palette / resolution | THEME-PROC-* | all | 0 | 0 |
-| Application | THEME-UI-* | 9 of 10 | 0 | 1 |
+| Application | THEME-UI-* | 10 of 10 | 0 | 0 |
 
-**Summary:** 10 of 11 active specs implemented; 1 active gap (THEME-UI-010).
+**Summary:** 11 of 11 active specs implemented; 0 active gaps.
 
 ## Key Findings
 
 1. **CAT-UI-050 landed** — `CategoryListScreen.kt`'s `CategoryRow` now renders the resolved category color as a 48dp filled circle around the emoji (`Box` + `CircleShape` background + `foregroundColorForBackground`), mirroring `EventRow` exactly. THEME-UI-010's text was narrowed accordingly to drop "category list rows" from its container-background scope (that surface is now circle-avatar, like event rows).
-2. **THEME-UI-010 remains an active gap, now scoped to filter chips only.** Checked `HomeScreen.kt`'s `FilterChip` calls directly — they apply no category-color styling (no custom `containerColor`, no border color). This is the same underlying gap as `event-logging`'s EL-UI-015 ("MetaCategory filter chip shall display a colored border... filled background... when active"). The edit-screen color picker's palette swatches (the other remaining THEME-UI-010 location) are confirmed implemented via `CategoryEditScreen.kt`'s `Swatch` composable.
+2. **EL-UI-015 landed** — `HomeScreen.kt` now has a shared `CategoryFilterChip` composable used by both MetaCategory and SubCategory chips: colored border via `FilterChipDefaults.filterChipBorder` when unselected, filled `selectedContainerColor` + `foregroundColorForBackground` label when active. THEME-UI-010 was narrowed to drop chips entirely — chip color is a selection-state pattern distinct from the always-filled "container background" pattern, so its specification now lives solely in `event-logging`'s EL-UI-015 to avoid two segments owning the same behavior.
 
 ## Work Required
 
 ### Must Fix
-1. Apply category color to timeline filter chips (border when unselected, filled background when active) — single fix should close both THEME-UI-010 and EL-UI-015.
+_None — fully implemented._
 
 ### Should Fix
 _None noted this pass._

@@ -39,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,6 +92,7 @@ import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
 import net.clahey.trackr.ui.components.ValueInputField
 import net.clahey.trackr.ui.components.formatValue
+import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -215,7 +217,8 @@ fun HomeScreen(
                             else -> false
                         }
                         item(key = "meta-${meta.id}") {
-                            FilterChip(
+                            CategoryFilterChip(
+                                category = meta,
                                 selected = isMetaSelected,
                                 onClick = {
                                     val f = activeFilter
@@ -225,7 +228,6 @@ fun HomeScreen(
                                         else -> homeVm.setFilter(ActiveFilter.TopLevel(meta))
                                     }
                                 },
-                                label = { Text("${meta.resolvedEmoji} ${meta.name}") },
                             )
                         }
                         if (showSubChips) {
@@ -236,7 +238,8 @@ fun HomeScreen(
                                     is ActiveFilter.Sub -> f.sub.id == sub.id
                                     else -> false
                                 }
-                                FilterChip(
+                                CategoryFilterChip(
+                                    category = sub,
                                     selected = isSubSelected,
                                     onClick = {
                                         homeVm.setFilter(
@@ -244,7 +247,6 @@ fun HomeScreen(
                                             else ActiveFilter.Sub(meta, sub)
                                         )
                                     },
-                                    label = { Text("${sub.resolvedEmoji} ${sub.name}") },
                                 )
                             }
                         }
@@ -392,6 +394,27 @@ private fun DayHeader(date: LocalDate) {
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+    )
+}
+
+// @spec EL-UI-015
+@Composable
+private fun CategoryFilterChip(category: Category, selected: Boolean, onClick: () -> Unit) {
+    val color = Color(category.resolvedColor)
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text("${category.resolvedEmoji} ${category.name}") },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = color,
+            selectedLabelColor = Color(foregroundColorForBackground(category.resolvedColor)),
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = color,
+            selectedBorderColor = color,
+        ),
     )
 }
 

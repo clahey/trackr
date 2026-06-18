@@ -35,14 +35,14 @@ arrows:
     drift: "9 implemented specs unannotated; Auto Backup XML rules (LS-BE-090/091/092) verified correctly configured for trackr.db, images, and datastore"
 
   theme:
-    status: PARTIAL
+    status: OK
     sampled: 2026-06-17
     audited: 2026-06-17
     audited_sha: be05346ae253309a0417cbfd2362d38a81a47760
     blocks: [app-shell, category-management, event-logging]
     blockedBy: []
     detail: theme.md
-    next: "THEME-UI-010 narrowed to filter chips only (category list rows fixed via CAT-UI-050); apply category color as chip border/fill — same fix closes EL-UI-015"
+    next: null
     drift: null
 
   app-shell:
@@ -75,7 +75,7 @@ arrows:
     blocks: []
     blockedBy: [data-model, local-storage, theme, category-management]
     detail: event-logging.md
-    next: "Largest raw active-gap count in the project (21). Spot-checked 6 (EL-UI-051, EL-UI-051b, EL-NAV-001, EL-NAV-004, EL-UI-031/031a/031b, EL-UI-053) — all 6 confirmed already implemented. Remaining ~15 are unverified; recommend a full reconciliation pass before trusting this list as a real MVP backlog."
+    next: "EL-UI-015 fixed this session (filter chip color). Largest raw active-gap count in the project (20 remaining). Spot-checked 6 pre-existing gaps (EL-UI-051, EL-UI-051b, EL-NAV-001, EL-NAV-004, EL-UI-031/031a/031b, EL-UI-053) — all 6 confirmed already implemented. Remaining ~15 are unverified; recommend a full reconciliation pass before trusting this list as a real MVP backlog."
     drift: "Same stale-checkbox pattern as category-management, more pronounced: every spot-check (6/6) found implemented code marked as an active gap"
 
 unmapped:

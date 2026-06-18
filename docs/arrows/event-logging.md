@@ -57,18 +57,19 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 | ViewModels | various | unverified this pass | 0 | unverified |
 | Navigation | EL-NAV-* | spot-checked subset confirmed (EL-NAV-001, 004) | 0 | unverified subset |
 
-**Summary:** Raw count is 78 implemented / 21 active gap / 0 deferred. Every one of the 6 active-gap specs spot-checked this pass turned out to be implemented — treat the raw 21 as an upper bound on real gaps, not a trustworthy backlog, until reconciled.
+**Summary:** Raw count is 79 implemented / 20 active gap / 0 deferred (EL-UI-015 fixed this session). Every one of the 6 pre-existing active-gap specs spot-checked turned out to be implemented — treat the raw 20 as an upper bound on real gaps, not a trustworthy backlog, until reconciled.
 
 ## Key Findings
 
-1. **6 of 6 spot-checked "active gap" specs are confirmed already implemented:**
+1. **EL-UI-015 fixed this session** — timeline filter chips (`HomeScreen.kt`) now show the category's `resolvedColor` as a border when unselected and a filled background when active, via a new shared `CategoryFilterChip` composable used by both MetaCategory and SubCategory chips. This was a genuine gap (verified absent before the fix, not a stale marker) and was also `theme`'s THEME-UI-010 for the chip surface specifically.
+2. **6 of 6 spot-checked "active gap" specs (pre-existing, separate from EL-UI-015) are confirmed already implemented:**
    - `EL-UI-051`/`EL-UI-051b` (Boolean Yes/No two-button input, unselected-by-default state) — `ValueInputField.kt`'s `BoolInput` composable implements exactly this, including the unpressed-when-`selected == null` state. No `@spec` annotation present.
    - `EL-NAV-001` (FAB opens quick-log sheet) — `HomeScreen.kt:174`, `FloatingActionButton(onClick = { ...; showSheet = true })`. Carries `@spec EL-UI-013, EL-UI-075` but not `EL-NAV-001` itself.
    - `EL-NAV-004` (tap event row → navigate to edit) — `HomeScreen.kt:282`, `onNavigateToEventEdit(entry.event.id, filterId)`.
    - `EL-UI-031`/`031a`/`031b` (quick-log step 2 fields: value input, photo, notes, timestamp, save) — present in `HomeScreen.kt` with an `@spec EL-UI-031a, EL-UI-031b` annotation already on part of it.
    - `EL-UI-053` (Text multi-line input) — `TextInput` composable exists and is dispatched for `ValueUIState.Text`.
-2. **This is the largest unverified surface in the project.** 15 of the 21 nominal active gaps were not individually checked this pass (budget); given the 6/6 hit rate on "actually implemented," the prior is strongly that most of the remaining 15 are also done, but this is an inference, not a verification — don't treat it as confirmed.
-3. No reverse orphans — every `@spec EL-*` annotation in code points to a real spec ID.
+3. **This is the largest unverified surface in the project.** 15 of the remaining 20 nominal active gaps were not individually checked this pass (budget); given the 6/6 hit rate on "actually implemented" for the pre-existing sample, the prior is strongly that most of the remaining 15 are also done, but this is an inference, not a verification — don't treat it as confirmed.
+4. No reverse orphans — every `@spec EL-*` annotation in code points to a real spec ID.
 
 ## Work Required
 

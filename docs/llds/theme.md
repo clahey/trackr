@@ -58,7 +58,7 @@ Default Material 3 shape scale throughout (rounded corners per M3 spec). No over
 ## Category Color System
 
 Each `Category` carries a `color: Long` (ARGB). Category colors appear in:
-- Category chips on the timeline filter row
+- Category chips on the timeline filter row (selection-state container: border when unselected, filled when active)
 - Event rows in the timeline (circle avatar)
 - Category list rows (circle avatar)
 - The category edit screen color picker's palette swatches, and the live preview card (which reuses `EventRow`, so circle avatar)
@@ -67,7 +67,9 @@ Each `Category` carries a `color: Long` (ARGB). Category colors appear in:
 
 Category color usage differs by surface:
 
-**Container background** (chips, edit screen color picker palette swatches): the category color fills the entire surface; text and icons on top use `foregroundColorForBackground(color)` — white for dark backgrounds, black for light, per WCAG relative luminance. Material 3's `contentColorFor()` is not used here since category colors are arbitrary user values outside the app's tonal palette.
+**Container background** (edit screen color picker palette swatches): the category color fills the entire surface; text and icons on top use `foregroundColorForBackground(color)` — white for dark backgrounds, black for light, per WCAG relative luminance. Material 3's `contentColorFor()` is not used here since category colors are arbitrary user values outside the app's tonal palette.
+
+**Selection-state container** (timeline filter chips): unlike the always-filled treatment above, chips show only a colored border in the category color when unselected (label uses default chip text color), and switch to a fully filled container in the category color (label using `foregroundColorForBackground(color)`) when selected/active. The "All" chip has no associated category and uses default `FilterChip` styling throughout.
 
 **Circle avatar** (timeline event rows, category list rows): the category color fills a 48dp filled circle around the category emoji; the emoji is centered inside the circle using `foregroundColorForBackground(color)`. The surrounding row surface itself uses the M3 surface container color (event rows) or the list background (category list rows), not the category color.
 
