@@ -231,6 +231,7 @@ class EventEditViewModel @Inject constructor(
         _isDirty.value = true
     }
 
+    // @spec EL-NAV-007
     fun cancel() {
         val newImages = _imagePaths.value.filter { it !in originalImagePaths }
         newImages.forEach { imageStore.delete(it) }

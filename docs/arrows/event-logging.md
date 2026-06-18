@@ -4,7 +4,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 
 ## Status
 
-**PARTIAL** — last audited 2026-06-17 (git SHA `be05346`). 78 of 99 specs marked implemented; spot-checks of the remaining 21 found every sample (6 of 6) already implemented despite `[ ]` markers. This is the largest segment in the project by raw spec count and by raw "active gap" count, and shows the same stale-checkbox pattern as `category-management`, more pronounced.
+**PARTIAL** — last audited 2026-06-17, full reconciliation pass completed same day (git SHA `be05346`). 94 of 99 specs now confirmed implemented (79 pre-reconciliation + EL-UI-015 + 15 reconciled this pass). 5 genuine gaps remain: EL-UI-031, EL-UI-032, EL-UI-056, EL-UI-057b, EL-UI-077.
 
 ## References
 
@@ -52,32 +52,43 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| Screens | EL-UI-001 to ~032 | most (spot-checked subset confirmed) | 0 | unverified subset |
-| Value Input by ValueType | EL-UI-05x | spot-checked subset confirmed (EL-UI-051, 051b) | 0 | unverified subset |
-| ViewModels | various | unverified this pass | 0 | unverified |
-| Navigation | EL-NAV-* | spot-checked subset confirmed (EL-NAV-001, 004) | 0 | unverified subset |
+| Timeline Display / Filter / Undo | EL-UI-001 to 023c | all | 0 | 0 |
+| Quick-Log Sheet | EL-UI-030 to 077 | most | 0 | 3 (EL-UI-031, EL-UI-032, EL-UI-077) |
+| Value Input by ValueType | EL-UI-050 to 068c | all but one | 0 | 1 (EL-UI-056) |
+| Event Edit Screen / Validation | EL-UI-040 to 057b | most | 0 | 1 (EL-UI-057b) |
+| Navigation | EL-NAV-* | all | 0 | 0 |
+| Process (image cleanup) | EL-PROC-* | all | 0 | 0 |
 
-**Summary:** Raw count is 79 implemented / 20 active gap / 0 deferred (EL-UI-015 fixed this session). Every one of the 6 pre-existing active-gap specs spot-checked turned out to be implemented — treat the raw 20 as an upper bound on real gaps, not a trustworthy backlog, until reconciled.
+**Summary:** 94 of 99 active specs confirmed implemented; 5 genuine active gaps; 0 deferred. Fully reconciled — no more unverified `[ ]` markers in this segment.
 
 ## Key Findings
 
-1. **EL-UI-015 fixed this session** — timeline filter chips (`HomeScreen.kt`) now show the category's `resolvedColor` as a border when unselected and a filled background when active, via a new shared `CategoryFilterChip` composable used by both MetaCategory and SubCategory chips. This was a genuine gap (verified absent before the fix, not a stale marker) and was also `theme`'s THEME-UI-010 for the chip surface specifically.
-2. **6 of 6 spot-checked "active gap" specs (pre-existing, separate from EL-UI-015) are confirmed already implemented:**
-   - `EL-UI-051`/`EL-UI-051b` (Boolean Yes/No two-button input, unselected-by-default state) — `ValueInputField.kt`'s `BoolInput` composable implements exactly this, including the unpressed-when-`selected == null` state. No `@spec` annotation present.
-   - `EL-NAV-001` (FAB opens quick-log sheet) — `HomeScreen.kt:174`, `FloatingActionButton(onClick = { ...; showSheet = true })`. Carries `@spec EL-UI-013, EL-UI-075` but not `EL-NAV-001` itself.
-   - `EL-NAV-004` (tap event row → navigate to edit) — `HomeScreen.kt:282`, `onNavigateToEventEdit(entry.event.id, filterId)`.
-   - `EL-UI-031`/`031a`/`031b` (quick-log step 2 fields: value input, photo, notes, timestamp, save) — present in `HomeScreen.kt` with an `@spec EL-UI-031a, EL-UI-031b` annotation already on part of it.
-   - `EL-UI-053` (Text multi-line input) — `TextInput` composable exists and is dispatched for `ValueUIState.Text`.
-3. **This is the largest unverified surface in the project.** 15 of the remaining 20 nominal active gaps were not individually checked this pass (budget); given the 6/6 hit rate on "actually implemented" for the pre-existing sample, the prior is strongly that most of the remaining 15 are also done, but this is an inference, not a verification — don't treat it as confirmed.
-4. No reverse orphans — every `@spec EL-*` annotation in code points to a real spec ID.
+1. **EL-UI-015 fixed in a prior pass this session** — timeline filter chips (`HomeScreen.kt`) now show the category's `resolvedColor` as a border when unselected and a filled background when active, via a shared `CategoryFilterChip` composable.
+2. **Full reconciliation pass completed.** All 20 nominally-active-gap specs were individually checked against code. 15 were confirmed already implemented (stale markers); `@spec` annotations backfilled at each implementation site. 5 are confirmed genuine gaps — see below.
+3. **15 stale markers corrected, now `[x]` with annotations added:**
+   - `EL-UI-023c` (undo row not tappable for nav) — `UndoPlaceholderRow` (`HomeScreen.kt`) has no `clickable` modifier on the row, only the restore `TextButton` — correct by construction.
+   - `EL-UI-051`/`EL-UI-051b` (Boolean two-button input, blocks save until tapped) — `BoolInput` (`ValueInputField.kt`) + `toEventValue`/`validateValueForSave` (`ValueUIState.kt`) confirm both the unpressed-by-default rendering and the save-blocking validation.
+   - `EL-UI-052c` (Number field preserves exact text while editing) — `NumberInput` binds the raw string directly with no reformatting; parsing only happens at save time via `toEventValue`.
+   - `EL-UI-053` (Text multi-line) — `TextInput` sets `minLines = 2`.
+   - `EL-UI-055`/`055c`/`055d` (Duration: 3 fields, empty preserved while editing, empty-vs-zero leading-component display) — `DurationInput` + `toEventValue` (empty → 0 at save) + `durationToUIState` (empty hours/minutes when zero, seconds always shown) all confirmed.
+   - `EL-UI-059b` (Sets/Reps preserve text, block save if empty/non-parseable/<1) — same raw-string-plus-save-time-validation pattern as Number/Duration, confirmed in `ExerciseInput` + `toEventValue`.
+   - `EL-PROC-003` (crash recovery for orphaned images) — same mechanism as `LS-BE-040`'s `onStartup()` blanket "delete anything unreferenced" sweep; covers the crash case by construction, no extra code needed.
+   - `EL-NAV-001`, `EL-NAV-003`, `EL-NAV-004`, `EL-NAV-007`, `EL-NAV-013` — all confirmed wired (FAB → sheet, dismiss-deletes-image, row-tap → edit, back-without-saving deletes new images, Save/Discard/Cancel dialog on both hardware back and the toolbar nav icon).
+4. **5 confirmed genuine gaps**, all newly found this pass (previous spot-check had wrongly treated EL-UI-031 as confirmed, based on its `031a`/`031b` sub-specs being done — the parent line bundles a 5th requirement, the timestamp field, which is absent):
+   - **EL-UI-031 / EL-UI-032 / EL-UI-077 share one root cause**: the quick-log sheet has *no timestamp UI at all*. `QuickLogViewModel.timestamp` defaults correctly to "now" (satisfying half of EL-UI-032), but there is no tappable field anywhere in `HomeScreen.kt`'s `QuickLogSheet` to view or edit it — so EL-UI-031's "tappable timestamp field" requirement and EL-UI-032 as a whole are unmet. Separately, `LaunchedEffect(saveResult)` dismisses the sheet on save but never scrolls the timeline list to the new event (EL-UI-077).
+   - **EL-UI-056**: error/unknown value display shows the raw value but not the error *kind*. `formatValue`'s `EventValue.ErrorValue` branch is `"[Error: ${value.raw}]"` — `value.kind` (e.g. `UNPARSABLE`, `OUT_OF_RANGE`) is never referenced.
+   - **EL-UI-057b**: no input field ever gets `isError = true`. Validation failures (`SaveResult.ValidationError`) only render a text message below the field in both the quick-log sheet and event edit screen — no highlighted-field treatment, and so also no possibility of the two screens being inconsistent (they're identically incomplete).
+5. No reverse orphans — every `@spec EL-*` annotation in code points to a real spec ID.
 
 ## Work Required
 
 ### Must Fix (before MVP / Play Store testing)
-1. **Run a full reconciliation pass on the remaining ~15 unverified active-gap specs** before treating this segment's spec file as an accurate "what's left" list. Given the 6/6 confirmed-implemented hit rate so far, the real gap count here is likely small, but it hasn't been proven — and this is the core logging loop, the single most important flow for an MVP.
+1. **Add a timestamp field to the quick-log sheet** (EL-UI-031, EL-UI-032) — tappable, opens a date/time picker, defaults to sheet-open time. This is the only gap in the segment that blocks a real user workflow (logging an event for a time other than "now").
+2. **Scroll the timeline to the newly saved event after a quick-log save** (EL-UI-077) — likely a `LazyListState.animateScrollToItem` call alongside the existing sheet-dismiss logic in `HomeScreen.kt`.
 
 ### Should Fix
-1. Backfill `@spec` annotations on all confirmed-implemented-but-unannotated specs found in this pass (EL-UI-051, EL-UI-051b, EL-NAV-001, EL-NAV-004) and whatever the full reconciliation turns up.
+1. **EL-UI-057b** — highlight the failing field (`isError = true`) on validation failure, consistently between the quick-log sheet and event edit screen.
+2. **EL-UI-056** — include the error kind in the read-only display text for `ErrorValue`/Unknown events, not just the raw value.
 
 ### Nice to Have
 _None noted this pass._

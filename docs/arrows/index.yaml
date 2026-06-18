@@ -75,8 +75,8 @@ arrows:
     blocks: []
     blockedBy: [data-model, local-storage, theme, category-management]
     detail: event-logging.md
-    next: "EL-UI-015 fixed this session (filter chip color). Largest raw active-gap count in the project (20 remaining). Spot-checked 6 pre-existing gaps (EL-UI-051, EL-UI-051b, EL-NAV-001, EL-NAV-004, EL-UI-031/031a/031b, EL-UI-053) — all 6 confirmed already implemented. Remaining ~15 are unverified; recommend a full reconciliation pass before trusting this list as a real MVP backlog."
-    drift: "Same stale-checkbox pattern as category-management, more pronounced: every spot-check (6/6) found implemented code marked as an active gap"
+    next: "Full reconciliation pass complete. 5 genuine gaps remain: EL-UI-031/EL-UI-032/EL-UI-077 (quick-log sheet has no timestamp field, and save doesn't scroll to the new event), EL-UI-056 (error kind missing from read-only display), EL-UI-057b (no field-level error highlighting). Must-fix for MVP: the timestamp field (031/032) and post-save scroll (077)."
+    drift: null
 
 unmapped:
   docs:

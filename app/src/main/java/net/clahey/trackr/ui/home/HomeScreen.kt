@@ -172,7 +172,7 @@ fun HomeScreen(
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.timeline_title)) }) },
         floatingActionButton = {
-            // @spec EL-UI-013, EL-UI-075
+            // @spec EL-NAV-001, EL-UI-013, EL-UI-075
             FloatingActionButton(onClick = {
                 when (val f = activeFilter) {
                     is ActiveFilter.Sub -> quickLogVm.selectCategory(f.sub)
@@ -275,6 +275,7 @@ fun HomeScreen(
                                 category = entry.category,
                                 hasMismatch = entry.hasMismatch,
                                 onSwipeDelete = { homeVm.swipeDelete(entry.event) },
+                                // @spec EL-NAV-004
                                 onClick = {
                                     val filterId = when (val f = activeFilter) {
                                         is ActiveFilter.All -> null
@@ -363,6 +364,7 @@ private fun SwipeableEventRow(
 }
 
 
+// @spec EL-UI-023c
 @Composable
 private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {
     Row(

@@ -35,7 +35,7 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-022**: When the user taps the undo button, the system shall restore the deleted event to its original position and remove the placeholder.
 - [x] **EL-UI-023**: When the user performs any mutating action while an undo placeholder is visible — swiping another event, saving a new event, or opening an event for editing — the system shall discard the placeholder without restoring the event.
 - [x] **EL-UI-023b**: When the category of a pending-delete event is deleted while the undo placeholder is visible, the system shall dismiss the placeholder without restoring the event.
-- [ ] **EL-UI-023c**: The undo placeholder row shall not be tappable for navigation; only the restore button within it responds to taps.
+- [x] **EL-UI-023c**: The undo placeholder row shall not be tappable for navigation; only the restore button within it responds to taps.
 
 ## Quick-Log Sheet
 
@@ -65,23 +65,23 @@ LLD: `docs/llds/event-logging.md`
 ## Value Input
 
 - [x] **EL-UI-050**: For Scale-type categories, the value input shall be a horizontal slider with integer snap accepting values in the range 1–10.
-- [ ] **EL-UI-051**: For Boolean-type categories, the value input shall be a two-button row labeled "Yes" and "No".
-- [ ] **EL-UI-051b**: When a Boolean value input is first displayed with no prior selection, both buttons shall appear unpressed; the system shall not allow saving until one button has been tapped.
+- [x] **EL-UI-051**: For Boolean-type categories, the value input shall be a two-button row labeled "Yes" and "No".
+- [x] **EL-UI-051b**: When a Boolean value input is first displayed with no prior selection, both buttons shall appear unpressed; the system shall not allow saving until one button has been tapped.
 - [x] **EL-UI-052**: For Number-type categories, the value input shall consist of a numeric text field and a separate unit text field; the unit field shall be pre-filled from the category's unit and shall be user-editable; an empty unit field shall be saved as null (unitless).
 - [x] **EL-UI-052b**: The Number value field shall not allow saving when the value field is empty or not parseable as a number.
-- [ ] **EL-UI-052c**: While the user is editing a Number value or unit field, the system shall preserve the exact text entered — including partial input such as a trailing decimal point, leading sign, or empty field — without snapping back to the previously committed value.
-- [ ] **EL-UI-053**: For Text-type categories, the value input shall be a multi-line text field.
+- [x] **EL-UI-052c**: While the user is editing a Number value or unit field, the system shall preserve the exact text entered — including partial input such as a trailing decimal point, leading sign, or empty field — without snapping back to the previously committed value.
+- [x] **EL-UI-053**: For Text-type categories, the value input shall be a multi-line text field.
 - [x] **EL-UI-054**: While the selected Text-type category has `allowEmptyText` set to false, the system shall not allow saving with an empty text value.
-- [ ] **EL-UI-055**: For Duration-type categories, the value input shall be three separate numeric fields for hours, minutes, and seconds; the value shall be stored as a `kotlin.time.Duration`.
+- [x] **EL-UI-055**: For Duration-type categories, the value input shall be three separate numeric fields for hours, minutes, and seconds; the value shall be stored as a `kotlin.time.Duration`.
 - [x] **EL-UI-055b**: The Duration input shall reject negative values in any field and shall reject values ≥ 60 in the minutes and seconds fields; the system shall not allow saving an invalid duration.
-- [ ] **EL-UI-055c**: While the user is editing a Duration field, the system shall preserve an empty field as entered; at save time an empty field shall be treated as zero.
-- [ ] **EL-UI-055d**: When a Duration value is initialized for display, leading-zero components shall appear as empty rather than "0": the hours field is empty when hours is zero; the minutes field is empty when both hours and minutes are zero; the seconds field always displays a value, showing "0" for zero seconds.
+- [x] **EL-UI-055c**: While the user is editing a Duration field, the system shall preserve an empty field as entered; at save time an empty field shall be treated as zero.
+- [x] **EL-UI-055d**: When a Duration value is initialized for display, leading-zero components shall appear as empty rather than "0": the hours field is empty when hours is zero; the minutes field is empty when both hours and minutes are zero; the seconds field always displays a value, showing "0" for zero seconds.
 - [ ] **EL-UI-056**: For Unknown or ErrorValue events, the value field shall display the error kind and raw value string in a read-only format.
 - [x] **EL-UI-057**: When save is invoked on either the quick-log sheet or the event edit screen, the system shall validate the value via a shared `validateValueForSave(value, category)` function: (a) if `value.toEventValue()` is null and `value` is not `ValueUIState.None`, save shall be blocked — this covers all partial or invalid inputs (EL-UI-051b, EL-UI-052b, EL-UI-055b, EL-UI-059b); (b) if `category.resolvedValueType` is `Text` and `allowEmptyText` is false and `value.toEventValue()` is an empty `TextValue`, save shall be blocked (EL-UI-054). All other states, including `None` with a null result, are valid.
 - [ ] **EL-UI-057b**: When save is blocked by a validation error, the system shall highlight the failing input field in an error state; both the event edit screen and the quick-log sheet shall use the same visual error treatment.
 - [x] **EL-UI-058**: When the quick-log sheet displays a Number, Text, Duration, or Exercise value input in step 2, the system shall automatically focus the primary input field (hours for Duration, Sets for Exercise) so the software keyboard is raised without an additional tap.
 - [x] **EL-UI-059**: For Exercise-type categories, the value input shall consist of two integer-only fields labeled "Sets" and "Reps" (integer keyboard, no decimal point); both fields shall require a value of 1 or greater before saving is permitted. Initial values are seeded per EL-UI-078.
-- [ ] **EL-UI-059b**: While the user is editing a Sets or Reps field, the system shall preserve the exact text entered — including an empty or non-parseable field — without discarding or snapping the change; saving shall be blocked if either field is empty or less than 1.
+- [x] **EL-UI-059b**: While the user is editing a Sets or Reps field, the system shall preserve the exact text entered — including an empty or non-parseable field — without discarding or snapping the change; saving shall be blocked if either field is empty or less than 1.
 - [x] **EL-UI-060**: Exercise values shall be displayed in the timeline and event edit screen as "$sets × $reps" using the Unicode multiplication sign (×, U+00D7).
 
 ## Category Hierarchy — Filter and Quick-Log
@@ -112,23 +112,23 @@ LLD: `docs/llds/event-logging.md`
 
 - [x] **EL-PROC-001**: When the user dismisses the quick-log sheet without saving, the system shall delete any attached image file.
 - [x] **EL-PROC-002**: When the user navigates away from the event edit screen without saving, the system shall delete any image files captured during that editing session that are not part of the previously saved event.
-- [ ] **EL-PROC-003**: If the process is killed before image cleanup can occur, the startup orphan scan (LS-BE-040) shall recover any unreferenced image files on next launch.
+- [x] **EL-PROC-003**: If the process is killed before image cleanup can occur, the startup orphan scan (LS-BE-040) shall recover any unreferenced image files on next launch.
 
 ## Navigation
 
-- [ ] **EL-NAV-001**: When the user taps the FAB on the timeline screen, the system shall open the quick-log sheet.
+- [x] **EL-NAV-001**: When the user taps the FAB on the timeline screen, the system shall open the quick-log sheet.
 - [x] **EL-NAV-002**: When the user saves a new event in the quick-log sheet, the system shall dismiss the sheet and update the timeline.
 - [x] **EL-NAV-002b**: After the quick-log sheet is dismissed for any reason (save or user dismiss), the system shall reset all form state — including the save result — so that the sheet opens in step 1 with a clean state on the next open.
-- [ ] **EL-NAV-003**: When the user dismisses the quick-log sheet without saving, the system shall delete any unsaved captured image and return to the timeline.
+- [x] **EL-NAV-003**: When the user dismisses the quick-log sheet without saving, the system shall delete any unsaved captured image and return to the timeline.
 - [x] **EL-NAV-003b**: When the user presses the system back button or performs a back edge swipe while the quick-log sheet is at step 2, the system shall return to step 1 without dismissing the sheet.
 - [x] **EL-NAV-003c**: When the user presses the system back button or performs a back edge swipe while the quick-log sheet is at step 1 in the drill-down view, the system shall return to the top-level category grid without dismissing the sheet.
-- [ ] **EL-NAV-004**: When the user taps an event row on the timeline, the system shall navigate to the event edit screen for that event.
+- [x] **EL-NAV-004**: When the user taps an event row on the timeline, the system shall navigate to the event edit screen for that event.
 - [x] **EL-NAV-005**: When the user saves changes on the event edit screen, the system shall navigate back to the timeline.
 - [x] **EL-NAV-006**: When the user confirms deletion on the event edit screen, the system shall delete the event and navigate back to the timeline.
-- [ ] **EL-NAV-007**: When the user navigates back from the event edit screen without saving, the system shall delete any newly captured images not part of the previously saved event and return to the timeline.
+- [x] **EL-NAV-007**: When the user navigates back from the event edit screen without saving, the system shall delete any newly captured images not part of the previously saved event and return to the timeline.
 - [x] **EL-NAV-008**: When the user opens an event from the timeline, the event edit screen shall load the ordered list of events matching the active filter (timestamp DESC, createdAt DESC, id ASC) and track the opened event's position within that list.
 - [x] **EL-NAV-009**: The event edit screen shall support horizontal swipe navigation: swiping left advances to the next older event; swiping right advances to the next newer event; the transition shall animate as a horizontal slide consistent with the swipe direction.
 - [x] **EL-NAV-010**: At the oldest event (swiping left) or newest event (swiping right), the page shall exhibit a rubber-band overscroll effect with a dark background visible beyond the edge; releasing returns to the current event.
 - [x] **EL-NAV-011**: Swipe navigation shall respect the filter active when the event edit screen was opened; navigating to an adjacent event shall not change which events are in scope.
 - [x] **EL-NAV-012**: While the current event has unsaved changes and the user attempts to swipe to an adjacent event, the pager shall restrict to a single page and rubber-band naturally; when the user releases after a swipe attempt, the system shall present a prompt offering to save, discard, or cancel; both save and discard shall resolve the changes in place without navigating, leaving the user free to swipe afterward; choosing discard shall delete any newly captured images not part of the previously saved event per EL-PROC-002.
-- [ ] **EL-NAV-013**: When the user attempts to navigate back (hardware back button or navigation icon) while the current event has unsaved changes, the system shall present a Save / Discard / Cancel prompt; Save shall persist the changes and navigate back; Discard shall delete any newly captured images not part of the previously saved event per EL-PROC-002 and navigate back; Cancel shall dismiss the prompt and return to the edit screen.
+- [x] **EL-NAV-013**: When the user attempts to navigate back (hardware back button or navigation icon) while the current event has unsaved changes, the system shall present a Save / Discard / Cancel prompt; Save shall persist the changes and navigate back; Discard shall delete any newly captured images not part of the previously saved event per EL-PROC-002 and navigate back; Cancel shall dismiss the prompt and return to the edit screen.

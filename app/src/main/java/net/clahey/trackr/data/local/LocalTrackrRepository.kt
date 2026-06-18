@@ -160,7 +160,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         return current
     }
 
-    // @spec LS-BE-040
+    // @spec LS-BE-040, EL-PROC-003
     override suspend fun onStartup() {
         val referencedPaths = eventDao.getAllOnce().flatMap { it.imagePaths() }.toSet()
         imageStore.allStoredPaths()
