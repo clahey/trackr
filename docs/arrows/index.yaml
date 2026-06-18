@@ -1,0 +1,84 @@
+schema_version: 1
+last_updated: 2026-06-17
+
+taxonomy:
+  data:
+    - data-model
+    - local-storage
+  ui:
+    - app-shell
+    - category-management
+    - event-logging
+    - theme
+
+arrows:
+  data-model:
+    status: AUDITED
+    sampled: 2026-06-17
+    audited: 2026-06-17
+    audited_sha: be05346ae253309a0417cbfd2362d38a81a47760
+    blocks: [category-management, event-logging, local-storage]
+    blockedBy: []
+    detail: data-model.md
+    next: "Backfill @spec annotations on DM-DATA-001/010-016/020-024/030-034 and DM-PROC-010/012 (implemented, just unlinked); not MVP-blocking"
+    drift: "24 implemented specs (mostly DM-DATA-*) have no @spec annotation anywhere in code — traceability gap, not a functional gap"
+
+  local-storage:
+    status: PARTIAL
+    sampled: 2026-06-17
+    audited: 2026-06-17
+    audited_sha: be05346ae253309a0417cbfd2362d38a81a47760
+    blocks: [category-management, event-logging]
+    blockedBy: [data-model]
+    detail: local-storage.md
+    next: "Confirm LS-BE-041 (onStartup ordering before first UI frame) is actually guaranteed, not just called; backfill @spec on LS-BE-001-004/033/060-062/070/090-092"
+    drift: "9 implemented specs unannotated; Auto Backup XML rules (LS-BE-090/091/092) verified correctly configured for trackr.db, images, and datastore"
+
+  theme:
+    status: PARTIAL
+    sampled: 2026-06-17
+    audited: 2026-06-17
+    audited_sha: be05346ae253309a0417cbfd2362d38a81a47760
+    blocks: [app-shell, category-management, event-logging]
+    blockedBy: []
+    detail: theme.md
+    next: "Verify THEME-UI-010: category color confirmed missing as a visual indicator on category list rows (see category-management CAT-UI-050 finding) — likely the same underlying gap"
+    drift: null
+
+  app-shell:
+    status: AUDITED
+    sampled: 2026-06-17
+    audited: 2026-06-17
+    audited_sha: be05346ae253309a0417cbfd2362d38a81a47760
+    blocks: []
+    blockedBy: [theme]
+    detail: app-shell.md
+    next: "Backfill @spec annotations on APP-ID-001/002/003 (implemented, just unlinked); otherwise fully coherent"
+    drift: "APP-ID-001/002/003 implemented with no @spec annotation"
+
+  category-management:
+    status: PARTIAL
+    sampled: 2026-06-17
+    audited: 2026-06-17
+    audited_sha: be05346ae253309a0417cbfd2362d38a81a47760
+    blocks: [event-logging]
+    blockedBy: [data-model, local-storage, theme]
+    detail: category-management.md
+    next: "5 confirmed genuine gaps before MVP: CAT-UI-002 (drag-to-reorder UI), CAT-UI-015/016 (Custom color swatch), CAT-UI-039 (Number-to-Scale conversion), CAT-UI-050 (color indicator on list rows). 11 of the 16 nominally-active-gap specs were verified already implemented — spec file is stale, not the code."
+    drift: "Spec checkboxes significantly out of sync with code: 11/16 active-gap specs (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-011a, CAT-UI-063-066) confirmed implemented via direct code read but still marked [ ]"
+
+  event-logging:
+    status: PARTIAL
+    sampled: 2026-06-17
+    audited: 2026-06-17
+    audited_sha: be05346ae253309a0417cbfd2362d38a81a47760
+    blocks: []
+    blockedBy: [data-model, local-storage, theme, category-management]
+    detail: event-logging.md
+    next: "Largest raw active-gap count in the project (21). Spot-checked 6 (EL-UI-051, EL-UI-051b, EL-NAV-001, EL-NAV-004, EL-UI-031/031a/031b, EL-UI-053) — all 6 confirmed already implemented. Remaining ~15 are unverified; recommend a full reconciliation pass before trusting this list as a real MVP backlog."
+    drift: "Same stale-checkbox pattern as category-management, more pronounced: every spot-check (6/6) found implemented code marked as an active gap"
+
+unmapped:
+  docs:
+    llds: []
+    specs: []
