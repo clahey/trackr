@@ -10,7 +10,7 @@ The segment owns two screens (category list and category edit), their ViewModels
 
 ### Category List Screen
 
-Displays all categories ordered by `sortOrder ASC` (user-defined). MetaCategories appear as top-level rows; their SubCategories are displayed visually nested beneath them (indented or grouped). Each row shows the category's resolved emoji, name, and resolved value type. Supports:
+Displays all categories ordered by `sortOrder ASC` (user-defined). MetaCategories appear as top-level rows; their SubCategories are displayed visually nested beneath them (indented or grouped). Each row shows the category's resolved color as a 48dp filled circle around the resolved emoji (same circle-avatar treatment as `EventRow`, per `theme.md § Category Color System`), the name, and the resolved value type. Supports:
 
 - Navigate to **Category Edit** for a new category (FAB, primary action)
 - Navigate to **Category Edit** for an existing category (tap row)

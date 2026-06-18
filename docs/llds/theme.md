@@ -60,16 +60,16 @@ Default Material 3 shape scale throughout (rounded corners per M3 spec). No over
 Each `Category` carries a `color: Long` (ARGB). Category colors appear in:
 - Category chips on the timeline filter row
 - Event rows in the timeline (circle avatar)
-- Category list rows
-- The category edit screen preview
+- Category list rows (circle avatar)
+- The category edit screen color picker's palette swatches, and the live preview card (which reuses `EventRow`, so circle avatar)
 
 ### Usage in UI
 
 Category color usage differs by surface:
 
-**Container background** (chips, category list rows, edit screen color preview swatch): the category color fills the entire surface; text and icons on top use `foregroundColorForBackground(color)` — white for dark backgrounds, black for light, per WCAG relative luminance. Material 3's `contentColorFor()` is not used here since category colors are arbitrary user values outside the app's tonal palette.
+**Container background** (chips, edit screen color picker palette swatches): the category color fills the entire surface; text and icons on top use `foregroundColorForBackground(color)` — white for dark backgrounds, black for light, per WCAG relative luminance. Material 3's `contentColorFor()` is not used here since category colors are arbitrary user values outside the app's tonal palette.
 
-**Circle avatar** (timeline event rows): the category color fills a 48dp filled circle on the left of each row; the category emoji is centered inside the circle using `foregroundColorForBackground(color)`. The row card surface itself uses the M3 surface container color, not the category color.
+**Circle avatar** (timeline event rows, category list rows): the category color fills a 48dp filled circle around the category emoji; the emoji is centered inside the circle using `foregroundColorForBackground(color)`. The surrounding row surface itself uses the M3 surface container color (event rows) or the list background (category list rows), not the category color.
 
 ### Preset Palette
 

@@ -1,6 +1,7 @@
 package net.clahey.trackr.ui.category
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,9 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -39,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import net.clahey.trackr.R
 import androidx.compose.ui.Modifier
@@ -46,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
+import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -160,7 +165,22 @@ private fun CategoryRow(
                 .padding(start = startPadding, end = 16.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = category.resolvedEmoji, style = MaterialTheme.typography.headlineSmall)
+            // @spec CAT-UI-050
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        color = Color(category.resolvedColor),
+                        shape = CircleShape,
+                    ),
+            ) {
+                Text(
+                    text = category.resolvedEmoji,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color(foregroundColorForBackground(category.resolvedColor)),
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = category.name, style = MaterialTheme.typography.bodyLarge)
