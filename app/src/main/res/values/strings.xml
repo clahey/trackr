@@ -10,6 +10,7 @@
     <string name="action_save">Save</string>
     <string name="action_delete">Delete</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_ok">OK</string>
     <string name="action_create">Create</string>
     <string name="action_undo">Undo</string>
     <string name="action_back">Back</string>
@@ -55,7 +56,8 @@
     <string name="event_delete_title">Delete event?</string>
     <string name="event_delete_message">This event will be permanently deleted.</string>
     <string name="event_deleted_snackbar">Event deleted</string>
-    <string name="event_field_timestamp">Timestamp</string>
+    <string name="event_field_date">Date</string>
+    <string name="event_field_time">Time</string>
     <string name="event_field_notes">Notes</string>
     <string name="event_field_notes_optional">Notes (optional)</string>
     <string name="value_required_error">Value is required</string>

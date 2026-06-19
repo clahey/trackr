@@ -214,6 +214,12 @@ class EventEditViewModel @Inject constructor(
         _isDirty.value = true
     }
 
+    // @spec EL-UI-040, EL-UI-043
+    fun setTimestamp(timestamp: Instant) {
+        _timestamp.value = timestamp
+        _isDirty.value = true
+    }
+
     // @spec EL-UI-044a
     fun createImageFile(): String = imageStore.newFile().absolutePath
 

@@ -63,12 +63,8 @@ import net.clahey.trackr.domain.Category
 import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.components.ValueInputField
+import net.clahey.trackr.ui.components.TimestampField
 import net.clahey.trackr.ui.components.ValueUIState
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-private val timestampFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
 
 // @spec EL-UI-040, EL-UI-042, EL-UI-043, EL-UI-044, EL-UI-044a, EL-UI-044b, EL-UI-045,
 // EL-NAV-005, EL-NAV-006, EL-NAV-009, EL-NAV-010, EL-NAV-012, EL-PROC-002, APP-NAV-003
@@ -263,6 +259,7 @@ fun EventEditScreen(
                         category = category,
                         readOnly = false,
                         showSave = true,
+                        onTimestampChange = { viewModel.setTimestamp(it) },
                         onValueChange = { viewModel.setValue(it) },
                         onDone = { scope.launch { viewModel.save() } },
                         onNotesChange = { viewModel.setNotes(it) },
@@ -281,6 +278,7 @@ fun EventEditScreen(
                             readOnly = false,
                             showSave = false,
                             // @spec EL-NAV-012
+                            onTimestampChange = { viewModel.setTimestamp(it) },
                             onValueChange = { viewModel.setValue(it) },
                             onDone = { scope.launch { viewModel.save() } },
                             onNotesChange = { viewModel.setNotes(it) },
@@ -323,6 +321,7 @@ private fun EventFormContent(
     category: Category?,
     readOnly: Boolean = true,
     showSave: Boolean = false,
+    onTimestampChange: (Instant) -> Unit = {},
     onValueChange: (ValueUIState) -> Unit = {},
     onDone: () -> Unit = {},
     onNotesChange: (String) -> Unit = {},
@@ -345,12 +344,10 @@ private fun EventFormContent(
                 style = MaterialTheme.typography.titleMedium,
             )
         }
-        OutlinedTextField(
-            value = timestampFormatter.format(timestamp),
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(stringResource(R.string.event_field_timestamp)) },
-            modifier = Modifier.fillMaxWidth(),
+        TimestampField(
+            timestamp = timestamp,
+            onTimestampChange = onTimestampChange,
+            enabled = !readOnly,
         )
 
         ValueInputField(

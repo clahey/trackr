@@ -66,7 +66,7 @@ When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has S
 - Value input (see Value Input section below); for Number, Text, and Duration types the input field is automatically focused on entry so the keyboard rises without an extra tap
 - Optional: single photo (camera or gallery picker)
 - Optional: notes text field
-- Timestamp: defaults to now; tappable to edit (date + time picker)
+- Timestamp: defaults to now; rendered via the shared `TimestampField` component (see `## Timestamp Field`)
 - **Save** button — writes event and dismisses sheet; scrolling the timeline to the newly saved event is deferred (EL-UI-077)
 
 For `ValueType.None` categories, step 2 has no value input — save is immediately accessible, achieving the three-tap goal (FAB → category → save).
@@ -79,7 +79,7 @@ Read-only header:
 - Category emoji and name — displayed above the editable fields; if the category cannot be resolved (orphaned event), the header is omitted.
 
 Editable fields:
-- Timestamp (date + time picker)
+- Timestamp — rendered via the shared `TimestampField` component (see `## Timestamp Field`); disabled (non-interactive) on the pager's prev/next preview pages, matching the existing `readOnly` treatment of the other fields on those pages
 - Value (see Value Input section)
 - Notes
 - Images (add via camera or gallery; remove individually; no cap on count)
@@ -96,6 +96,20 @@ The filter context (`filterCategoryId: String?`) is passed as an optional naviga
 - SubCategory id → `getEventsByCategoryIdIncludingChildren(id)` (Sub filter, consistent with HomeViewModel)
 
 **Unsaved changes on swipe:** `EventEditViewModel` tracks an `isDirty` flag set whenever any field is edited. When `isDirty` is true, `pageCount` is set to 1 so the pager rubber-bands naturally on any swipe attempt. When the user releases, a prompt offers Save / Discard / Cancel. Both Save and Discard resolve the changes in place without navigating — `isDirty` clears and `pageCount` returns to N, leaving the user free to swipe afterward. Discard runs the same newly-captured-image cleanup as EL-PROC-002.
+
+## Timestamp Field
+
+A shared composable (`ui/components/TimestampField.kt`) used by both the quick-log sheet and the event edit screen. Renders the current `Instant` (converted to local date/time via `ZoneId.systemDefault()`) as two independently-tappable read-only sub-fields side by side: Date and Time. Takes `timestamp: Instant`, `onTimestampChange: (Instant) -> Unit`, and `enabled: Boolean = true`.
+
+Each sub-field is styled with a trailing dropdown chevron (`ExposedDropdownMenuDefaults.TrailingIcon`, the standard M3 dropdown-affordance icon, rotated while its dialog is open) so the fields read as tap-to-pick selectors rather than free-text inputs, even though they open a dialog rather than an actual anchored dropdown menu. The entire field rectangle is one click target: each field is a `Box` with the `OutlinedTextField` underneath and a transparent click-catcher `Box` (`Modifier.matchParentSize().clickable { ... }`) layered on top, since `OutlinedTextField`'s own internal pointer-input handling for the text/content area otherwise swallows clicks before a `clickable()` on the field's own modifier would see them — without the overlay, only the label text reliably registers taps.
+
+**Tapping the date** opens a `DatePickerDialog` (Material3, native — no third-party dependency) seeded to the current date. Confirm updates only the date component, keeping the existing time unchanged; dismiss (tap outside or Cancel) leaves the timestamp unchanged. Date and time are edited independently — picking a date never opens or affects the time, and vice versa (an earlier design chained date confirm into a time picker; removed per user feedback after using the real picker — independent editing matched expectations better).
+
+**Tapping the time** opens a custom `Dialog` wrapping `TimePicker` (M3 has no built-in dialog wrapper for `TimePicker`/`TimeInput`, unlike `DatePicker`), seeded to the *current* timestamp's time. Confirm updates only the time component, keeping the existing date. Dismiss leaves the timestamp unchanged.
+
+**Implementation note — M3 `DatePicker` UTC boundary:** `DatePickerState.selectedDateMillis` represents UTC midnight of the selected date, not a local-zone instant. Converting the selected millis to a `LocalDate` must go through `ZoneOffset.UTC`, not `ZoneId.systemDefault()`, or the date can shift by one day near timezone boundaries (e.g. for negative UTC-offset zones in the evening). The final combined date+time is converted to the stored `Instant` via `ZoneId.systemDefault()` as normal — only the picker's own boundary needs the UTC-specific handling.
+
+**Enabled/disabled:** the event edit screen's pager prev/next preview pages pass `enabled = false`, making the field fully non-interactive (no dialogs open on tap), consistent with those pages' read-only treatment of the other fields.
 
 ## Value Input by ValueType
 

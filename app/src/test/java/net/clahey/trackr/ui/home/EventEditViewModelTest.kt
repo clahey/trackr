@@ -430,6 +430,17 @@ class EventEditViewModelTest {
         assertTrue(vm.isDirty.first())
     }
 
+    // @spec EL-UI-040, EL-UI-043
+    @Test fun `setTimestamp updates timestamp and sets isDirty`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.saveEvent(makeEvent("e1", "c1"))
+        vm = makeVm("e1")
+        val newTimestamp = Instant.parse("2026-01-01T00:00:00Z")
+        vm.setTimestamp(newTimestamp)
+        assertEquals(newTimestamp, vm.timestamp.first())
+        assertTrue(vm.isDirty.first())
+    }
+
     // @spec EL-NAV-012
     @Test fun `addImage sets isDirty`() = runTest {
         repo.setCategories(makeCategory("c1"))

@@ -90,6 +90,7 @@ import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
+import net.clahey.trackr.ui.components.TimestampField
 import net.clahey.trackr.ui.components.ValueInputField
 import net.clahey.trackr.ui.components.formatValue
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
@@ -458,6 +459,7 @@ private fun QuickLogSheet(
     val expandedMetaCategoryId by viewModel.expandedMetaCategoryId.collectAsState()
     val notes by viewModel.notes.collectAsState()
     val imagePath by viewModel.imagePath.collectAsState()
+    val timestamp by viewModel.timestamp.collectAsState()
     val value by viewModel.value.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val scope = rememberCoroutineScope()
@@ -640,6 +642,12 @@ private fun QuickLogSheet(
                     TextButton(onClick = { showImageSourceDialog = true }) { Text(stringResource(R.string.action_replace)) }
                 }
             }
+
+            // @spec EL-UI-031, EL-UI-032
+            TimestampField(
+                timestamp = timestamp,
+                onTimestampChange = { viewModel.timestamp.value = it },
+            )
 
             Button(
                 onClick = { scope.launch { viewModel.save() } },

@@ -75,7 +75,7 @@ arrows:
     blocks: []
     blockedBy: [data-model, local-storage, theme, category-management]
     detail: event-logging.md
-    next: "Full reconciliation pass complete. 5 genuine gaps remain: EL-UI-031/EL-UI-032/EL-UI-077 (quick-log sheet has no timestamp field, and save doesn't scroll to the new event), EL-UI-056 (error kind missing from read-only display), EL-UI-057b (no field-level error highlighting). Must-fix for MVP: the timestamp field (031/032) and post-save scroll (077)."
+    next: "Timestamp editing fixed (shared TimestampField component, EL-UI-031/032/040/043). 3 minor gaps remain, none MVP-blocking: EL-UI-077 (post-save scroll), EL-UI-056 (error kind missing from display), EL-UI-057b (no field-level error highlighting)."
     drift: null
 
 unmapped:

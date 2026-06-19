@@ -4,7 +4,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 
 ## Status
 
-**PARTIAL** — last audited 2026-06-17, full reconciliation pass completed same day (git SHA `be05346`). 94 of 99 specs now confirmed implemented (79 pre-reconciliation + EL-UI-015 + 15 reconciled this pass). 5 genuine gaps remain: EL-UI-031, EL-UI-032, EL-UI-056, EL-UI-057b, EL-UI-077.
+**PARTIAL** — last audited 2026-06-17, full reconciliation pass and timestamp-field fix completed 2026-06-18. 96 of 99 specs now confirmed implemented. 3 genuine gaps remain, none MVP-blocking: EL-UI-056 (error kind missing from display), EL-UI-057b (no field-level error highlighting), EL-UI-077 (post-save scroll to new event).
 
 ## References
 
@@ -22,6 +22,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 - app/src/test/java/net/clahey/trackr/FakeTrackrRepository.kt
 - app/src/test/java/net/clahey/trackr/ui/components/FormatValueTest.kt
 - app/src/test/java/net/clahey/trackr/ui/components/ValueUIStateTest.kt
+- app/src/test/java/net/clahey/trackr/ui/components/TimestampFieldTest.kt
 - app/src/test/java/net/clahey/trackr/ui/home/EventEditViewModelTest.kt
 - app/src/test/java/net/clahey/trackr/ui/home/HomeViewModelTest.kt
 - app/src/test/java/net/clahey/trackr/ui/home/QuickLogViewModelTest.kt
@@ -35,6 +36,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 - app/src/main/java/net/clahey/trackr/ui/components/EventRow.kt
 - app/src/main/java/net/clahey/trackr/ui/components/ValueInputField.kt
 - app/src/main/java/net/clahey/trackr/ui/components/ValueUIState.kt
+- app/src/main/java/net/clahey/trackr/ui/components/TimestampField.kt
 - app/src/main/java/net/clahey/trackr/data/local/EventDao.kt
 - app/src/main/java/net/clahey/trackr/data/local/LocalTrackrRepository.kt
 
@@ -53,13 +55,13 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
 | Timeline Display / Filter / Undo | EL-UI-001 to 023c | all | 0 | 0 |
-| Quick-Log Sheet | EL-UI-030 to 077 | most | 0 | 3 (EL-UI-031, EL-UI-032, EL-UI-077) |
+| Quick-Log Sheet | EL-UI-030 to 077 | all but one | 0 | 1 (EL-UI-077) |
 | Value Input by ValueType | EL-UI-050 to 068c | all but one | 0 | 1 (EL-UI-056) |
-| Event Edit Screen / Validation | EL-UI-040 to 057b | most | 0 | 1 (EL-UI-057b) |
+| Event Edit Screen / Validation | EL-UI-040 to 057b | all but one | 0 | 1 (EL-UI-057b) |
 | Navigation | EL-NAV-* | all | 0 | 0 |
 | Process (image cleanup) | EL-PROC-* | all | 0 | 0 |
 
-**Summary:** 94 of 99 active specs confirmed implemented; 5 genuine active gaps; 0 deferred. Fully reconciled — no more unverified `[ ]` markers in this segment.
+**Summary:** 96 of 99 active specs confirmed implemented; 3 genuine active gaps; 0 deferred. Fully reconciled — no more unverified `[ ]` markers in this segment.
 
 ## Key Findings
 
@@ -74,21 +76,28 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
    - `EL-UI-059b` (Sets/Reps preserve text, block save if empty/non-parseable/<1) — same raw-string-plus-save-time-validation pattern as Number/Duration, confirmed in `ExerciseInput` + `toEventValue`.
    - `EL-PROC-003` (crash recovery for orphaned images) — same mechanism as `LS-BE-040`'s `onStartup()` blanket "delete anything unreferenced" sweep; covers the crash case by construction, no extra code needed.
    - `EL-NAV-001`, `EL-NAV-003`, `EL-NAV-004`, `EL-NAV-007`, `EL-NAV-013` — all confirmed wired (FAB → sheet, dismiss-deletes-image, row-tap → edit, back-without-saving deletes new images, Save/Discard/Cancel dialog on both hardware back and the toolbar nav icon).
-4. **5 confirmed genuine gaps**, all newly found this pass (previous spot-check had wrongly treated EL-UI-031 as confirmed, based on its `031a`/`031b` sub-specs being done — the parent line bundles a 5th requirement, the timestamp field, which is absent):
-   - **EL-UI-031 / EL-UI-032 / EL-UI-077 share one root cause**: the quick-log sheet has *no timestamp UI at all*. `QuickLogViewModel.timestamp` defaults correctly to "now" (satisfying half of EL-UI-032), but there is no tappable field anywhere in `HomeScreen.kt`'s `QuickLogSheet` to view or edit it — so EL-UI-031's "tappable timestamp field" requirement and EL-UI-032 as a whole are unmet. Separately, `LaunchedEffect(saveResult)` dismisses the sheet on save but never scrolls the timeline list to the new event (EL-UI-077).
+4. **Timestamp editing fixed (2026-06-18).** Discovered while scoping the EL-UI-031/032 fix: the event edit screen's timestamp field was *also* non-functional — hardcoded `readOnly = true` with a no-op `onValueChange`, despite EL-UI-040 and EL-UI-043 both being marked `[x]` and asserting it was editable. Both were false positives (the inverse of the stale-`[ ]` pattern found everywhere else this pass) and were flipped back to `[ ]` until the real fix landed. Built one shared `TimestampField` composable (`ui/components/TimestampField.kt`) used by both the quick-log sheet and the event edit screen:
+   - Tapping the date opens a `DatePickerDialog` that updates only the date; tapping the time opens a `TimePicker` dialog (defaulting to the current time) that updates only the time. Dismissing either leaves the timestamp unchanged. (Revised 2026-06-19, after using the real picker: an earlier design chained date-confirm into a time picker defaulting to midnight, with a brief midnight-vs-current-time refinement in between — removed entirely per user feedback that independent date/time editing matched expectations better.)
+   - Each field also got two usability fixes from the same feedback: a trailing dropdown-chevron icon (`ExposedDropdownMenuDefaults.TrailingIcon`) so the fields visually read as tap-to-pick selectors, and a full-field click target (a transparent click-catcher `Box` layered on top of the `OutlinedTextField`) — without it, `OutlinedTextField`'s own pointer-input handling swallowed clicks anywhere except the label text.
+   - Tapping the time opens just the time dialog, defaulting to the **current** time; confirm updates only the time, keeping the existing date.
+   - Pure date/time math (`utcMillisToLocalDate`, `localDateToUtcMillis`, `combineDateAndTime`) extracted as testable top-level functions, covering the M3 `DatePicker` UTC-boundary conversion specifically — unit tested in `TimestampFieldTest.kt`. The composable itself is untested (project preference: no new Compose UI tests until a dedicated batch PR).
+   - On the event edit screen, the field is disabled (`enabled = false`) on the pager's prev/next preview pages, matching the existing read-only treatment there.
+   - EL-UI-031, EL-UI-032, EL-UI-040, EL-UI-043 all flipped to `[x]`.
+5. **3 confirmed genuine gaps remain**, none MVP-blocking:
+   - **EL-UI-077**: `LaunchedEffect(saveResult)` dismisses the quick-log sheet on save but never scrolls the timeline list to the new event.
    - **EL-UI-056**: error/unknown value display shows the raw value but not the error *kind*. `formatValue`'s `EventValue.ErrorValue` branch is `"[Error: ${value.raw}]"` — `value.kind` (e.g. `UNPARSABLE`, `OUT_OF_RANGE`) is never referenced.
    - **EL-UI-057b**: no input field ever gets `isError = true`. Validation failures (`SaveResult.ValidationError`) only render a text message below the field in both the quick-log sheet and event edit screen — no highlighted-field treatment, and so also no possibility of the two screens being inconsistent (they're identically incomplete).
-5. No reverse orphans — every `@spec EL-*` annotation in code points to a real spec ID.
+6. No reverse orphans — every `@spec EL-*` annotation in code points to a real spec ID.
 
 ## Work Required
 
 ### Must Fix (before MVP / Play Store testing)
-1. **Add a timestamp field to the quick-log sheet** (EL-UI-031, EL-UI-032) — tappable, opens a date/time picker, defaults to sheet-open time. This is the only gap in the segment that blocks a real user workflow (logging an event for a time other than "now").
-2. **Scroll the timeline to the newly saved event after a quick-log save** (EL-UI-077) — likely a `LazyListState.animateScrollToItem` call alongside the existing sheet-dismiss logic in `HomeScreen.kt`.
+_None — the timestamp gap (the only one assessed as a real workflow blocker) is fixed._
 
 ### Should Fix
-1. **EL-UI-057b** — highlight the failing field (`isError = true`) on validation failure, consistently between the quick-log sheet and event edit screen.
-2. **EL-UI-056** — include the error kind in the read-only display text for `ErrorValue`/Unknown events, not just the raw value.
+1. **Scroll the timeline to the newly saved event after a quick-log save** (EL-UI-077) — likely a `LazyListState.animateScrollToItem` call alongside the existing sheet-dismiss logic in `HomeScreen.kt`.
+2. **EL-UI-057b** — highlight the failing field (`isError = true`) on validation failure, consistently between the quick-log sheet and event edit screen.
+3. **EL-UI-056** — include the error kind in the read-only display text for `ErrorValue`/Unknown events, not just the raw value.
 
 ### Nice to Have
 _None noted this pass._
