@@ -1,0 +1,39 @@
+# Drag Reorder List Specs
+
+LLD: `docs/llds/drag-reorder-list.md`
+
+These specs describe `DragReorderList`'s own behavior in terms of its generic item model (`depth`, `canHaveChildren`, `canBecomeChild`) — not in terms of `Category`/`MetaCategory`/`SubCategory`. The category-specific integration (mapping categories to this model, and persisting a drop) is specced separately in `docs/specs/category-management.md` (CAT-UI-002, CAT-UI-080).
+
+---
+
+## Pickup
+
+- [x] **DRAG-UI-001**: The widget shall display a drag handle (48dp touch target) on the trailing edge of each row when more than one row exists in the list; while exactly one row exists, the handle shall be hidden. The handle shall be its own touch target with its own pointer-input handling, independent of any long-press gesture the host screen attaches to the row, so touching and dragging the handle picks up that row for reordering without requiring a long-press.
+
+## Live Reflow & Visual Feedback
+
+- [x] **DRAG-UI-002**: While a row is being dragged, the widget shall continuously recompute the order that would result from dropping at the current pointer position and animate the rest of the list into that arrangement (per-item placement animation); a haptic tick shall fire whenever the computed drop position changes, where two different target+zone pairs that would produce the same resulting order (e.g. "after row T" and "before T's next sibling", or "nest as T's first child" and "before T's current first child") count as the same position, not a change. The dragged row itself shall render as a floating element, raised with elevated shadow, that tracks the pointer in both axes and is excluded from this reflow; its drag handle shall render as part of this floating element, not at the row-height placeholder left behind in the list (DRAG-UI-003).
+- [x] **DRAG-UI-003**: While dragging, the widget shall mark the current drop position with a row-height placeholder tinted `MaterialTheme.colorScheme.primaryContainer`, indented to the depth the dragged row would have if dropped there — one level deeper than the target for a nest (DRAG-UI-007, DRAG-UI-008), with no additional highlight on the target row itself. The indent shall transition smoothly (animated, not an instant snap) whenever it changes, matching the per-item placement animation already moving the placeholder vertically (DRAG-UI-002) — both axes of a depth change shall complete together, not one after the other. When the pointer is over a row offering no valid zone for the current drag (including the dragged row's own original position), the placeholder shall remain at its last valid position; no additional cue marks the row as invalid.
+- [x] **DRAG-UI-004**: While dragging, when the pointer is within 64dp of the top or bottom edge of the visible list, the widget shall auto-scroll the list at a constant rate until the pointer moves away from the edge.
+- [x] **DRAG-UI-005**: When the user releases a dragged row, the widget shall fire a confirm haptic and report the drop's result to the caller along with a completion callback (see DRAG-UI-014); since the list already reflects the live hypothetical position at the moment of release, no additional settle animation occurs at drop time itself.
+
+## Drop Zones
+
+- [x] **DRAG-UI-006**: While dragging over a row with `canHaveChildren = false`, the widget shall split it into two equal vertical bands: the top band, on drop, inserts the dragged row as a sibling of the target, immediately before it, joining the target's own current sibling group; the bottom band inserts it immediately after, in the same group.
+- [x] **DRAG-UI-007**: While dragging over a row with `canHaveChildren = true` and no current children, and the dragged row is currently eligible to become a child (`canBecomeChild = true`), the widget shall split it into three vertical bands (25%/50%/25%): the top and bottom bands insert the dragged row as a sibling of the target, immediately before or after it (joining the target's own current sibling group); the middle band nests the dragged row as the target's only child.
+- [x] **DRAG-UI-008**: While dragging over a row with `canHaveChildren = true` and one or more current children, and the dragged row is currently eligible to become a child (`canBecomeChild = true`), the widget shall split it into two vertical bands (50%/50%): the top band inserts the dragged row as a sibling of the target, immediately before it (joining the target's own current sibling group); the bottom band nests the dragged row as the target's first child, prepended before its existing children. Appending a dragged row at the end of an existing group is done via that group's last child's own after-band (DRAG-UI-006), not via the target row itself.
+- [x] **DRAG-UI-009**: While the dragged row is not currently eligible to become a child (`canBecomeChild = false`), the widget shall offer drop zones only on the before/after bands of rows with `canHaveChildren = true` (their own sibling group); every row with `canHaveChildren = false` shall offer no drop zone for this drag, and no row shall offer a nest band.
+- [x] **DRAG-UI-010**: Dropping in the empty space below the last rendered row shall insert the dragged row as the last member of the depth-0 sibling group (the outermost list), regardless of the depth of the last visible row.
+
+## Collapse on Pickup
+
+- [ ] **DRAG-UI-011**: While the dragged row currently has one or more children, the widget shall, on pickup, collapse the dragged row's own currently-visible children (animated) for the duration of the drag and restore them on drop or on drag cancel, without changing the scroll position of content already on screen; if collapsing leaves the list shorter than the viewport, the widget shall correct the scroll position so the list does not appear scrolled past its new end.
+- [ ] **DRAG-UI-012**: While the dragged row is not currently eligible to become a child (`canBecomeChild = false`), the widget shall collapse every *other* row's currently-visible children (animated) for the duration of the drag, under the same restore-on-drop-or-cancel and scroll-position rules as DRAG-UI-011. This trigger is independent of DRAG-UI-011 — it applies whether or not the dragged row itself currently has children.
+
+## Gesture Exclusivity
+
+- [x] **DRAG-UI-013**: While a row is being dragged, the widget shall block any new touch elsewhere in the list — including a long-press gesture the host screen attaches to another row, or the start of a second drag — until the current drag ends; the dragged row's own already-active gesture continues to receive its events normally throughout.
+
+## Settling
+
+- [ ] **DRAG-UI-014**: After a drop (DRAG-UI-005), until the caller calls the completion callback passed with that drop's result, the widget shall continue rendering the list using the order it already had at the moment of drop rather than switching to the caller's `items` (which may not yet reflect the move — persisting it, or deciding not to, is the caller's responsibility and is not assumed to be synchronous), and shall block any new drag pickup the same way an active drag blocks a second touch (DRAG-UI-013). Once the callback is called, the widget shall resume rendering directly from `items` and allow new drags again — if `items` now reflects the move, this produces no visible change; if it doesn't (the caller decided not to persist), the dropped row shall animate back to its pre-drag position using the same reflow animation as any other move (DRAG-UI-002), not a special-cased snap.

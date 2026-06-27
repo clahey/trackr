@@ -43,37 +43,62 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getCategoryById(id: String): Flow<Category?> =
         categoryDao.getByIdWithParent(id).map { it?.toDomain() }
 
+    private suspend fun requireNoChildren(category: Category) {
+        if (category is Category.SubCategory) {
+            val childCount = categoryDao.countByParentIdOnce(category.id)
+            require(childCount == 0) {
+                "Cannot nest category '${category.id}': it has $childCount SubCategory children"
+            }
+        }
+    }
+
+    private suspend fun migrateEventsForCategory(categoryId: String, targetType: ValueType) {
+        eventDao.getByCategoryIncludingChildrenWithNullTypeOnce(categoryId).forEach { entity ->
+            val event = entity.toDomain()
+            val newValue = convertEventValue(event.value, targetType)
+            if (newValue != event.value) {
+                eventDao.upsert(event.copy(value = newValue).toEntity())
+            }
+        }
+    }
+
     // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
         db.withTransaction {
-            if (category is Category.SubCategory) {
-                val childCount = categoryDao.countByParentIdOnce(category.id)
-                require(childCount == 0) {
-                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
-                }
-            }
+            requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
         }
     }
 
     // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021, DM-DATA-028
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
-        val targetType = category.resolvedValueType
         db.withTransaction {
-            if (category is Category.SubCategory) {
-                val childCount = categoryDao.countByParentIdOnce(category.id)
-                require(childCount == 0) {
-                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
-                }
-            }
+            requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
-            eventDao.getByCategoryIncludingChildrenWithNullTypeOnce(category.id).forEach { entity ->
-                val event = entity.toDomain()
-                val newValue = convertEventValue(event.value, targetType)
-                if (newValue != event.value) {
-                    eventDao.upsert(event.copy(value = newValue).toEntity())
-                }
-            }
+            migrateEventsForCategory(category.id, category.resolvedValueType)
+        }
+    }
+
+    // @spec CAT-UI-080
+    override suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>) {
+        db.withTransaction {
+            requireNoChildren(category)
+            categoryDao.upsert(category.toEntity())
+            categoryDao.updateSortOrders(orderedSiblingIds)
+        }
+    }
+
+    // @spec CAT-UI-080, CAT-UI-081
+    override suspend fun moveCategoryAndMigrateEvents(
+        category: Category,
+        orderedSiblingIds: List<String>,
+        fromType: ValueType,
+    ) {
+        db.withTransaction {
+            requireNoChildren(category)
+            categoryDao.upsert(category.toEntity())
+            categoryDao.updateSortOrders(orderedSiblingIds)
+            migrateEventsForCategory(category.id, category.resolvedValueType)
         }
     }
 

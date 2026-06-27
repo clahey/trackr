@@ -86,6 +86,57 @@ class FakeTrackrRepositoryTest {
         }
     }
 
+    // @spec CAT-UI-080
+    @Test fun `moveCategory reindexes only the destination sibling group leaving other categories untouched`() = runTest {
+        val repo = FakeTrackrRepository()
+        val groupA = makeCategory("groupA", sortOrder = 0)
+        val a1 = makeSubCategory("a1", parent = groupA, sortOrder = 5)
+        val a2 = makeSubCategory("a2", parent = groupA, sortOrder = 9)
+        val groupB = makeCategory("groupB", sortOrder = 1)
+        repo.setCategories(groupA, a1, a2, groupB)
+        // Reorder a1/a2 within groupA — groupB's own sortOrder must be unaffected.
+        repo.moveCategory(a2.copy(sortOrder = 9), orderedSiblingIds = listOf("a2", "a1"))
+        val cats = repo.getCategories().first().associateBy { it.id }
+        assertEquals(0, (cats["a2"] as Category.SubCategory).sortOrder)
+        assertEquals(1, (cats["a1"] as Category.SubCategory).sortOrder)
+        assertEquals(1, (cats["groupB"] as Category.MetaCategory).sortOrder)
+    }
+
+    // @spec CAT-UI-080
+    @Test fun `moveCategory reparents a SubCategory to a new MetaCategory and reindexes the destination group`() = runTest {
+        val repo = FakeTrackrRepository()
+        val oldParent = makeCategory("oldParent")
+        val newParent = makeCategory("newParent")
+        val existingChild = makeSubCategory("existing", parent = newParent, sortOrder = 0)
+        val moved = makeSubCategory("moved", parent = oldParent, sortOrder = 0)
+        repo.setCategories(oldParent, newParent, existingChild, moved)
+        repo.moveCategory(moved.copy(parent = newParent), orderedSiblingIds = listOf("existing", "moved"))
+        val cats = repo.getCategories().first().associateBy { it.id }
+        val movedResult = cats["moved"] as Category.SubCategory
+        assertEquals("newParent", movedResult.parent.id)
+        assertEquals(1, movedResult.sortOrder)
+        assertEquals(0, (cats["existing"] as Category.SubCategory).sortOrder)
+    }
+
+    // @spec CAT-UI-080, CAT-UI-081
+    @Test fun `moveCategoryAndMigrateEvents reindexes siblings and converts the category's own events`() = runTest {
+        val repo = FakeTrackrRepository()
+        val oldParent = makeCategory("oldParent")
+        val newParent = makeCategory("newParent").copy(valueType = ValueType.Text)
+        val moved = makeSubCategory("moved", parent = oldParent, sortOrder = 0)  // inherits None -> Text
+        repo.setCategories(oldParent, newParent, moved)
+        val anchor = Instant.parse("2024-01-15T12:00:00Z")
+        repo.setEvents(Event("e1", "moved", anchor, null, null, emptyList(), anchor))
+        repo.moveCategoryAndMigrateEvents(
+            moved.copy(parent = newParent),
+            orderedSiblingIds = listOf("moved"),
+            fromType = ValueType.None,
+        )
+        val movedResult = repo.getCategoryById("moved").first() as Category.SubCategory
+        assertEquals("newParent", movedResult.parent.id)
+        assertEquals(0, movedResult.sortOrder)
+    }
+
     // @spec CAT-UI-001
     @Test fun `getCategories sorts SubCategories after parent even when SubCategory sortOrder is lower`() = runTest {
         val repo = FakeTrackrRepository()

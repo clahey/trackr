@@ -116,6 +116,38 @@ class FakeTrackrRepository : TrackrRepository {
         }
     }
 
+    // Reindexes sortOrder for just the given ids (a sibling group), leaving every other
+    // category's sortOrder untouched — unlike reorderCategories, which assumes its
+    // argument is the complete list.
+    private fun updateSortOrdersFor(orderedIds: List<String>) {
+        val positions = orderedIds.withIndex().associate { (i, id) -> id to i }
+        categories.update { list ->
+            list.map { cat ->
+                val newOrder = positions[cat.id] ?: return@map cat
+                when (cat) {
+                    is Category.MetaCategory -> cat.copy(sortOrder = newOrder)
+                    is Category.SubCategory -> cat.copy(sortOrder = newOrder)
+                }
+            }
+        }
+    }
+
+    // @spec CAT-UI-080
+    override suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>) {
+        saveCategory(category)  // constraint check is inside saveCategory
+        updateSortOrdersFor(orderedSiblingIds)
+    }
+
+    // @spec CAT-UI-080, CAT-UI-081
+    override suspend fun moveCategoryAndMigrateEvents(
+        category: Category,
+        orderedSiblingIds: List<String>,
+        fromType: ValueType,
+    ) {
+        saveCategoryAndMigrateEvents(category, fromType)
+        updateSortOrdersFor(orderedSiblingIds)
+    }
+
     override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> {
         return if (!includeSubCategoriesWithNullType) {
             events.map { it.count { e -> e.categoryId == categoryId } }

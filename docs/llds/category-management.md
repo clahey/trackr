@@ -15,7 +15,7 @@ Displays all categories ordered by `sortOrder ASC` (user-defined). MetaCategorie
 - Navigate to **Category Edit** for a new category (FAB, primary action)
 - Navigate to **Category Edit** for an existing category (tap row)
 - Delete a category (long-press row → context menu)
-- Reorder categories (drag handle on each row; calls `repository.reorderCategories()` on drop; SubCategories can only be reordered within their parent's group)
+- Reorder categories (drag handle on each row; see `docs/llds/drag-reorder-list.md` for the full drag interaction, drop-zone, and persistence design — drag also subsumes reparenting: dropping on/near a different group's rows moves the category there)
 - Group operations (long-press row → context menu, items depend on category type):
 
 | Category type | Long-press group actions |
@@ -70,6 +70,8 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
 
 **ValueType change warning and migration:** when saving a category edit with a changed `valueType`, the system migrates all existing event values using the conversion table below. Conversions listed as **fully safe** are silent — no inline warning is shown while editing. All other conversions show an inline warning below the value type picker while the changed type is selected; the warning disappears if the user reverts the type. Event values that cannot be converted per the table are left unchanged.
 
+The same tier system and migration also gate **reparenting** a `SubCategory` whose `valueType` is `null` (inherited) when it changes which `MetaCategory`'s effective type it inherits — via drag, "Add to group," or "Move to another group." Reparenting has no edit-screen form to show an inline warning under, so it uses a confirmation dialog instead, with the same tiered message text; see `docs/llds/drag-reorder-list.md § Category-Management Adapter` for the mechanism, shared across all three reparent entry points.
+
 **Conversion table:**
 
 | From | To | Rule | Fully safe? | Reversible? |
@@ -110,6 +112,7 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
 - Exposes `categories: StateFlow<List<Category>>` from `repository.getCategories()`
 - `deleteCategory(id: String)`: queries event count first; exposes `pendingDeleteConfirmation: StateFlow<DeleteConfirmation?>` for the UI to show a dialog; executes deletion on confirmation
 - `confirmDelete()` / `cancelDelete()`: resolve the pending confirmation
+- `onDragMove(result: DragMoveResult, onSettled: () -> Unit)`: the widget's `onMove` callback (see `docs/llds/drag-reorder-list.md § Settling`). When no value-type confirmation is needed, calls `onSettled` at the end of its own coroutine, after the repository call returns. When one is needed, `onSettled` is stored on `PendingValueTypeConfirmation` itself rather than called here, and invoked later from `confirmPendingValueTypeChange()` (after the migrating persist completes) or `cancelPendingValueTypeChange()` (immediately, nothing persisted) — whichever the user picks. Exactly one of these three call sites runs per drag drop.
 
 ### CategoryEditViewModel
 
@@ -242,8 +245,10 @@ For MetaCategory (no parent), the Inherit toggle row is omitted; the field rende
    - **The official Emojipedia API** — access is granted case-by-case on request, not generally/publicly available, so not viable to depend on.
 
    Deferred post-MVP; no EARS specs exist for this yet.
+7. **Move Up / Move Down context-menu actions (extends CAT-UI-002)** — accessible, non-drag path for within-group reordering, needed because the kept context-menu actions (Add to group / Move to another group / Remove from group) cover reparenting but not reordering. Resolved as "yes, build this" during `drag-reorder-list.md`'s design (see that LLD's Open Questions § Resolved item 2); deferred as a follow-up task, not bundled into the drag feature's own implementation. No EARS specs exist for this yet.
 
 ## References
 
 - `docs/llds/data-model.md` — `Category` domain model, `ValueType` sealed class, `allowEmptyText`
 - `docs/llds/local-storage.md` — `TrackrRepository` interface, cascade delete behavior
+- `docs/llds/drag-reorder-list.md` — drag-to-reorder/reparent widget design for `CAT-UI-002`/`CAT-UI-080`/`CAT-UI-081`; the widget's own behavior is specced separately as `DRAG-UI-001`–`013` in `docs/specs/drag-reorder-list.md`

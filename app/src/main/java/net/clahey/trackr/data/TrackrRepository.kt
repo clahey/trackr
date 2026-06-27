@@ -14,6 +14,10 @@ interface TrackrRepository {
     // @spec CAT-UI-006
     suspend fun deleteCategory(id: String)
     suspend fun reorderCategories(orderedIds: List<String>)
+    // @spec CAT-UI-080
+    suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>)
+    // @spec CAT-UI-080, CAT-UI-081
+    suspend fun moveCategoryAndMigrateEvents(category: Category, orderedSiblingIds: List<String>, fromType: ValueType)
     fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
     fun getSubCategoryCount(categoryId: String): Flow<Int>
 

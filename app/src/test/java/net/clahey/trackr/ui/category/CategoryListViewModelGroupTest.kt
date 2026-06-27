@@ -2,7 +2,9 @@ package net.clahey.trackr.ui.category
 
 import net.clahey.trackr.FakeTrackrRepository
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.ValueType
+import net.clahey.trackr.domain.ValueTypeWarningTier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -18,6 +20,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("TestFunctionName")
@@ -112,6 +115,34 @@ class CategoryListViewModelGroupTest {
         assertEquals(0xFF00BCD4L, saved.color)
         assertEquals(ValueType.Text, saved.valueType)
         assertEquals("newParent", saved.parent.id)
+    }
+
+    // @spec CAT-UI-081
+    @Test fun `reparentCategory shows a value-type confirmation dialog when the inherited type would change unsafely`() = runTest {
+        val oldParent = makeMetaCategory("oldParent", valueType = ValueType.Number)
+        val newParent = makeMetaCategory("newParent", valueType = ValueType.Duration)
+        val child = makeSubCategory("child", oldParent) // inherits Number -> Duration: unsafe
+        repo.saveCategory(oldParent)
+        repo.saveCategory(newParent)
+        repo.saveCategory(child)
+        repo.setEvents(Event("e1", "child", Instant.parse("2024-01-15T12:00:00Z"), null, null, emptyList(), Instant.parse("2024-01-15T12:00:00Z")))
+        vm.reparentCategory("child", "newParent")
+        val pending = vm.pendingValueTypeConfirmation.value
+        assertEquals(ValueTypeWarningTier.Unsafe, pending?.tier)
+        assertEquals("oldParent", (repo.getCategoryById("child").first() as Category.SubCategory).parent.id)
+    }
+
+    // @spec CAT-UI-081
+    @Test fun `reparentCategory persists directly when the inherited type does not change`() = runTest {
+        val oldParent = makeMetaCategory("oldParent", valueType = ValueType.Text)
+        val newParent = makeMetaCategory("newParent", valueType = ValueType.Text)
+        val child = makeSubCategory("child", oldParent)
+        repo.saveCategory(oldParent)
+        repo.saveCategory(newParent)
+        repo.saveCategory(child)
+        vm.reparentCategory("child", "newParent")
+        assertNull(vm.pendingValueTypeConfirmation.value)
+        assertEquals("newParent", (repo.getCategoryById("child").first() as Category.SubCategory).parent.id)
     }
 
     // @spec CAT-UI-051

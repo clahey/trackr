@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -50,6 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
+import net.clahey.trackr.domain.ValueTypeWarningTier
+import net.clahey.trackr.ui.components.DragListItem
+import net.clahey.trackr.ui.components.DragReorderList
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,6 +68,7 @@ fun CategoryListScreen(
     val categories by viewModel.categories.collectAsState()
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val pendingGroupPicker by viewModel.pendingGroupPicker.collectAsState()
+    val pendingValueTypeConfirmation by viewModel.pendingValueTypeConfirmation.collectAsState()
     var menuCategoryId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -86,39 +88,49 @@ fun CategoryListScreen(
             }
         }
     ) { innerPadding ->
-        LazyColumn(
+        // @spec CAT-UI-002
+        val dragItems = categories.map { category ->
+            DragListItem(
+                id = category.id,
+                depth = if (category is Category.SubCategory) 1 else 0,
+                canHaveChildren = category is Category.MetaCategory,
+                canBecomeChild = categories.none { it is Category.SubCategory && it.parent.id == category.id },
+            )
+        }
+        DragReorderList(
+            items = dragItems,
+            onMove = { result, onSettled -> viewModel.onDragMove(result, onSettled) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-        ) {
-            items(categories, key = { it.id }) { category ->
-                val hasSubCategories = category is Category.MetaCategory &&
-                    categories.any { it is Category.SubCategory && it.parent.id == category.id }
-                CategoryRow(
-                    category = category,
-                    hasSubCategories = hasSubCategories,
-                    onClick = { onNavigateToCategoryEdit(category.id) },
-                    onLongClick = { menuCategoryId = category.id },
-                    menuExpanded = menuCategoryId == category.id,
-                    onMenuDismiss = { menuCategoryId = null },
-                    onDeleteClick = {
-                        menuCategoryId = null
-                        viewModel.deleteCategory(category.id)
-                    },
-                    onAddToGroupClick = {
-                        menuCategoryId = null
-                        viewModel.startAddToGroup(category.id)
-                    },
-                    onMoveToAnotherGroupClick = {
-                        menuCategoryId = null
-                        viewModel.startMoveToAnotherGroup(category.id)
-                    },
-                    onRemoveFromGroupClick = {
-                        menuCategoryId = null
-                        viewModel.removeFromGroup(category.id)
-                    },
-                )
-            }
+        ) { item ->
+            val category = categories.first { it.id == item.id }
+            val hasSubCategories = category is Category.MetaCategory &&
+                categories.any { it is Category.SubCategory && it.parent.id == category.id }
+            CategoryRow(
+                category = category,
+                hasSubCategories = hasSubCategories,
+                onClick = { onNavigateToCategoryEdit(category.id) },
+                onLongClick = { menuCategoryId = category.id },
+                menuExpanded = menuCategoryId == category.id,
+                onMenuDismiss = { menuCategoryId = null },
+                onDeleteClick = {
+                    menuCategoryId = null
+                    viewModel.deleteCategory(category.id)
+                },
+                onAddToGroupClick = {
+                    menuCategoryId = null
+                    viewModel.startAddToGroup(category.id)
+                },
+                onMoveToAnotherGroupClick = {
+                    menuCategoryId = null
+                    viewModel.startMoveToAnotherGroup(category.id)
+                },
+                onRemoveFromGroupClick = {
+                    menuCategoryId = null
+                    viewModel.removeFromGroup(category.id)
+                },
+            )
         }
     }
 
@@ -139,6 +151,45 @@ fun CategoryListScreen(
             onDismiss = { viewModel.dismissGroupPicker() },
         )
     }
+
+    // @spec CAT-UI-081
+    pendingValueTypeConfirmation?.let { confirmation ->
+        ValueTypeChangeConfirmationDialog(
+            tier = confirmation.tier,
+            onConfirm = { viewModel.confirmPendingValueTypeChange() },
+            onDismiss = { viewModel.cancelPendingValueTypeChange() },
+        )
+    }
+}
+
+// @spec CAT-UI-081, CAT-UI-036, CAT-UI-037, CAT-UI-038
+@Composable
+private fun ValueTypeChangeConfirmationDialog(
+    tier: ValueTypeWarningTier,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.category_reparent_warning_title)) },
+        text = {
+            Text(
+                stringResource(
+                    when (tier) {
+                        ValueTypeWarningTier.IrreversibleSafe -> R.string.category_warning_irreversible_safe
+                        ValueTypeWarningTier.Partial -> R.string.category_warning_partial
+                        ValueTypeWarningTier.Unsafe -> R.string.category_warning_unsafe
+                    }
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.category_reparent_warning_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

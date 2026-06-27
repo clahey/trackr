@@ -27,6 +27,7 @@
     <string name="cd_attached_photo">Attached photo</string>
     <string name="cd_remove_image">Remove image</string>
     <string name="cd_delete_swipe">Delete</string>
+    <string name="cd_drag_handle">Drag to reorder</string>
 
     <!-- Value input labels -->
     <string name="value_input_value">Value</string>
@@ -92,6 +93,8 @@
     <string name="category_warning_irreversible_safe">Existing events will be converted. This change cannot be reversed by switching back.</string>
     <string name="category_warning_partial">Some existing events may not be convertible and will display incorrectly.</string>
     <string name="category_warning_unsafe">Existing events cannot be converted and will display incorrectly.</string>
+    <string name="category_reparent_warning_title">Value type will change</string>
+    <string name="category_reparent_warning_confirm">Continue</string>
 
     <!-- Value types -->
     <string name="value_type_none">None</string>
