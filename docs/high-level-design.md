@@ -127,3 +127,4 @@ The intended full-sync and sharing backend. Chosen because the team is already i
 - [Room persistence library](https://developer.android.com/training/data-storage/room)
 - [Jetpack Compose](https://developer.android.com/jetpack/compose)
 - [Hilt dependency injection](https://developer.android.com/training/dependency-injection/hilt-android)
+- `docs/llds/publishing.md` — path to Play Store publishing, store-listing creative (icon, feature graphic, slogan), and compliance forms. No EARS specs or tests apply to this segment — it's process and external assets, not app behavior.
