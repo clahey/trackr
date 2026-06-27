@@ -17,6 +17,9 @@ local.properties
 # Google Services (contains API keys)
 google-services.json
 
+# Scratch (local working files, never commit)
+scratch/
+
 # OS
 .DS_Store
 Thumbs.db
