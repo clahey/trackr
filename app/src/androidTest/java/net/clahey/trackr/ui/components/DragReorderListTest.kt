@@ -279,11 +279,14 @@ class DragReorderListTest {
         composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput { up() }
     }
 
-    // @spec DRAG-UI-004
-    // Regression test: holding a drag near the bottom edge long enough for sustained
+    // @spec DRAG-UI-004, DRAG-UI-015
+    // Exercises auto-scroll (DRAG-UI-004) as the precondition for the survival guarantee
+    // (DRAG-UI-015): holding a drag near the bottom edge long enough for sustained
     // auto-scroll to carry the dragged row's original position well off (or, per the
     // user's report, back onto) screen must not interrupt the gesture — it should still be
-    // possible to keep adjusting the drop position and complete the move afterward.
+    // possible to keep adjusting the drop position and complete the move afterward. Fails
+    // under the per-row gesture host (the disposed row cancels the gesture coroutine
+    // mid-drag); the persistent overlay strip — the default gesture host — fixes it.
     // mainClock.autoAdvance is turned off so advanceTimeBy() deterministically drives the
     // auto-scroll LaunchedEffect's delay(16) loop through many iterations without relying
     // on real wall-clock time.

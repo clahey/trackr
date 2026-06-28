@@ -8,11 +8,13 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -31,12 +33,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -336,12 +340,18 @@ fun computeDragTarget(
     return if (sameDrop) unchanged else candidateId to candidateZone
 }
 
-// @spec DRAG-UI-001, DRAG-UI-002, DRAG-UI-003, DRAG-UI-004, DRAG-UI-005, DRAG-UI-011, DRAG-UI-012, DRAG-UI-013
+// @spec DRAG-UI-001, DRAG-UI-002, DRAG-UI-003, DRAG-UI-004, DRAG-UI-005, DRAG-UI-011, DRAG-UI-012, DRAG-UI-013, DRAG-UI-015
 @Composable
 fun DragReorderList(
     items: List<DragListItem>,
     onMove: (result: DragMoveResult, onSettled: () -> Unit) -> Unit,
     modifier: Modifier = Modifier,
+    // TEMPORARY scaffolding (docs/llds/drag-reorder-list.md § Validation scaffolding): selects
+    // the drag gesture host. true = a single persistent overlay strip that survives the
+    // LazyColumn disposing the dragged row during auto-scroll (DRAG-UI-015); false = the old
+    // per-row handle pointerInput. Removed once the strip is confirmed on-device, leaving the
+    // strip as the sole host.
+    useOverlayStrip: Boolean = true,
     content: @Composable (DragListItem) -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -430,6 +440,55 @@ fun DragReorderList(
         }
     }
 
+    // The drop/cancel/move-step handlers are identical for both gesture hosts (the per-row
+    // handle and the overlay strip) — only pickup differs (which row, and how it's located).
+    // None of these read the picked-up row's id from a closure; they all go through live
+    // state (draggedId / currentTargetId / currentZone / currentItems), so a single coroutine
+    // hosting them is correct regardless of which row was grabbed.
+    fun endDragAndMaybeMove() {
+        android.util.Log.d("DragReorderListDebug", "onDragEnd (draggedId=$draggedId)")
+        val finalDraggedId = draggedId
+        val finalTarget = currentTargetId
+        val finalZone = currentZone
+        if (finalDraggedId != null && finalTarget != null) {
+            computeMoveResult(currentItems, finalDraggedId, finalTarget, finalZone)?.let { result ->
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                settledDisplayOrder = hypotheticalOrder(currentItems, finalDraggedId, finalTarget, finalZone)
+                onMove(result) { settledDisplayOrder = null }
+            }
+        }
+        draggedId = null
+        currentTargetId = null
+        currentZone = DropZone.None
+        dragDelta = Offset.Zero
+        draggingPointerId = null
+    }
+
+    fun cancelDrag() {
+        android.util.Log.d("DragReorderListDebug", "onDragCancel (draggedId=$draggedId)")
+        draggedId = null
+        currentTargetId = null
+        currentZone = DropZone.None
+        dragDelta = Offset.Zero
+        draggingPointerId = null
+    }
+
+    fun onDragMove(change: PointerInputChange, amount: Offset) {
+        change.consume()
+        draggingPointerId = change.id
+        dragDelta += amount
+        dragStartPosition?.let { start ->
+            pointerYInList = start.y + dragDelta.y + dragRowSize.height / 2f
+        }
+        android.util.Log.d(
+            "DragReorderListDebug",
+            "onDrag: changeId=${change.id} amount=$amount dragDelta=$dragDelta " +
+                "pointerYInList=$pointerYInList currentTarget=$currentTargetId/$currentZone " +
+                "canScrollForward=${listState.canScrollForward}",
+        )
+        resolveTargetAndZone()
+    }
+
     // @spec DRAG-UI-004
     LaunchedEffect(draggedId) {
         val edgePx = with(density) { 64.dp.toPx() }
@@ -516,86 +575,97 @@ fun DragReorderList(
                                     .testTag("drag_handle_${item.id}")
                                     .size(48.dp)
                                     .alpha(if (isDraggedRow) 0f else 1f)
-                                    .pointerInput(item.id) {
-                                        android.util.Log.d("DragReorderListDebug", "pointerInput coroutine launched for ${item.id}")
-                                        try {
-                                            detectDragGestures(
-                                                onDragStart = {
-                                                    // Settling (DRAG-UI-014) blocks new pickups the same way an
-                                                    // active drag does — belt-and-suspenders alongside the
-                                                    // exclusivity overlay below, which should already be
-                                                    // consuming this touch.
-                                                    if (settledDisplayOrder == null) {
-                                                        android.util.Log.d("DragReorderListDebug", "onDragStart for ${item.id}")
-                                                        draggedId = item.id
-                                                        dragDelta = Offset.Zero
-                                                        currentTargetId = null
-                                                        currentZone = DropZone.None
-                                                        rowCoordinates[item.id]?.let { coords ->
-                                                            val pos = coords.positionInRoot()
-                                                            dragStartPosition = Offset(pos.x, pos.y - rootTop)
-                                                            dragRowSize = coords.size
-                                                            pointerYInList = (pos.y - rootTop) + coords.size.height / 2f
+                                    .then(
+                                        // Legacy per-row gesture host. With the overlay strip
+                                        // active (the default), this handle is purely
+                                        // decorative — the strip hosts the gesture — so no
+                                        // pointerInput is attached here at all.
+                                        if (!useOverlayStrip) {
+                                            Modifier.pointerInput(item.id) {
+                                                detectDragGestures(
+                                                    onDragStart = {
+                                                        // Settling (DRAG-UI-014) blocks new pickups the same way an
+                                                        // active drag does — belt-and-suspenders alongside the
+                                                        // exclusivity overlay below, which should already be
+                                                        // consuming this touch.
+                                                        if (settledDisplayOrder == null) {
+                                                            draggedId = item.id
+                                                            dragDelta = Offset.Zero
+                                                            currentTargetId = null
+                                                            currentZone = DropZone.None
+                                                            rowCoordinates[item.id]?.let { coords ->
+                                                                val pos = coords.positionInRoot()
+                                                                dragStartPosition = Offset(pos.x, pos.y - rootTop)
+                                                                dragRowSize = coords.size
+                                                                pointerYInList = (pos.y - rootTop) + coords.size.height / 2f
+                                                            }
                                                         }
-                                                    }
-                                                },
-                                                onDragEnd = {
-                                                    android.util.Log.d("DragReorderListDebug", "onDragEnd for ${item.id}")
-                                                    val finalDraggedId = draggedId
-                                                    val finalTarget = currentTargetId
-                                                    val finalZone = currentZone
-                                                    if (finalDraggedId != null && finalTarget != null) {
-                                                        computeMoveResult(currentItems, finalDraggedId, finalTarget, finalZone)?.let { result ->
-                                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                            settledDisplayOrder =
-                                                                hypotheticalOrder(currentItems, finalDraggedId, finalTarget, finalZone)
-                                                            onMove(result) { settledDisplayOrder = null }
-                                                        }
-                                                    }
-                                                    draggedId = null
-                                                    currentTargetId = null
-                                                    currentZone = DropZone.None
-                                                    dragDelta = Offset.Zero
-                                                    draggingPointerId = null
-                                                },
-                                                onDragCancel = {
-                                                    android.util.Log.d("DragReorderListDebug", "onDragCancel for ${item.id}")
-                                                    draggedId = null
-                                                    currentTargetId = null
-                                                    currentZone = DropZone.None
-                                                    dragDelta = Offset.Zero
-                                                    draggingPointerId = null
-                                                },
-                                            ) { change, amount ->
-                                                change.consume()
-                                                draggingPointerId = change.id
-                                                dragDelta += amount
-                                                dragStartPosition?.let { start ->
-                                                    pointerYInList = start.y + dragDelta.y + dragRowSize.height / 2f
-                                                }
-                                                android.util.Log.d(
-                                                    "DragReorderListDebug",
-                                                    "onDrag for ${item.id}: changeId=${change.id} amount=$amount " +
-                                                        "dragDelta=$dragDelta pointerYInList=$pointerYInList " +
-                                                        "currentTarget=$currentTargetId/$currentZone canScrollForward=${listState.canScrollForward}",
-                                                )
-                                                resolveTargetAndZone()
+                                                    },
+                                                    onDragEnd = { endDragAndMaybeMove() },
+                                                    onDragCancel = { cancelDrag() },
+                                                ) { change, amount -> onDragMove(change, amount) }
                                             }
-                                        } finally {
-                                            android.util.Log.d("DragReorderListDebug", "pointerInput coroutine ending for ${item.id} (draggedId=$draggedId)")
-                                        }
-                                    }
+                                        } else {
+                                            Modifier
+                                        },
+                                    )
                                     // Padding comes after the touch target is established
-                                    // (size + pointerInput above) so it only shrinks what's
-                                    // drawn, not the 48dp hit area itself — the standard
-                                    // Material icon size (24dp) within a 48dp touch target,
-                                    // not a 48dp icon.
+                                    // (size above, plus pointerInput in the legacy path) so it
+                                    // only shrinks what's drawn, not the 48dp hit area — the
+                                    // standard Material icon size (24dp) within a 48dp touch
+                                    // target, not a 48dp icon.
                                     .padding(12.dp),
                             )
                         }
                     }
                 }
             }
+        }
+
+        // @spec DRAG-UI-015 — the drag gesture, hosted on a single persistent strip over the
+        // handle column rather than on each row's handle. Because the strip is never a
+        // LazyColumn item, the LazyColumn disposing the dragged row as it auto-scrolls
+        // off-screen can't dispose this gesture's coroutine, so the drag survives sustained
+        // auto-scroll. Confined to the non-scrolling handle column so it doesn't compete with
+        // the LazyColumn's own scroll gesture (see docs/llds/drag-reorder-list.md § Pickup).
+        // On pickup it hit-tests the touch-down Y against the currently visible rows to find
+        // which row was grabbed. TEMPORARY: only attached on the default (useOverlayStrip) path.
+        if (useOverlayStrip && displayOrder.size > 1) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .fillMaxHeight()
+                    .width(48.dp)
+                    .testTag("drag_strip")
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { startOffset ->
+                                // The strip shares the outer Box's coordinate origin with the
+                                // LazyColumn's viewport, so the down's Y is directly comparable
+                                // to visibleItemsInfo offsets.
+                                if (settledDisplayOrder == null) {
+                                    val order = lastRenderedOrder
+                                    val y = startOffset.y
+                                    val hit = listState.layoutInfo.visibleItemsInfo
+                                        .firstOrNull { y >= it.offset && y < it.offset + it.size }
+                                    val rowId = hit?.let { order.getOrNull(it.index)?.id }
+                                    android.util.Log.d("DragReorderListDebug", "strip onDragStart y=$y -> $rowId")
+                                    if (hit != null && rowId != null && order.size > 1) {
+                                        draggedId = rowId
+                                        dragDelta = Offset.Zero
+                                        currentTargetId = null
+                                        currentZone = DropZone.None
+                                        dragStartPosition = Offset(0f, hit.offset.toFloat())
+                                        dragRowSize = IntSize(0, hit.size)
+                                        pointerYInList = hit.offset + hit.size / 2f
+                                    }
+                                }
+                            },
+                            onDragEnd = { endDragAndMaybeMove() },
+                            onDragCancel = { cancelDrag() },
+                        ) { change, amount -> onDragMove(change, amount) }
+                    },
+            )
         }
 
         // @spec DRAG-UI-013, DRAG-UI-014 — blocks new touches elsewhere (a second finger
