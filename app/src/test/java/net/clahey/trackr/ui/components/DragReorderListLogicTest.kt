@@ -6,8 +6,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+// The drag math runs over the widget's internal depth-annotated flat representation
+// (FlatNode), which the public DragListItem tree is flattened into on input.
 private fun item(id: String, depth: Int, canHaveChildren: Boolean = false, canBecomeChild: Boolean = true) =
-    DragListItem(id, depth, canHaveChildren, canBecomeChild)
+    FlatNode(id, depth, canHaveChildren, canBecomeChild)
 
 // A (childless meta) / B (meta with children: C, D) / E (childless meta)
 private val fixture = listOf(
@@ -19,6 +21,26 @@ private val fixture = listOf(
 )
 
 class DragReorderListLogicTest {
+
+    // The same A / B(C,D) / E shape as `fixture`, expressed as the public input tree.
+    private val tree = listOf(
+        DragListItem("A", canHaveChildren = true, canBecomeChild = true),
+        DragListItem(
+            "B", canHaveChildren = true, canBecomeChild = false,
+            children = listOf(
+                DragListItem("C", canHaveChildren = false, canBecomeChild = true),
+                DragListItem("D", canHaveChildren = false, canBecomeChild = true),
+            ),
+        ),
+        DragListItem("E", canHaveChildren = true, canBecomeChild = true),
+    )
+
+    // Representation-only boundary (no behavioral spec): the public tree flattens
+    // depth-first — each node immediately followed by its children — into the internal
+    // depth-annotated list the rest of the drag math operates on.
+    @Test fun `flatten turns the public tree into the internal depth-annotated list`() {
+        assertEquals(fixture, flatten(tree))
+    }
 
     // @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008
     @Test fun `siblingGroup of a depth-0 item is every depth-0 item`() {

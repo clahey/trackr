@@ -134,12 +134,12 @@ class CategoryListViewModel @Inject constructor(
                 onSettled()
                 return@launch
             }
-            val newParent = result.newGroupAnchorId?.let {
+            val newParent = result.newParentId?.let {
                 repository.getCategoryById(it).first() as? Category.MetaCategory
             }
             val effectiveTypeBefore = moved.resolvedValueType
             val reconstructed = reconstructForMove(moved, newParent)
-            persistReparent(reconstructed, effectiveTypeBefore, result.orderedGroupIds, onSettled)
+            persistReparent(reconstructed, effectiveTypeBefore, result.orderedSiblingIds, onSettled)
         }
     }
 

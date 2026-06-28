@@ -107,12 +107,17 @@ fun CategoryListScreen(
         }
     ) { innerPadding ->
         // @spec CAT-UI-002
-        val dragItems = categories.map { category ->
+        // Build the widget's input tree: each MetaCategory is a top-level node whose children
+        // are its SubCategories, selected by parent relationship (not by flat-list ordering).
+        val dragItems = categories.filterIsInstance<Category.MetaCategory>().map { meta ->
+            val subs = categories.filterIsInstance<Category.SubCategory>().filter { it.parent.id == meta.id }
             DragListItem(
-                id = category.id,
-                depth = if (category is Category.SubCategory) 1 else 0,
-                canHaveChildren = category is Category.MetaCategory,
-                canBecomeChild = categories.none { it is Category.SubCategory && it.parent.id == category.id },
+                id = meta.id,
+                canHaveChildren = true,
+                canBecomeChild = subs.isEmpty(),
+                children = subs.map { sub ->
+                    DragListItem(id = sub.id, canHaveChildren = false, canBecomeChild = true)
+                },
             )
         }
         DragReorderList(

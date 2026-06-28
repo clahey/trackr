@@ -35,11 +35,11 @@ class DragReorderListTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private fun rowItem(id: String, depth: Int = 0) =
-        DragListItem(id, depth, canHaveChildren = true, canBecomeChild = true)
+    private fun rowItem(id: String, children: List<DragListItem> = emptyList()) =
+        DragListItem(id, canHaveChildren = true, canBecomeChild = true, children = children)
 
     private fun flatItem(id: String) =
-        DragListItem(id, depth = 0, canHaveChildren = false, canBecomeChild = true)
+        DragListItem(id, canHaveChildren = false, canBecomeChild = true)
 
     // @spec DRAG-UI-001
     @Test
@@ -169,10 +169,10 @@ class DragReorderListTest {
         // target (own-placeholder no-op) and leaving S1's depth at its untouched original
         // value; even if it did overshoot onto a neighbor, every plausible landing spot is
         // still a depth-1 sibling, so the *resulting* depth is robustly 1 either way.
-        val depth1Siblings = (1..8).map { DragListItem("S$it", depth = 1, canHaveChildren = false, canBecomeChild = true) }
+        val subChildren = (1..8).map { flatItem("S$it") }
         composeTestRule.setContent {
             DragReorderList(
-                items = listOf(rowItem("A", depth = 0)) + depth1Siblings,
+                items = listOf(rowItem("A", children = subChildren)),
                 onMove = { _, onSettled -> onSettled() },
             ) { item ->
                 Text(item.id, modifier = Modifier.testTag("row_${item.id}").padding(vertical = 48.dp))

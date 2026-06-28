@@ -59,12 +59,57 @@ import net.clahey.trackr.R
 import kotlin.math.roundToInt
 
 // @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008, DRAG-UI-009, DRAG-UI-010, DRAG-UI-011, DRAG-UI-012
+//
+// The widget's public input is a tree: each node carries its own ordered [children], and a
+// leaf is simply an empty [children] list. There is deliberately no `depth` field — depth is
+// implied by the nesting and the widget supports arbitrary nesting depth. Any per-app cap
+// (e.g. the category screen's two-level limit) is the caller's concern, enforced by how it
+// builds the tree, not by this type; and a malformed "jump" (a depth-0 row followed by a
+// depth-2 row, skipping a level) is simply unrepresentable here. ids must be unique across
+// the entire tree. See docs/llds/drag-reorder-list.md § Generic Widget API.
 data class DragListItem(
+    val id: String,
+    val canHaveChildren: Boolean,
+    val canBecomeChild: Boolean,
+    val children: List<DragListItem> = emptyList(),
+)
+
+// The internal depth-annotated representation the drag math runs over. The public
+// [DragListItem] tree is flattened depth-first into a `List<FlatNode>` on input (see
+// [flatten]); zone resolution, hypothetical reordering, and sibling-group computation all
+// operate on this flat list, and the result is mapped back to tree terms on drop.
+internal data class FlatNode(
     val id: String,
     val depth: Int,
     val canHaveChildren: Boolean,
     val canBecomeChild: Boolean,
 )
+
+/**
+ * Flattens the public [items] tree depth-first — each node immediately followed by its own
+ * subtree — into the internal depth-annotated list the rest of the drag math operates on.
+ * Top-level nodes are depth 0, their children depth 1, and so on.
+ */
+internal fun flatten(items: List<DragListItem>): List<FlatNode> {
+    val result = mutableListOf<FlatNode>()
+    fun visit(item: DragListItem, depth: Int) {
+        result.add(FlatNode(item.id, depth, item.canHaveChildren, item.canBecomeChild))
+        item.children.forEach { visit(it, depth + 1) }
+    }
+    items.forEach { visit(it, 0) }
+    return result
+}
+
+/** Every node in the [items] tree, keyed by id, for resolving a flat row back to its source node. */
+private fun nodesById(items: List<DragListItem>): Map<String, DragListItem> {
+    val result = mutableMapOf<String, DragListItem>()
+    fun visit(item: DragListItem) {
+        result[item.id] = item
+        item.children.forEach { visit(it) }
+    }
+    items.forEach { visit(it) }
+    return result
+}
 
 sealed class DropZone {
     data object Before : DropZone()
@@ -75,8 +120,11 @@ sealed class DropZone {
 
 data class DragMoveResult(
     val movedId: String,
-    val newGroupAnchorId: String?,
-    val orderedGroupIds: List<String>,
+    // The moved item's immediate enclosing node in the resulting order (its nearest preceding
+    // shallower node), or null when it lands at the top level.
+    val newParentId: String?,
+    // The moved item's destination sibling group in final order, including the moved item.
+    val orderedSiblingIds: List<String>,
 )
 
 /**
@@ -84,7 +132,7 @@ data class DragMoveResult(
  * preceding/following item at a shallower depth. For a depth-0 anchor, that's every
  * depth-0 item in the list (the outermost group).
  */
-fun siblingGroup(items: List<DragListItem>, anchorId: String): List<DragListItem> {
+internal fun siblingGroup(items: List<FlatNode>, anchorId: String): List<FlatNode> {
     val anchorIndex = items.indexOfFirst { it.id == anchorId }
     val depth = items[anchorIndex].depth
     if (depth == 0) return items.filter { it.depth == 0 }
@@ -96,7 +144,7 @@ fun siblingGroup(items: List<DragListItem>, anchorId: String): List<DragListItem
 }
 
 /** The id of the nearest preceding shallower-depth item, or null if [id] is already depth 0. */
-fun groupAnchorOf(items: List<DragListItem>, id: String): String? {
+internal fun groupAnchorOf(items: List<FlatNode>, id: String): String? {
     val index = items.indexOfFirst { it.id == id }
     val depth = items[index].depth
     if (depth == 0) return null
@@ -107,10 +155,10 @@ fun groupAnchorOf(items: List<DragListItem>, id: String): String? {
 }
 
 /** Items immediately nested one level under [parentId] (its current children). */
-fun childrenOf(items: List<DragListItem>, parentId: String): List<DragListItem> {
+internal fun childrenOf(items: List<FlatNode>, parentId: String): List<FlatNode> {
     val index = items.indexOfFirst { it.id == parentId }
     val parentDepth = items[index].depth
-    val result = mutableListOf<DragListItem>()
+    val result = mutableListOf<FlatNode>()
     var i = index + 1
     while (i < items.size && items[i].depth > parentDepth) {
         if (items[i].depth == parentDepth + 1) result.add(items[i])
@@ -126,7 +174,7 @@ fun childrenOf(items: List<DragListItem>, parentId: String): List<DragListItem> 
  * greater depth. Deliberately independent of `canBecomeChild`: see
  * docs/llds/drag-reorder-list.md § Drop Zone Geometry.
  */
-fun hasChildrenStructurally(items: List<DragListItem>, index: Int, excludeId: String?): Boolean {
+internal fun hasChildrenStructurally(items: List<FlatNode>, index: Int, excludeId: String?): Boolean {
     val depth = items[index].depth
     var i = index + 1
     while (i < items.size && items[i].id == excludeId) i++
@@ -159,8 +207,8 @@ fun dropZone(
 }
 
 // @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008, DRAG-UI-010
-fun computeMoveResult(
-    items: List<DragListItem>,
+internal fun computeMoveResult(
+    items: List<FlatNode>,
     draggedId: String,
     targetId: String,
     zone: DropZone,
@@ -183,12 +231,12 @@ fun computeMoveResult(
 }
 
 // @spec DRAG-UI-010
-fun endOfListMoveResult(items: List<DragListItem>, draggedId: String): DragMoveResult {
+internal fun endOfListMoveResult(items: List<FlatNode>, draggedId: String): DragMoveResult {
     val topLevel = items.filter { it.depth == 0 && it.id != draggedId }.map { it.id }
     return DragMoveResult(draggedId, null, topLevel + draggedId)
 }
 
-private fun countDescendants(items: List<DragListItem>, index: Int): Int {
+private fun countDescendants(items: List<FlatNode>, index: Int): Int {
     val depth = items[index].depth
     var count = 0
     var i = index + 1
@@ -204,12 +252,12 @@ private fun countDescendants(items: List<DragListItem>, index: Int): Int {
  * drives the live-reflow animation. Returns [items] unchanged for an invalid drop.
  */
 // @spec DRAG-UI-002
-fun hypotheticalOrder(
-    items: List<DragListItem>,
+internal fun hypotheticalOrder(
+    items: List<FlatNode>,
     draggedId: String,
     targetId: String,
     zone: DropZone,
-): List<DragListItem> {
+): List<FlatNode> {
     if (zone == DropZone.None || targetId == draggedId) return items
     val draggedIndex = items.indexOfFirst { it.id == draggedId }
     val draggedItem = items[draggedIndex]
@@ -242,7 +290,7 @@ fun hypotheticalOrder(
  * of whether the dragged row itself has children.
  */
 // @spec DRAG-UI-011, DRAG-UI-012
-fun shouldCollapseChildrenOf(rowId: String, dragged: DragListItem, draggedHasChildren: Boolean): Boolean =
+internal fun shouldCollapseChildrenOf(rowId: String, dragged: FlatNode, draggedHasChildren: Boolean): Boolean =
     if (rowId == dragged.id) draggedHasChildren else !dragged.canBecomeChild
 
 /** A visible row's position/size within the list, as reported by `LazyListItemInfo`. */
@@ -255,7 +303,7 @@ data class VisibleRowGeometry(val index: Int, val offset: Int, val size: Int)
  * the hit row is the dragged row's own already-relocated placeholder.
  */
 private fun resolveHitDropCandidate(
-    order: List<DragListItem>,
+    order: List<FlatNode>,
     draggedId: String,
     pointerYInList: Float,
     visible: List<VisibleRowGeometry>,
@@ -288,7 +336,7 @@ private fun resolveHitDropCandidate(
  * sibling" (touch slop alone is frequently enough to land there), which is not a move at
  * all — it's exactly where the row started.
  */
-private fun identityMoveResult(order: List<DragListItem>, draggedId: String): DragMoveResult =
+private fun identityMoveResult(order: List<FlatNode>, draggedId: String): DragMoveResult =
     DragMoveResult(draggedId, groupAnchorOf(order, draggedId), siblingGroup(order, draggedId).map { it.id })
 
 /**
@@ -314,8 +362,8 @@ private fun identityMoveResult(order: List<DragListItem>, draggedId: String): Dr
  * pointer has moved anywhere meaningful at all.
  */
 // @spec DRAG-UI-002, DRAG-UI-003
-fun computeDragTarget(
-    order: List<DragListItem>,
+internal fun computeDragTarget(
+    order: List<FlatNode>,
     draggedId: String,
     pointerYInList: Float,
     visible: List<VisibleRowGeometry>,
@@ -335,8 +383,8 @@ fun computeDragTarget(
         identityMoveResult(order, draggedId)
     }
     val sameDrop = baselineResult != null &&
-        candidateResult.newGroupAnchorId == baselineResult.newGroupAnchorId &&
-        candidateResult.orderedGroupIds == baselineResult.orderedGroupIds
+        candidateResult.newParentId == baselineResult.newParentId &&
+        candidateResult.orderedSiblingIds == baselineResult.orderedSiblingIds
     return if (sameDrop) unchanged else candidateId to candidateZone
 }
 
@@ -372,16 +420,21 @@ fun DragReorderList(
     // moment of drop, kept frozen so the list doesn't snap back to the caller's
     // (still-stale) `items` and then re-animate forward the instant `items` catches up.
     // Also gates new pickups: see the exclusivity overlay and onDragStart below.
-    var settledDisplayOrder by remember { mutableStateOf<List<DragListItem>?>(null) }
+    var settledDisplayOrder by remember { mutableStateOf<List<FlatNode>?>(null) }
     // Every row's last-known position/size, updated continuously (independent of drag
     // state) so pickup can read an already-known value synchronously instead of racing
     // a fresh layout pass against the gesture coroutine.
     val rowCoordinates = remember { mutableMapOf<String, LayoutCoordinates>() }
-    // pointerInput(item.id) below launches one coroutine per row that is *not* relaunched
-    // on every recomposition (its key never changes) — anything it reads that isn't itself
-    // a MutableState (like the `items` parameter) must go through rememberUpdatedState, or
-    // the coroutine stays bound to the closure from the row's very first composition.
-    val currentItems by rememberUpdatedState(items)
+    // The drag math runs over the internal flattened representation; the public `items` tree
+    // is flattened on input (DragListItem -> FlatNode). pointerInput(item.id) below launches
+    // one coroutine per row that is *not* relaunched on every recomposition (its key never
+    // changes) — anything it reads that isn't itself a MutableState (like the flattened
+    // `items`) must go through rememberUpdatedState, or the coroutine stays bound to the
+    // closure from the row's very first composition.
+    val currentItems by rememberUpdatedState(flatten(items))
+    // The original tree node for each id, so the flat display rows can be rendered back via
+    // the caller's `content`, which takes a (tree) DragListItem.
+    val sourceNodes = remember(items) { nodesById(items) }
 
     val draggedIndex = draggedId?.let { id -> currentItems.indexOfFirst { it.id == id } } ?: -1
     val draggedItem = if (draggedIndex >= 0) currentItems[draggedIndex] else null
@@ -555,7 +608,7 @@ fun DragReorderList(
                                     .border(2.dp, MaterialTheme.colorScheme.primary, placeholderShape),
                             )
                         } else {
-                            Box(modifier = Modifier.weight(1f)) { content(item) }
+                            Box(modifier = Modifier.weight(1f)) { content(sourceNodes.getValue(item.id)) }
                         }
                         // Stays mounted for the dragged row too — removing it from
                         // composition mid-drag (i.e. gating on !isDraggedRow) would tear
@@ -703,7 +756,7 @@ fun DragReorderList(
                     .offset { IntOffset((start.x + dragDelta.x).roundToInt(), (start.y + dragDelta.y).roundToInt()) },
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    Box(modifier = Modifier.weight(1f)) { content(draggedItem) }
+                    Box(modifier = Modifier.weight(1f)) { content(sourceNodes.getValue(draggedItem.id)) }
                     // Decorative only — the real, interactive handle (which hosts the
                     // active gesture) stays mounted at the placeholder's position, just
                     // invisible there; this copy is what actually reads as "attached to
