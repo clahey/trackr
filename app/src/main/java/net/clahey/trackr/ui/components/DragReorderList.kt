@@ -4,7 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -42,6 +45,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -425,6 +429,11 @@ fun DragReorderList(
     // state) so pickup can read an already-known value synchronously instead of racing
     // a fresh layout pass against the gesture coroutine.
     val rowCoordinates = remember { mutableMapOf<String, LayoutCoordinates>() }
+    // Each visible row's drag-handle icon bounds, so the overlay strip can tell whether a
+    // touch-down actually landed on a handle (start a drag) versus elsewhere in the handle
+    // column (let it fall through to the list, e.g. to scroll). Only visible rows' handles
+    // are looked up — entries for disposed rows are stale and never consulted.
+    val handleCoordinates = remember { mutableMapOf<String, LayoutCoordinates>() }
     // The drag math runs over the internal flattened representation; the public `items` tree
     // is flattened on input (DragListItem -> FlatNode). pointerInput(item.id) below launches
     // one coroutine per row that is *not* relaunched on every recomposition (its key never
@@ -626,6 +635,7 @@ fun DragReorderList(
                                 contentDescription = stringResource(R.string.cd_drag_handle),
                                 modifier = Modifier
                                     .testTag("drag_handle_${item.id}")
+                                    .onGloballyPositioned { handleCoordinates[item.id] = it }
                                     .size(48.dp)
                                     .alpha(if (isDraggedRow) 0f else 1f)
                                     .then(
@@ -675,14 +685,19 @@ fun DragReorderList(
             }
         }
 
-        // @spec DRAG-UI-015 — the drag gesture, hosted on a single persistent strip over the
-        // handle column rather than on each row's handle. Because the strip is never a
+        // @spec DRAG-UI-001, DRAG-UI-015 — the drag gesture, hosted on a single persistent strip
+        // over the handle column rather than on each row's handle. Because the strip is never a
         // LazyColumn item, the LazyColumn disposing the dragged row as it auto-scrolls
         // off-screen can't dispose this gesture's coroutine, so the drag survives sustained
-        // auto-scroll. Confined to the non-scrolling handle column so it doesn't compete with
-        // the LazyColumn's own scroll gesture (see docs/llds/drag-reorder-list.md § Pickup).
-        // On pickup it hit-tests the touch-down Y against the currently visible rows to find
-        // which row was grabbed. TEMPORARY: only attached on the default (useOverlayStrip) path.
+        // auto-scroll. Confined to the handle column so it doesn't reach the row content.
+        //
+        // Unlike a blanket detectDragGestures (which would grab every touch anywhere in the
+        // column), this hand-rolled loop only claims a touch that actually lands on a row's
+        // drag-handle icon: it finds the visible row under the down, then checks the down is
+        // within that row's handle bounds (DRAG-UI-001 — pickup is *on the handle*). A touch
+        // that misses every handle is left unconsumed, so it falls through to the LazyColumn
+        // underneath and scrolls normally. Pickup waits for touch slop, so a tap on a handle
+        // is not a drag. TEMPORARY: only attached on the default (useOverlayStrip) path.
         if (useOverlayStrip && displayOrder.size > 1) {
             Box(
                 modifier = Modifier
@@ -691,32 +706,60 @@ fun DragReorderList(
                     .width(48.dp)
                     .testTag("drag_strip")
                     .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { startOffset ->
+                        awaitPointerEventScope {
+                            while (true) {
+                                // requireUnconsumed = false: the LazyColumn under the strip may
+                                // also see this down; we still want first look so we can decide
+                                // whether to claim it (handle) or leave it (scroll).
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                // Settling (DRAG-UI-014) blocks new pickups; let the touch fall
+                                // through (the exclusivity overlay is consuming it anyway).
+                                if (settledDisplayOrder != null) continue
+
                                 // The strip shares the outer Box's coordinate origin with the
                                 // LazyColumn's viewport, so the down's Y is directly comparable
-                                // to visibleItemsInfo offsets.
-                                if (settledDisplayOrder == null) {
-                                    val order = lastRenderedOrder
-                                    val y = startOffset.y
-                                    val hit = listState.layoutInfo.visibleItemsInfo
-                                        .firstOrNull { y >= it.offset && y < it.offset + it.size }
-                                    val rowId = hit?.let { order.getOrNull(it.index)?.id }
-                                    android.util.Log.d("DragReorderListDebug", "strip onDragStart y=$y -> $rowId")
-                                    if (hit != null && rowId != null && order.size > 1) {
-                                        draggedId = rowId
-                                        dragDelta = Offset.Zero
-                                        currentTargetId = null
-                                        currentZone = DropZone.None
-                                        dragStartPosition = Offset(0f, hit.offset.toFloat())
-                                        dragRowSize = IntSize(0, hit.size)
-                                        pointerYInList = hit.offset + hit.size / 2f
-                                    }
+                                // to visibleItemsInfo offsets and to handle bounds expressed in
+                                // that same (root - rootTop) space.
+                                val order = lastRenderedOrder
+                                val y = down.position.y
+                                val hit = listState.layoutInfo.visibleItemsInfo
+                                    .firstOrNull { y >= it.offset && y < it.offset + it.size }
+                                val rowId = hit?.let { order.getOrNull(it.index)?.id }
+                                val handle = rowId?.let { handleCoordinates[it] }
+                                val overHandle = handle != null && run {
+                                    val top = handle.positionInRoot().y - rootTop
+                                    y >= top && y < top + handle.size.height
                                 }
-                            },
-                            onDragEnd = { endDragAndMaybeMove() },
-                            onDragCancel = { cancelDrag() },
-                        ) { change, amount -> onDragMove(change, amount) }
+                                android.util.Log.d(
+                                    "DragReorderListDebug",
+                                    "strip down y=$y -> row=$rowId overHandle=$overHandle",
+                                )
+                                if (hit == null || rowId == null || !overHandle || order.size <= 1) {
+                                    // Not on a handle — leave the down unconsumed so the list scrolls.
+                                    continue
+                                }
+
+                                // Claim the gesture so the list's scroll doesn't also start, then
+                                // wait for slop before committing to a drag (a tap does nothing).
+                                down.consume()
+                                val slop = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
+                                if (slop == null) continue
+
+                                draggedId = rowId
+                                dragDelta = Offset.Zero
+                                currentTargetId = null
+                                currentZone = DropZone.None
+                                dragStartPosition = Offset(0f, hit.offset.toFloat())
+                                dragRowSize = IntSize(0, hit.size)
+                                pointerYInList = hit.offset + hit.size / 2f
+
+                                val completed = drag(slop.id) { change ->
+                                    onDragMove(change, change.positionChange())
+                                    change.consume()
+                                }
+                                if (completed) endDragAndMaybeMove() else cancelDrag()
+                            }
+                        }
                     },
             )
         }
