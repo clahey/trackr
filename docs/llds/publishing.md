@@ -11,7 +11,7 @@ Roughly in order:
 1. **Keystore** — generate a signing key, store it somewhere safe, not in git. Losing it means the app can never be updated on Play again. Consider Google Play App Signing (Google holds the upload key) as a safety net.
 2. **Target API compliance** — `targetSdk` must meet Play's current minimum (API 34+ as of this writing).
 3. **App icon** — launcher icon at all densities, adaptive icon XML (already in place — see Store Listing Assets below).
-4. **Google Play Console account** — $25 one-time fee; activation can take a day or two.
+4. **Google Play Console account** — **active.** The original account, under `youraveragechris@gmail.com`, was reinstated 2026-06-30 after an inactivity closure (see "Keeping the original developer account" in Decisions). No longer a blocker.
 5. **Store listing** — short description, full description, screenshots (phone + 7" tablet optional), feature graphic (1024×500).
 6. **Privacy policy** — required even for local-only apps. Since Trackr collects nothing and sends nothing to any Trackr-controlled server, this can be a one-liner. Auto Backup goes to the user's own Google account, so that's covered by Google's policy, not a separate one of ours.
 7. **Data safety form** — declare what's collected/shared. Local-only + Auto Backup to the user's own account is the simplest possible declaration: no data shared with third parties.
@@ -47,20 +47,19 @@ Chosen approach: extend the icon's own visual language rather than a text-only g
 |---|---|---|---|
 | Feature graphic approach | Icon + wordmark, extending the launcher icon's gradient/EKG visual language | Text-forward (app name/slogan on a plain or gradient field, no icon art); screenshot composite (phone mockup showing the timeline UI) | Trackr's Material You aesthetic and the icon's existing gradient + white + yellow color language reads as cohesive without needing a designer; a screenshot composite reads busier than fits a personal health-logging utility, and pure text forgoes the brand recognition the icon already carries |
 | Slogan | "Log anything. Fast." | "Your personal health log." | Shorter, leads with the core value prop (logging *anything*, not a narrow health-only framing) and the speed promise that's also an HLD goal ("log any event in under three taps") |
-| Keeping the original developer account | Reinstate the account tied to `youraveragechris@gmail.com` (fall back to a new email only if denied) | Register fresh under a different email | The public email *is* the developer identity — it's the address shown on the developer page when users look up the publisher, and `youraveragechris@gmail.com` is public by design for exactly that reason. A fresh registration would surface a different, less intentional email. That outweighs the convenience of a guaranteed new registration |
+| Keeping the original developer account | Reinstated the account tied to `youraveragechris@gmail.com` (succeeded 2026-06-30) | Register fresh under a different email | The public email *is* the developer identity — it's the address shown on the developer page when users look up the publisher, and `youraveragechris@gmail.com` is public by design for exactly that reason. A fresh registration would surface a different, less intentional email. That outweighs the convenience of a guaranteed new registration |
 
 ## Open Questions & Future Decisions
 
-### Blocked
+### Active
 
-1. **Google Play Console developer account is closed (inactivity); resolution in progress (as of 2026-06-26).** The prior account — email `youraveragechris@gmail.com`, under which `net.clahey.golfscore` (a separate app, [`clahey/golf-score`](https://github.com/clahey/golf-score)) was being prepared — was closed by Google for inactivity. Google Play Developer Support has confirmed that **a closed account's email cannot be reused** for a new registration. Two paths offered: (a) reinstate the original account via emailed business justification (not guaranteed), or (b) register a new account under a *different* email. **Chosen path: attempt reinstatement first**, falling back to a new-email registration if denied — see "Keeping the original developer account" in Decisions below for why the original account matters. A reinstatement reply with business justification (active development of Trackr, ending the inactivity) is drafted and ready to send. This blocks step 4 of Path to Publishing (and everything after it) until a usable account exists.
+1. **Keystore: reuse vs. fresh.** With the developer account now active, signing is the next item on the critical path to a release build (step 9). An existing upload keystore from prior GolfScore publishing prep sits at `~/keystores/upload-keystore.jks` (generated Nov 2024, never wired into the [`clahey/golf-score`](https://github.com/clahey/golf-score) `build.gradle` — its `release` build type currently signs with `signingConfigs.debug`, not a real release key). Open decision: reuse that key for Trackr or generate a fresh one. Consider Google Play App Signing (Google holds the upload key) as a safety net either way.
 
 ### Deferred
 
 1. **Screenshots** (phone, optionally 7" tablet) — not yet produced.
 2. **Short description / full description copy** for the store listing — not yet drafted (the slogan can anchor the short description, but it isn't the same text).
 3. **Content rating questionnaire, data safety form, privacy policy text** — not yet completed; see Path to Publishing above for what each needs to say given Trackr's local-only + Auto-Backup-only data model.
-4. **Keystore generation and storage** — not yet done for Trackr specifically. Note: an existing upload keystore from prior GolfScore publishing prep is sitting at `~/keystores/upload-keystore.jks` (generated Nov 2024, never wired into the [`clahey/golf-score`](https://github.com/clahey/golf-score) `build.gradle` — its `release` build type currently signs with `signingConfigs.debug`, not a real release key). Whether to reuse that key for Trackr or generate a fresh one is an open decision, independent of the developer-account question above.
 
 ## References
 
