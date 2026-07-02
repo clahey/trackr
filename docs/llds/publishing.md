@@ -8,7 +8,7 @@ This segment covers everything needed to get Trackr onto the Play Store and keep
 
 Roughly in order:
 
-1. **Keystore** — generate a signing key, store it somewhere safe, not in git. Losing it means the app can never be updated on Play again. Consider Google Play App Signing (Google holds the upload key) as a safety net.
+1. **Keystore** — one keystore *file* holding a **distinct key alias per app** (see Decisions). Reuse the existing `~/keystores/upload-keystore.jks`, adding a new Trackr-specific alias rather than a new file. Store it somewhere safe, not in git. Losing it means the app can never be updated on Play again — mitigated by enrolling in Google Play App Signing (Google holds the real app-signing key; the local `.jks` is then just the resettable *upload* key).
 2. **Target API compliance** — `targetSdk` must meet Play's current minimum (API 34+ as of this writing).
 3. **App icon** — launcher icon at all densities, adaptive icon XML (already in place — see Store Listing Assets below).
 4. **Google Play Console account** — **active.** The original account, under `youraveragechris@gmail.com`, was reinstated 2026-06-30 after an inactivity closure (see "Keeping the original developer account" in Decisions). No longer a blocker.
@@ -47,13 +47,18 @@ Chosen approach: extend the icon's own visual language rather than a text-only g
 |---|---|---|---|
 | Feature graphic approach | Icon + wordmark, extending the launcher icon's gradient/EKG visual language | Text-forward (app name/slogan on a plain or gradient field, no icon art); screenshot composite (phone mockup showing the timeline UI) | Trackr's Material You aesthetic and the icon's existing gradient + white + yellow color language reads as cohesive without needing a designer; a screenshot composite reads busier than fits a personal health-logging utility, and pure text forgoes the brand recognition the icon already carries |
 | Slogan | "Log anything. Fast." | "Your personal health log." | Shorter, leads with the core value prop (logging *anything*, not a narrow health-only framing) and the speed promise that's also an HLD goal ("log any event in under three taps") |
+| Keystore structure | One keystore *file*, a distinct key alias per app (reuse `~/keystores/upload-keystore.jks`, add a new Trackr alias) | A single shared key for all apps; a separate keystore file per app; a fresh key/file just for Trackr | One file addresses the catastrophic-loss surface (a signing key can never be rotated away, so fewer files to safeguard is safer), while per-app keys keep a compromise isolated to one app and leave each app independently transferable — the shared-key downside without the shared-key risk. Google supports reusing keys across your own apps, so a single shared key would also be valid; per-app aliases are the low-cost hedge. Play App Signing further lowers the stakes by making the local key a resettable upload key |
 | Keeping the original developer account | Reinstated the account tied to `youraveragechris@gmail.com` (succeeded 2026-06-30) | Register fresh under a different email | The public email *is* the developer identity — it's the address shown on the developer page when users look up the publisher, and `youraveragechris@gmail.com` is public by design for exactly that reason. A fresh registration would surface a different, less intentional email. That outweighs the convenience of a guaranteed new registration |
 
 ## Open Questions & Future Decisions
 
 ### Active
 
-1. **Keystore: reuse vs. fresh.** With the developer account now active, signing is the next item on the critical path to a release build (step 9). An existing upload keystore from prior GolfScore publishing prep sits at `~/keystores/upload-keystore.jks` (generated Nov 2024, never wired into the [`clahey/golf-score`](https://github.com/clahey/golf-score) `build.gradle` — its `release` build type currently signs with `signingConfigs.debug`, not a real release key). Open decision: reuse that key for Trackr or generate a fresh one. Consider Google Play App Signing (Google holds the upload key) as a safety net either way.
+1. **Keystore execution** (structure decided — see Decisions; this is the remaining work). On the critical path to a signed release build (step 9):
+   - Add a new Trackr-specific key alias to `~/keystores/upload-keystore.jks` (the file currently holds only the now-defunct golf-score alias). Needs the keystore password.
+   - Verify the file's key validity extends well past ~2033 (Studio-wizard keys default to 25 years and are fine; a `keytool`-default 90-day key would not be) — a read-only `keytool -list -v` confirms alias, fingerprint, and validity window.
+   - Wire a real `release` `signingConfig` into `app/build.gradle.kts` using that alias (the golf-score `build.gradle` signed `release` with `signingConfigs.debug`; Trackr must not repeat that).
+   - Enroll Trackr in Google Play App Signing on first upload, so the local `.jks` is the resettable upload key rather than the sole app-signing key.
 
 ### Deferred
 
