@@ -63,6 +63,41 @@ Then launch the app — the timeline shows the demo data. If it's a brand-new
 install and `run-as ... mkdir` can't find the app's data dir, launch the app
 once first (so it creates `databases/`), force-stop, then re-run the load.
 
+## Capture Play Store screenshots
+
+Play requires phone screenshots at **16:9 or 9:16**, each side 320–3840 px, and
+wants **≥4 at ≥1080 px per side** for promotion eligibility. The clean target is
+**1080×1920 portrait** (exactly 9:16, meets the 1080 minimum).
+
+Use a **natively 16:9** emulator so no cropping is needed. Modern phones (Pixel
+5 = 1080×2340 = 19.5:9) are the *wrong* ratio — a raw screenshot would be
+rejected or need cropping. Create a **custom 1080×1920 phone** rather than
+reusing a named device: Tools → Device Manager → Create Virtual Device → New
+Hardware Profile, set the resolution to 1080×1920 (16:9), save, then pick a
+recent system image. (The `Screenshot_Phone` AVD is exactly this.)
+
+Capture at native resolution straight from the device (no post-processing):
+
+```
+adb -s emulator-5554 exec-out screencap -p > shot-01.png
+```
+
+(or the camera icon in the emulator toolbar). Optionally clean the status bar
+first with demo mode:
+
+```
+adb shell settings put global sysui_demo_allowed 1
+adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 1000
+adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
+adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4
+# ... take screenshots ...
+adb shell am broadcast -a com.android.systemui.demo -e command exit
+```
+
+Suggested shots (the demo data is built to show these off): timeline (hero),
+quick-log sheet, category list, filtered-by-chip timeline, and optionally an
+event detail/edit and the category value-type picker.
+
 ## Snapshot an existing install (reverse direction)
 
 To capture whatever is currently on the emulator (e.g. after hand-tuning the
