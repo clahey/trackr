@@ -17,9 +17,9 @@ features" declaration).
 
 ## Short description (max 80 chars)
 
-`Log anything in three taps. No account, and your data stays on your device.`
+`Log anything in three taps. Your categories, your values, your device.`
 
-*(76 characters)*
+*(70 characters)*
 
 ## Full description (max 4000 chars)
 
@@ -51,4 +51,4 @@ Open any entry to edit its time, value, and notes, or attach photos — straight
 Private by default
 Trackr keeps your data on your device. There's no account to create, it works fully offline, and your log lives in a private database on your phone. If you use Android's backup, your data goes to your own Google account — and nowhere you didn't choose. Your data is yours.
 
-No tracking, no nonsense. A fast, private way to log the things you care about.
+Free and open source. No tracking, no nonsense. A fast, private way to log the things you care about.
