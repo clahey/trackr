@@ -30,14 +30,14 @@ The long poles are usually Play Console account activation and store-listing ass
 
 **Feature graphic** (1024×500, shown above the screenshots on the Play Store listing page, and on some featured placements — matters less for a personal/utility app than a consumer app chasing featured placement, but it can render without the screenshots on some devices, so it has to communicate what the app is on its own).
 
-Chosen approach: extend the icon's own visual language rather than a text-only graphic or a screenshot composite (see Decisions below).
+Chosen approach: extend the icon's own visual language rather than a text-only graphic or a screenshot composite (see Decisions below). Source of truth: `docs/store-listing/feature-graphic.svg` (editable master), exported to `docs/store-listing/feature-graphic.png` (the exact 1024×500 asset for the Play listing — produced, not yet uploaded).
 
-- Same background gradient as the launcher icon (`#47AADC` → `#04325C`, 135°).
-- Foreground: the heartbeat/EKG line fades into the background, repeated several times for depth/motion — the navy end of the gradient naturally swallows the fainter repeats — built in Inkscape as an SVG.
-- Wordmark "Trackr" in white, clean sans-serif, alongside the icon art.
-- Slogan **"Log anything. Fast."** underneath the wordmark.
-- Yellow accent (`#FCD214`, matching the icon's dot) as a small detail — e.g. echoed in the slogan's final period — not a dominant color.
-- Export: exactly 1024×500px, **PNG** (Play does not accept SVG), RGB (not CMYK), fully opaque (Play rejects transparency in this asset).
+- Same background gradient as the launcher icon (`#47AADC` → `#04325C`, 135°), full-bleed (no transparent margins).
+- **Layout:** two separated bands so the EKG line never crosses the type — text block (wordmark + slogan) on the **left**, heartbeat trace on the **right**. An earlier version overlapped them and read muddy.
+- Foreground: the heartbeat/EKG line is repeated across the canvas (five copies) and faded via a horizontal luminance mask that peaks bright on the right-of-center "hero" beat and falls off toward both edges, giving depth/motion. The hero beat carries the yellow `#FCD214` R-peak dot from the icon. Hand-authored SVG (path lifted verbatim from the launcher icon), editable in Inkscape or any SVG tool.
+- Wordmark "Trackr" in white, clean sans-serif.
+- Slogan **"Log anything. Fast."** under the wordmark, with **"Fast."** set bold in the yellow accent (`#FCD214`, matching the icon's dot). The bold word — rather than a colored period — is the accent: it stays legible at thumbnail size and puts the emphasis on the value prop. One yellow note on each side (slogan + hero dot) balances the composition left-to-right.
+- Export: exactly 1024×500px, **PNG** (Play does not accept SVG), sRGB (not CMYK), fully opaque with the alpha channel stripped (Play rejects transparency in this asset). Generated with `rsvg-convert` + `magick -alpha remove -alpha off`.
 
 **Slogan: "Log anything. Fast."** Used on the feature graphic and available for the short description / store-listing copy generally.
 
