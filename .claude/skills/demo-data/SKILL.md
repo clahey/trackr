@@ -52,12 +52,16 @@ The app must not be running while its database is swapped.
 ```
 adb shell am force-stop net.clahey.trackr
 adb push /tmp/trackr-demo.db /data/local/tmp/trackr-demo.db
-adb shell run-as net.clahey.trackr sh -c '
-  mkdir -p databases &&
-  cp /data/local/tmp/trackr-demo.db databases/trackr.db &&
-  rm -f databases/trackr.db-wal databases/trackr.db-shm'
+adb shell run-as net.clahey.trackr mkdir -p databases
+adb shell run-as net.clahey.trackr cp /data/local/tmp/trackr-demo.db databases/trackr.db
+adb shell run-as net.clahey.trackr rm -f databases/trackr.db-wal databases/trackr.db-shm
 adb shell rm /data/local/tmp/trackr-demo.db
 ```
+
+Run each `run-as` as its own command — do **not** wrap them in `sh -c '...'`.
+Your local shell strips the single quotes before `adb` forwards the string, so
+the device's shell receives an unquoted blob and `sh -c` breaks (`mkdir: Needs 1
+argument`). One `run-as` per line sidesteps the quoting entirely.
 
 Then launch the app — the timeline shows the demo data. If it's a brand-new
 install and `run-as ... mkdir` can't find the app's data dir, launch the app
@@ -76,23 +80,28 @@ reusing a named device: Tools → Device Manager → Create Virtual Device → N
 Hardware Profile, set the resolution to 1080×1920 (16:9), save, then pick a
 recent system image. (The `Screenshot_Phone` AVD is exactly this.)
 
-Capture at native resolution straight from the device (no post-processing):
+The `screenshots.sh` script in this directory exposes the reliable steps as
+subcommands, so the caller does the UI navigation and invokes a primitive at
+each screen:
 
 ```
-adb -s emulator-5554 exec-out screencap -p > shot-01.png
+./screenshots.sh seed                        # (re)build + load the demo DB
+./screenshots.sh demo on                     # clean status bar
+./screenshots.sh launch                      # start the app
+./screenshots.sh shot shot-01-timeline.png   # on the timeline
+#   ...navigate to Categories...
+./screenshots.sh shot shot-02-categories.png
+#   ...open the quick-log sheet...
+./screenshots.sh shot shot-03-quicklog.png
+#   ...back to timeline, tap a filter chip...
+./screenshots.sh shot shot-04-filtered.png
+./screenshots.sh demo off
 ```
 
-(or the camera icon in the emulator toolbar). Optionally clean the status bar
-first with demo mode:
-
-```
-adb shell settings put global sysui_demo_allowed 1
-adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 1000
-adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
-adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4
-# ... take screenshots ...
-adb shell am broadcast -a com.android.systemui.demo -e command exit
-```
+Shots land in `docs/store-listing/screenshots/`. Navigation between calls is
+manual on purpose — scripting it would need hardcoded `input tap` coordinates,
+which shift with AVD density. Read `screenshots.sh` for the exact adb commands
+each subcommand runs.
 
 Suggested shots (the demo data is built to show these off): timeline (hero),
 quick-log sheet, category list, filtered-by-chip timeline, and optionally an
