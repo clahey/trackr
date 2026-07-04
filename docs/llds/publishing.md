@@ -23,10 +23,12 @@ The long poles are usually Play Console account activation and store-listing ass
 
 ## Store Listing Assets
 
-**App icon.** Already built (`res/drawable/ic_launcher_*.xml`, adaptive icon): a white EKG/heartbeat line on a diagonal gradient background, with a yellow dot at the peak.
+**App icon.** Already built as the adaptive launcher icon (`res/drawable/ic_launcher_*.xml`): a white EKG/heartbeat line on a diagonal gradient background, with a yellow dot at the peak.
 
 - Background gradient: `#47AADC` (light blue, top-left) → `#04325C` (dark navy, bottom-right), 135°.
 - Foreground: white EKG stroke; yellow dot (`#FCD214`) at the heartbeat's peak.
+
+The Play Console also requires a **512×512 high-res store icon** (a static PNG, separate from the in-app adaptive icon). Rather than screenshot a launcher, the store icon is composed directly from the same two vector layers so it stays pixel-exact and re-exportable. Source of truth: `docs/store-listing/icon-512.svg` (editable master, viewBox `0 0 108 108` to match the adaptive canvas), exported to `docs/store-listing/icon-512.png` (exactly 512×512, 32-bit RGBA, fully opaque — produced, not yet uploaded). Generated with `rsvg-convert -w 512 -h 512` + `magick ... -define png:color-type=6`. Full-bleed square: Play applies its own corner masking on display, so the uploaded asset carries no rounding or transparency of its own.
 
 **Feature graphic** (1024×500, shown above the screenshots on the Play Store listing page, and on some featured placements — matters less for a personal/utility app than a consumer app chasing featured placement, but it can render without the screenshots on some devices, so it has to communicate what the app is on its own).
 
@@ -78,7 +80,9 @@ Chosen approach: extend the icon's own visual language rather than a text-only g
 
 - `docs/llds/app-shell.md § App Identity` — `applicationId = "net.clahey.trackr"`, the permanent Play Store identity (distinct from this LLD's concern, which is the listing/creative around that identity, not the identity itself)
 - `docs/high-level-design.md § Goals` — "log any event in under three taps," echoed in the chosen slogan
-- `app/src/main/res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml` — source of truth for the gradient and accent colors
+- `app/src/main/res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml` — source of truth for the gradient and accent colors, and the layers the store icon + feature graphic are composed from
+- `docs/store-listing/icon-512.svg` / `icon-512.png` — the 512×512 Play high-res store icon (editable master + exported asset)
+- `docs/store-listing/feature-graphic.svg` / `feature-graphic.png` — the 1024×500 Play feature graphic (editable master + exported asset)
 - `docs/store-listing/listing-copy.md` — the Play listing text (app title, short + full description), source of truth
 - `PRIVACY.md` (repo root) — the privacy policy; hosted for Play at `https://github.com/clahey/trackr/blob/master/PRIVACY.md` (currently served from the `after-rename` branch URL until merged to master)
 - `app/src/main/res/xml/backup_rules.xml`, `data_extraction_rules.xml`, `AndroidManifest.xml` — the actual data model the privacy policy and data-safety declaration are grounded in (no permissions declared; backup/transfer scope limited to `trackr.db`, `images`, `datastore`)
