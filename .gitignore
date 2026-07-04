@@ -15,6 +15,9 @@ local.properties
 *.keystore
 keystore.properties
 
+# Signed release output (Generate Signed Bundle / APK wizard)
+app/release/
+
 # Google Services (contains API keys)
 google-services.json
 
