@@ -42,13 +42,20 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNode
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.node.DelegatingNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -685,19 +692,27 @@ fun DragReorderList(
             }
         }
 
-        // @spec DRAG-UI-001, DRAG-UI-015 — the drag gesture, hosted on a single persistent strip
-        // over the handle column rather than on each row's handle. Because the strip is never a
-        // LazyColumn item, the LazyColumn disposing the dragged row as it auto-scrolls
-        // off-screen can't dispose this gesture's coroutine, so the drag survives sustained
-        // auto-scroll. Confined to the handle column so it doesn't reach the row content.
+        // @spec DRAG-UI-001, DRAG-UI-015, DRAG-UI-016 — the drag gesture, hosted on a single
+        // persistent strip over the handle column rather than on each row's handle. Because the
+        // strip is never a LazyColumn item, the LazyColumn disposing the dragged row as it
+        // auto-scrolls off-screen can't dispose this gesture's coroutine, so the drag survives
+        // sustained auto-scroll. Confined to the handle column so it doesn't reach the row content.
         //
         // Unlike a blanket detectDragGestures (which would grab every touch anywhere in the
         // column), this hand-rolled loop only claims a touch that actually lands on a row's
         // drag-handle icon: it finds the visible row under the down, then checks the down is
-        // within that row's handle bounds (DRAG-UI-001 — pickup is *on the handle*). A touch
-        // that misses every handle is left unconsumed, so it falls through to the LazyColumn
-        // underneath and scrolls normally. Pickup waits for touch slop, so a tap on a handle
-        // is not a drag. TEMPORARY: only attached on the default (useOverlayStrip) path.
+        // within that row's handle bounds (DRAG-UI-001 — pickup is *on the handle*). Pickup waits
+        // for touch slop, so a tap on a handle is not a drag.
+        //
+        // A touch that misses every handle is left unconsumed AND — because the gesture is hosted
+        // on a node that returns true from sharePointerInputWithSiblings (see
+        // stripGestureSharedWithSiblings below) — the LazyColumn drawn behind the strip still
+        // receives it and scrolls normally (DRAG-UI-016). Leaving the touch unconsumed alone would
+        // not do this: a plain pointerInput node is opaque to hit-testing of the siblings behind
+        // it, so the list never saw the touch and never scrolled. When the strip *does* claim a
+        // handle touch it consumes it, so the shared LazyColumn sees a consumed event and its own
+        // scroll gesture stays out of the way. TEMPORARY: only attached on the default
+        // (useOverlayStrip) path.
         if (useOverlayStrip && displayOrder.size > 1) {
             Box(
                 modifier = Modifier
@@ -705,12 +720,12 @@ fun DragReorderList(
                     .fillMaxHeight()
                     .width(48.dp)
                     .testTag("drag_strip")
-                    .pointerInput(Unit) {
+                    .stripGestureSharedWithSiblings {
                         awaitPointerEventScope {
                             while (true) {
-                                // requireUnconsumed = false: the LazyColumn under the strip may
-                                // also see this down; we still want first look so we can decide
-                                // whether to claim it (handle) or leave it (scroll).
+                                // requireUnconsumed = false: the LazyColumn shares this down with
+                                // the strip (sharePointerInputWithSiblings), so we get first look
+                                // and decide whether to claim it (handle) or leave it (scroll).
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 // Settling (DRAG-UI-014) blocks new pickups; let the touch fall
                                 // through (the exclusivity overlay is consuming it anyway).
@@ -817,4 +832,49 @@ fun DragReorderList(
             }
         }
     }
+}
+
+// @spec DRAG-UI-016 — hosts the overlay strip's gesture exactly like Modifier.pointerInput(Unit),
+// except the underlying pointer node returns true from sharePointerInputWithSiblings(). That is the
+// one bit Modifier.pointerInput can't express: by default a pointer-input node is opaque to
+// hit-testing of the siblings drawn behind it, so a touch the strip declines (not on a handle)
+// never reaches the LazyColumn underneath and the list can't scroll. Sharing lets that sibling stay
+// in the hit path; the strip still consumes a handle touch, so a claimed drag isn't also scrolled.
+// See docs/llds/drag-reorder-list.md § "Why a persistent strip".
+private fun Modifier.stripGestureSharedWithSiblings(
+    block: suspend PointerInputScope.() -> Unit,
+): Modifier = this then StripGestureElement(block)
+
+private class StripGestureElement(
+    private val block: suspend PointerInputScope.() -> Unit,
+) : ModifierNodeElement<StripGestureNode>() {
+    override fun create() = StripGestureNode(block)
+
+    // Keyed like pointerInput(Unit): the long-running gesture is never restarted across
+    // recompositions, so there is nothing to reconcile — the node keeps its original handler (and
+    // that handler's captured state reads, which are State-backed and therefore always current) for
+    // its whole lifetime.
+    override fun update(node: StripGestureNode) {}
+
+    override fun hashCode() = System.identityHashCode(block)
+
+    override fun equals(other: Any?) = this === other
+}
+
+private class StripGestureNode(
+    handler: suspend PointerInputScope.() -> Unit,
+) : DelegatingNode(), PointerInputModifierNode {
+    // The suspend-gesture machinery lives in a delegated SuspendingPointerInputModifierNode; this
+    // node forwards pointer dispatch to it and adds only the sharePointerInputWithSiblings override.
+    private val pointerNode = delegate(SuspendingPointerInputModifierNode(handler))
+
+    override fun onPointerEvent(
+        pointerEvent: PointerEvent,
+        pass: PointerEventPass,
+        bounds: IntSize,
+    ) = pointerNode.onPointerEvent(pointerEvent, pass, bounds)
+
+    override fun onCancelPointerInput() = pointerNode.onCancelPointerInput()
+
+    override fun sharePointerInputWithSiblings() = true
 }

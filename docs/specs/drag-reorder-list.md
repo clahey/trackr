@@ -8,7 +8,9 @@ These specs describe `DragReorderList`'s own behavior in terms of its generic ne
 
 ## Pickup
 
-- [x] **DRAG-UI-001**: The widget shall display a drag handle (48dp touch target) on the trailing edge of each row when more than one row exists in the list; while exactly one row exists, the handle shall be hidden. Touching and dragging on a handle shall pick up that row for reordering immediately — without requiring a long-press, and independent of any long-press gesture the host screen attaches to the row.
+- [x] **DRAG-UI-001**: The widget shall display a drag handle (48dp touch target) on the trailing edge of each row when more than one row exists in the list; while exactly one row exists, the handle shall be hidden. Touching a handle and dragging past the touch-slop threshold shall pick up that row for reordering — without requiring a long-press (a stationary tap on a handle picks up nothing), and independent of any long-press gesture the host screen attaches to the row. Only a touch that begins on a handle picks up a row; a touch elsewhere in the handle column scrolls the list instead (DRAG-UI-016).
+
+- [ ] **DRAG-UI-016**: A touch that begins in the drag-handle column but not on a handle — the vertical gaps between adjacent rows' handles — shall not start a drag; it shall reach the underlying list and scroll it exactly as a touch on the row content would, including fling momentum. Only a touch beginning on a handle (DRAG-UI-001) shall be captured for dragging.
 
 ## Live Reflow & Visual Feedback
 
