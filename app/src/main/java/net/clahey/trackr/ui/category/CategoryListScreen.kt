@@ -37,13 +37,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import net.clahey.trackr.BuildConfig
 import net.clahey.trackr.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -73,10 +71,6 @@ fun CategoryListScreen(
     val pendingValueTypeConfirmation by viewModel.pendingValueTypeConfirmation.collectAsState()
     var menuCategoryId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    // TEMPORARY scaffolding (docs/llds/drag-reorder-list.md § Validation scaffolding): debug-only
-    // on-device A/B between the overlay-strip and per-row drag gesture hosts. Removed, along with
-    // the widget's useOverlayStrip parameter, once the strip is confirmed.
-    var useOverlayStrip by rememberSaveable { mutableStateOf(true) }
 
     val snackbarMessage by pendingSnackbarMessage.collectAsState()
     LaunchedEffect(snackbarMessage) {
@@ -89,14 +83,6 @@ fun CategoryListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.categories_title)) },
-                actions = {
-                    // TEMPORARY debug-only toggle — see useOverlayStrip above.
-                    if (BuildConfig.DEBUG) {
-                        TextButton(onClick = { useOverlayStrip = !useOverlayStrip }) {
-                            Text(if (useOverlayStrip) "Strip" else "Row")
-                        }
-                    }
-                },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -126,7 +112,6 @@ fun CategoryListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            useOverlayStrip = useOverlayStrip,
         ) { item ->
             val category = categories.first { it.id == item.id }
             val hasSubCategories = category is Category.MetaCategory &&
