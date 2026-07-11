@@ -58,15 +58,15 @@ import kotlinx.coroutines.isActive
 import net.clahey.trackr.R
 import kotlin.math.roundToInt
 
-// @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008, DRAG-UI-009, DRAG-UI-010, DRAG-UI-011, DRAG-UI-012
-//
-// The widget's public input is a tree: each node carries its own ordered [children], and a
-// leaf is simply an empty [children] list. There is deliberately no `depth` field — depth is
-// implied by the nesting and the widget supports arbitrary nesting depth. Any per-app cap
-// (e.g. the category screen's two-level limit) is the caller's concern, enforced by how it
-// builds the tree, not by this type; and a malformed "jump" (a depth-0 row followed by a
-// depth-2 row, skipping a level) is simply unrepresentable here. ids must be unique across
-// the entire tree. See docs/llds/drag-reorder-list.md § Generic Widget API.
+/**
+ * A node in the [DragReorderList] input tree. Each node carries its own ordered [children];
+ * a leaf has an empty list. Ids must be unique across the entire tree.
+ *
+ * @property id unique across the entire tree
+ * @property canHaveChildren whether this row can accept a nest-drop (domain policy)
+ * @property canBecomeChild whether this node is currently eligible to become a child (domain policy)
+ * @property children nested items, in order; empty for a leaf
+ */
 data class DragListItem(
     val id: String,
     val canHaveChildren: Boolean,
@@ -111,19 +111,30 @@ private fun nodesById(items: List<DragListItem>): Map<String, DragListItem> {
     return result
 }
 
-sealed class DropZone {
+/**
+ * Where a drop at the current pointer position would land relative to the target row:
+ * [Before] or [After] as a sibling in the target's own group, [Nest] as the target's child,
+ * or [None] when the target offers no valid zone for the current drag.
+ */
+internal sealed class DropZone {
     data object Before : DropZone()
     data object After : DropZone()
     data object Nest : DropZone()
     data object None : DropZone()
 }
 
+/**
+ * The structural move reported to the caller on drop (see [DragReorderList]'s `onMove`).
+ *
+ * @property movedId the id of the row that was dragged
+ * @property newParentId the id of the moved item's new parent, or null if it is now a
+ *   top-level item
+ * @property orderedSiblingIds the moved item's destination sibling group in final order,
+ *   including the moved item
+ */
 data class DragMoveResult(
     val movedId: String,
-    // The moved item's immediate enclosing node in the resulting order (its nearest preceding
-    // shallower node), or null when it lands at the top level.
     val newParentId: String?,
-    // The moved item's destination sibling group in final order, including the moved item.
     val orderedSiblingIds: List<String>,
 )
 
@@ -185,8 +196,21 @@ internal fun hasChildrenStructurally(
     return i < items.size && items[i].depth > depth
 }
 
+/**
+ * Resolves which [DropZone] the pointer is in over a target row, from the row's vertical band
+ * geometry. The band layout depends on the target's role: a target that can't have children
+ * is a 50/50 before/after split; a nest-eligible target is 25/50/25 when childless and 50/50
+ * (before / nest-as-first-child) when it already has children; an ineligible drag
+ * (`draggedCanBecomeChild = false`) never offers a nest band. See
+ * `docs/llds/drag-reorder-list.md` § Drop Zone Geometry.
+ *
+ * @param targetCanHaveChildren whether the target row can accept a nest-drop
+ * @param targetHasChildren whether the target currently has children (read structurally)
+ * @param draggedCanBecomeChild whether the dragged row is currently eligible to nest
+ * @param pointerFraction the pointer's vertical position within the target row, 0f..1f
+ */
 // @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008, DRAG-UI-009
-fun dropZone(
+internal fun dropZone(
     targetCanHaveChildren: Boolean,
     targetHasChildren: Boolean,
     draggedCanBecomeChild: Boolean,
@@ -305,7 +329,7 @@ internal fun shouldCollapseChildrenOf(
     if (rowId == dragged.id) draggedHasChildren else !dragged.canBecomeChild
 
 /** A visible row's position/size within the list, as reported by `LazyListItemInfo`. */
-data class VisibleRowGeometry(val index: Int, val offset: Int, val size: Int)
+internal data class VisibleRowGeometry(val index: Int, val offset: Int, val size: Int)
 
 /**
  * The raw (target, zone) the pointer is over right now, against [order] — the order
@@ -410,6 +434,22 @@ internal fun computeDragTarget(
     return if (sameDrop) unchanged else candidateId to candidateZone
 }
 
+/**
+ * A drag-to-reorder list over an ordered tree of [DragListItem]s. A row is picked up by its
+ * trailing drag handle and dragged to reorder among siblings or re-parent (nest / promote);
+ * the rest of the list reflows live to show where a drop would land. Knows nothing about the
+ * caller's domain — it reports a structural [DragMoveResult] and lets the caller persist it.
+ *
+ * See `docs/llds/drag-reorder-list.md` for the interaction model and design rationale.
+ *
+ * @param items the top-level nodes, in order; each carries its own ordered subtree
+ * @param onMove invoked once on drop with the resulting move and an `onSettled` callback the
+ *   caller must eventually invoke exactly once, after persisting the move or deciding not to
+ *   (see § Settling)
+ * @param modifier applied to the widget's root
+ * @param content renders one row; invoked lazily per visible row, for nested nodes as well as
+ *   top-level ones
+ */
 // @spec DRAG-UI-001, DRAG-UI-002, DRAG-UI-003, DRAG-UI-004, DRAG-UI-005, DRAG-UI-011, DRAG-UI-012, DRAG-UI-013, DRAG-UI-015
 @Composable
 fun DragReorderList(
