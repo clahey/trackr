@@ -77,6 +77,7 @@
     <string name="category_edit_title">Edit Category</string>
     <string name="category_new_title">New Category</string>
     <string name="category_not_found">Category not found.</string>
+    <string name="category_cannot_nest_has_subcategories">\'%1$s\' now has subcategories and can\'t be nested.</string>
     <string name="category_field_name">Name</string>
     <string name="category_field_emoji">Emoji</string>
     <string name="category_emoji_inherit">Inherit</string>

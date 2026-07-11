@@ -85,6 +85,40 @@ class CategoryListViewModelDragTest {
         val saved = repo.getCategoryById("target").first() as Category.SubCategory
         assertEquals("parent", saved.parent.id)
         assertEquals("🎯", saved.emoji)
+        assertNull("a successful nest emits no rejection message", vm.reparentRejectedCategoryName.value)
+    }
+
+    // @spec CAT-UI-082, CAT-UI-084
+    @Test fun `onDragMove nesting a MetaCategory that concurrently gained children is rejected, settles once, persists nothing, and emits a rejection message`() = runTest {
+        // The menu/snapshot saw "target" as a childless MetaCategory (nest-eligible), but it
+        // gained a SubCategory before the drop applied — nesting it now would break the cap.
+        val target = makeMetaCategory("target", valueType = ValueType.None)
+        val newParent = makeMetaCategory("parent")
+        val sneakyChild = makeSubCategory("sneaky", target)
+        repo.setCategories(target, newParent, sneakyChild)
+        var settledCount = 0
+        vm.onDragMove(DragMoveResult("target", "parent", listOf("target"))) { settledCount++ }
+        // Rolled back: target is still a top-level MetaCategory and still parents "sneaky".
+        assertTrue(repo.getCategoryById("target").first() is Category.MetaCategory)
+        assertEquals("sneaky still nested under target", "target",
+            (repo.getCategoryById("sneaky").first() as Category.SubCategory).parent.id)
+        assertEquals("onSettled fires exactly once even on rejection", 1, settledCount)
+        assertEquals("target", vm.reparentRejectedCategoryName.value)
+        // The message is one-shot: consuming it clears the flow.
+        vm.consumeReparentRejection()
+        assertNull(vm.reparentRejectedCategoryName.value)
+    }
+
+    // @spec CAT-UI-084
+    @Test fun `Add to group of a MetaCategory that concurrently gained children is rejected and emits a message without crashing`() = runTest {
+        val target = makeMetaCategory("target")
+        val newParent = makeMetaCategory("parent")
+        val child = makeSubCategory("child", target)
+        repo.setCategories(target, newParent, child)
+        vm.reparentCategory("target", "parent")
+        assertTrue("nothing persisted; target stays top-level",
+            repo.getCategoryById("target").first() is Category.MetaCategory)
+        assertEquals("target", vm.reparentRejectedCategoryName.value)
     }
 
     // @spec CAT-UI-081, CAT-UI-082

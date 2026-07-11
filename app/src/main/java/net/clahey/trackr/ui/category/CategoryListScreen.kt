@@ -79,6 +79,17 @@ fun CategoryListScreen(
         onSnackbarMessageConsumed()
     }
 
+    // @spec CAT-UI-084
+    // A reparent-to-nest was rejected because the category concurrently gained SubCategories.
+    // The ViewModel is context-free, so it emits the bare name and we format the message here.
+    val reparentRejectedName by viewModel.reparentRejectedCategoryName.collectAsState()
+    val cannotNestTemplate = stringResource(R.string.category_cannot_nest_has_subcategories)
+    LaunchedEffect(reparentRejectedName) {
+        val name = reparentRejectedName ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(String.format(cannotNestTemplate, name))
+        viewModel.consumeReparentRejection()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

@@ -59,7 +59,7 @@ data class PendingValueTypeConfirmation(
 )
 
 // @spec CAT-UI-001, CAT-UI-002, CAT-UI-003, CAT-UI-004, CAT-UI-005, CAT-UI-006,
-// CAT-UI-051, CAT-UI-052, CAT-UI-080, CAT-UI-081, CAT-UI-082, DM-PROC-020
+// CAT-UI-051, CAT-UI-052, CAT-UI-080, CAT-UI-081, CAT-UI-082, CAT-UI-084, DM-PROC-020
 @HiltViewModel
 class CategoryListViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -77,6 +77,18 @@ class CategoryListViewModel @Inject constructor(
     private val _pendingValueTypeConfirmation = MutableStateFlow<PendingValueTypeConfirmation?>(null)
     val pendingValueTypeConfirmation: StateFlow<PendingValueTypeConfirmation?> =
         _pendingValueTypeConfirmation.asStateFlow()
+
+    // @spec CAT-UI-084
+    // Name of the category whose reparent-to-nest was rejected because it concurrently
+    // gained SubCategories. One-shot: the screen formats a snackbar from it and calls
+    // consumeReparentRejection(). Kept as a bare name (not a resolved message) because the
+    // ViewModel has no Context; the string resource is resolved in the composable.
+    private val _reparentRejectedCategoryName = MutableStateFlow<String?>(null)
+    val reparentRejectedCategoryName: StateFlow<String?> = _reparentRejectedCategoryName.asStateFlow()
+
+    fun consumeReparentRejection() {
+        _reparentRejectedCategoryName.value = null
+    }
 
     // @spec CAT-UI-004, CAT-UI-005
     fun deleteCategory(id: String) {
@@ -188,18 +200,22 @@ class CategoryListViewModel @Inject constructor(
         onSettled: () -> Unit = {},
     ) {
         if (!valueTypeChangeNeeded(category, effectiveTypeBefore)) {
-            if (orderedSiblingIds != null) repository.moveCategory(category, orderedSiblingIds)
-            else repository.saveCategory(category)
+            persistOrReject(category) {
+                if (orderedSiblingIds != null) repository.moveCategory(category, orderedSiblingIds)
+                else repository.saveCategory(category)
+            }
             onSettled()
             return
         }
         val ownEventCount = repository.getEventCountForCategory(category.id).first()
         val tier = warningTierFor(effectiveTypeBefore, category.resolvedValueType)
         if (ownEventCount == 0 || tier == null) {
-            if (orderedSiblingIds != null) {
-                repository.moveCategoryAndMigrateEvents(category, orderedSiblingIds, effectiveTypeBefore)
-            } else {
-                repository.saveCategoryAndMigrateEvents(category, effectiveTypeBefore)
+            persistOrReject(category) {
+                if (orderedSiblingIds != null) {
+                    repository.moveCategoryAndMigrateEvents(category, orderedSiblingIds, effectiveTypeBefore)
+                } else {
+                    repository.saveCategoryAndMigrateEvents(category, effectiveTypeBefore)
+                }
             }
             onSettled()
         } else {
@@ -208,14 +224,31 @@ class CategoryListViewModel @Inject constructor(
         }
     }
 
+    // @spec CAT-UI-084
+    // Runs a persist that the in-transaction childlessness guard (DM-DATA-028) may reject
+    // when the category concurrently gained SubCategories since the drag/menu snapshot, so
+    // nesting it would exceed the two-level cap. On rejection the transaction has already
+    // rolled back — nothing is persisted and the category stays where it was; we record its
+    // name so the screen can show a snackbar. The caller still fires its completion callback,
+    // so a drag settles the row back to its origin (CAT-UI-082).
+    private suspend fun persistOrReject(category: Category, persist: suspend () -> Unit) {
+        try {
+            persist()
+        } catch (e: IllegalArgumentException) {
+            _reparentRejectedCategoryName.value = category.name
+        }
+    }
+
     // @spec CAT-UI-081, CAT-UI-082
     fun confirmPendingValueTypeChange() {
         val pending = _pendingValueTypeConfirmation.value ?: return
         viewModelScope.launch {
-            if (pending.orderedSiblingIds != null) {
-                repository.moveCategoryAndMigrateEvents(pending.category, pending.orderedSiblingIds, pending.fromType)
-            } else {
-                repository.saveCategoryAndMigrateEvents(pending.category, pending.fromType)
+            persistOrReject(pending.category) {
+                if (pending.orderedSiblingIds != null) {
+                    repository.moveCategoryAndMigrateEvents(pending.category, pending.orderedSiblingIds, pending.fromType)
+                } else {
+                    repository.saveCategoryAndMigrateEvents(pending.category, pending.fromType)
+                }
             }
             _pendingValueTypeConfirmation.value = null
             pending.onSettled()
