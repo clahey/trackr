@@ -413,7 +413,7 @@ internal fun computeDragTarget(
     currentZone: DropZone,
 ): Pair<String?, DropZone> {
     val unchanged = currentTargetId to currentZone
-    val (candidateId, candidateZone) = resolveHitDropCandidate(
+    val candidate = resolveHitDropCandidate(
         order,
         draggedId,
         pointerYInList,
@@ -421,18 +421,19 @@ internal fun computeDragTarget(
         canScrollForward
     )
         ?: return unchanged
-    if (candidateId == currentTargetId && candidateZone == currentZone) return unchanged
+    if (candidate == unchanged) return unchanged
+    val (candidateId, candidateZone) = candidate
     val candidateResult = computeMoveResult(order, draggedId, candidateId, candidateZone)
-        ?: return candidateId to candidateZone
+        ?: return candidate
     val baselineResult = if (currentTargetId != null) {
         computeMoveResult(order, draggedId, currentTargetId, currentZone)
     } else {
         identityMoveResult(order, draggedId)
     }
-    val sameDrop = baselineResult != null &&
-            candidateResult.newParentId == baselineResult.newParentId &&
-            candidateResult.orderedSiblingIds == baselineResult.orderedSiblingIds
-    return if (sameDrop) unchanged else candidateId to candidateZone
+    // Same resulting drop position (movedId is draggedId in both, so structural equality
+    // on the whole result is equivalent to comparing parent + sibling order) — treat as no
+    // change: no haptic, no target/zone write.
+    return if (candidateResult == baselineResult) unchanged else candidate
 }
 
 /**
