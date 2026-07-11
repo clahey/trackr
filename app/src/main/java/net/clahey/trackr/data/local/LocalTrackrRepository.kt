@@ -8,6 +8,7 @@ import androidx.room.withTransaction
 import net.clahey.trackr.data.ImageStore
 import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.SiblingSlot
 import net.clahey.trackr.domain.ValueType
@@ -48,9 +49,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     private suspend fun requireNoChildren(category: Category) {
         if (category is Category.SubCategory) {
             val childCount = categoryDao.countByParentIdOnce(category.id)
-            require(childCount == 0) {
-                "Cannot nest category '${category.id}': it has $childCount SubCategory children"
-            }
+            if (childCount != 0) throw CategoryHasChildrenException(category.id, childCount)
         }
     }
 

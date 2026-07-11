@@ -1,6 +1,7 @@
 package net.clahey.trackr
 
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.ValueType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,8 +52,8 @@ class FakeTrackrRepositoryTest {
         repo.setCategories(parent, newParent, child)
         try {
             repo.saveCategory(makeSubCategory("parent", parent = newParent))
-            fail("Expected IllegalArgumentException")
-        } catch (e: IllegalArgumentException) {
+            fail("Expected CategoryHasChildrenException")
+        } catch (e: CategoryHasChildrenException) {
             // expected
         }
     }
@@ -80,8 +81,8 @@ class FakeTrackrRepositoryTest {
                 makeSubCategory("parent", parent = newParent),
                 fromType = ValueType.None,
             )
-            fail("Expected IllegalArgumentException")
-        } catch (e: IllegalArgumentException) {
+            fail("Expected CategoryHasChildrenException")
+        } catch (e: CategoryHasChildrenException) {
             // expected
         }
     }

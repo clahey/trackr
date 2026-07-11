@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.domain.warningTierFor
@@ -234,7 +235,7 @@ class CategoryListViewModel @Inject constructor(
     private suspend fun persistOrReject(category: Category, persist: suspend () -> Unit) {
         try {
             persist()
-        } catch (e: IllegalArgumentException) {
+        } catch (e: CategoryHasChildrenException) {
             _reparentRejectedCategoryName.value = category.name
         }
     }

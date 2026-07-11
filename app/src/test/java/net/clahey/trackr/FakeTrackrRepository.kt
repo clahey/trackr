@@ -2,6 +2,7 @@ package net.clahey.trackr
 
 import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.SiblingSlot
 import net.clahey.trackr.domain.ValueType
@@ -47,9 +48,7 @@ class FakeTrackrRepository : TrackrRepository {
                 val childCount = list.count { c ->
                     c is Category.SubCategory && c.parent.id == category.id
                 }
-                require(childCount == 0) {
-                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
-                }
+                if (childCount != 0) throw CategoryHasChildrenException(category.id, childCount)
             }
             val updated = list.filter { it.id != category.id } + category
             if (category is Category.MetaCategory) {
