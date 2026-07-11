@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -485,7 +486,8 @@ fun DragReorderList(
     // Each visible row's drag-handle icon bounds, so the interceptor can tell whether a
     // touch-down actually landed on a handle (start a drag) versus elsewhere in the list
     // (let it fall through to the list's own scroll). Only visible rows' handles are looked
-    // up — entries for disposed rows are stale and never consulted.
+    // up; each row prunes its own entry on disposal (DisposableEffect in the item lambda), so
+    // the map tracks live rows rather than every id seen this session.
     val handleCoordinates = remember { mutableMapOf<String, LayoutCoordinates>() }
     // The drag math runs over the internal flattened representation; the public `items` tree
     // is flattened on input (DragListItem -> FlatNode). The interceptor's pointerInput
@@ -716,6 +718,14 @@ fun DragReorderList(
 
         LazyColumn(state = listState, modifier = gestureInterceptor) {
             items(displayOrder, key = { it.id }) { item ->
+                // Prune this row's handle bounds when its slot leaves composition (scrolled
+                // out of the lazy window, or removed from the list), so handleCoordinates
+                // doesn't retain stale entries for rows that no longer exist. Keyed on the
+                // stable row id, outside AnimatedVisibility so a collapse (which is not a
+                // disposal) doesn't drop a still-present row's bounds.
+                DisposableEffect(item.id) {
+                    onDispose { handleCoordinates.remove(item.id) }
+                }
                 val isDraggedRow = item.id == draggedId
                 val parentId = if (item.depth > 0) groupAnchorOf(displayOrder, item.id) else null
                 val collapsed = draggedId != null && parentId != null && draggedItem != null &&
