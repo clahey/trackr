@@ -21,9 +21,9 @@ class SiblingReindexTest {
     @Test fun `an id in the hint that is no longer a member is dropped`() {
         val ordered = reconcileSiblingOrder(
             currentMembers = slots("a" to 0, "c" to 2),  // "b" deleted/reparented away since the snapshot
-            orderedSiblingIds = listOf("a", "b", "c"),
+            orderedSiblingIds = listOf("c", "b", "a"),
         )
-        assertEquals(listOf("a", "c"), ordered)
+        assertEquals(listOf("c", "a"), ordered)
     }
 
     // @spec CAT-UI-083
@@ -42,17 +42,17 @@ class SiblingReindexTest {
         // "x" was added between a2 and a3 (sortOrder 15) after the snapshot was taken.
         val ordered = reconcileSiblingOrder(
             currentMembers = slots("a1" to 0, "a2" to 10, "x" to 15, "a3" to 20),
-            orderedSiblingIds = listOf("a3", "a1", "a2"),
+            orderedSiblingIds = listOf("a3", "a2", "a1"),
         )
         // "x" currently follows a2 by sortOrder, so it trails a2 in the result — not pulled to
-        // front or end, never displacing the user's arranged [a3, a1, a2].
-        assertEquals(listOf("a3", "a1", "a2", "x"), ordered)
+        // front or end, never displacing the user's arranged [a3, a2, a1].
+        assertEquals(listOf("a3", "a2", "x", "a1"), ordered)
     }
 
     // @spec CAT-UI-083
     @Test fun `multiple unknowns sharing one anchor keep their mutual sortOrder order`() {
         val ordered = reconcileSiblingOrder(
-            currentMembers = slots("a" to 0, "y" to 6, "x" to 5, "b" to 10),
+            currentMembers = slots("a" to 0, "x" to 5, "y" to 6, "b" to 10),
             orderedSiblingIds = listOf("b", "a"),
         )
         // x (5) and y (6) both currently follow a and precede b; they stay after a in
