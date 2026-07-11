@@ -178,6 +178,39 @@ class CategoryListViewModelDragTest {
         assertTrue("expected onSettled to have been called after confirm", settled)
     }
 
+    // @spec CAT-UI-082, CAT-UI-084
+    // The deferred (confirm-path) persist can still be rejected: "d" was a childless,
+    // inheriting SubCategory when the drag opened the type-change dialog, but a concurrent
+    // write promoted it to a MetaCategory and gave it children while the dialog was open. On
+    // confirm the in-transaction guard re-reads d's live children and throws. The guarantee
+    // under test is graceful, non-freezing degradation — onSettled must still fire so the drag
+    // widget unfreezes — not the (deferred, sync-gated) reactive-dialog-dismiss behavior; see
+    // category-management.md Open Questions.
+    @Test fun `a confirm whose deferred persist is rejected still settles the row and clears the dialog`() = runTest {
+        val p1 = makeMetaCategory("p1", valueType = ValueType.Number)
+        val p2 = makeMetaCategory("p2", valueType = ValueType.Duration)
+        val d = makeSubCategory("d", p1)  // inheriting: dragging it to p2 needs a type change -> dialog
+        repo.setCategories(p1, p2, d)
+        repo.setEvents(Event("e1", "d", Instant.parse("2024-01-15T12:00:00Z"), null, null, emptyList(), Instant.parse("2024-01-15T12:00:00Z")))
+        var settledCount = 0
+        vm.onDragMove(DragMoveResult("d", "p2", listOf("d"))) { settledCount++ }
+        // Dialog is up; nothing has settled yet.
+        assertEquals(ValueTypeWarningTier.Unsafe, vm.pendingValueTypeConfirmation.value?.tier)
+        assertEquals(0, settledCount)
+        // Concurrently: d is promoted to a MetaCategory and gains a child, so the pending
+        // SubCategory snapshot of d can no longer be nested.
+        val dPromoted = makeMetaCategory("d", valueType = ValueType.Number)
+        repo.setCategories(p1, p2, dPromoted, makeSubCategory("gc", dPromoted))
+        vm.confirmPendingValueTypeChange()
+        // The row settles exactly once (widget unfreezes), the dialog clears, and the move is
+        // rejected rather than applied.
+        assertEquals("onSettled must fire so the drag widget never freezes", 1, settledCount)
+        assertNull(vm.pendingValueTypeConfirmation.value)
+        assertEquals("d", vm.reparentRejectedCategoryName.value)
+        assertTrue("d stays a MetaCategory; the nest was not persisted",
+            repo.getCategoryById("d").first() is Category.MetaCategory)
+    }
+
     // @spec CAT-UI-081, CAT-UI-082
     @Test fun `cancelPendingValueTypeChange abandons the move entirely and still settles`() = runTest {
         val oldParent = makeMetaCategory("oldParent", valueType = ValueType.Number)
