@@ -22,6 +22,10 @@ android {
 
     buildTypes {
         release {
+            // Release signing is done interactively via Android Studio's Generate Signed
+            // Bundle / APK wizard (keystore password kept in the developer's head, never
+            // stored on disk or in env). No signingConfig here on purpose: CLI `bundleRelease`
+            // produces an unsigned bundle. See docs/llds/publishing.md § Decisions.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

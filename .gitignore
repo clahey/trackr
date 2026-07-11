@@ -13,6 +13,10 @@ local.properties
 # Keystore files (never commit)
 *.jks
 *.keystore
+keystore.properties
+
+# Signed release output (Generate Signed Bundle / APK wizard)
+app/release/
 
 # Google Services (contains API keys)
 google-services.json
