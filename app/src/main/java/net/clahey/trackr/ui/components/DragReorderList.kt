@@ -47,6 +47,7 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -687,28 +688,18 @@ fun DragReorderList(
                     // exclusivity overlay, which is consuming it anyway.
                     if (state.settledDisplayOrder != null) continue
 
-                    // down.position is in this node's (the LazyColumn's) local space,
-                    // whose origin is the root Box's origin — so it's directly comparable
-                    // to visibleItemsInfo offsets and to handle bounds expressed in that
-                    // same (positionInRoot - rootOrigin) space.
-                    val order = state.renderedOrder
-                    val x = down.position.x
-                    val y = down.position.y
-                    val hit = listState.layoutInfo.visibleItemsInfo
-                        .firstOrNull { y >= it.offset && y < it.offset + it.size }
-                    val rowId = hit?.let { order.getOrNull(it.index)?.id }
-                    val handle = rowId?.let { state.handleCoordinates[it] }
-                    val overHandle = handle != null && run {
-                        // Handle top-left in the Box's local space (same space as down.position).
-                        val topLeft = handle.positionInRoot() - state.rootOrigin
-                        x >= topLeft.x && x < topLeft.x + handle.size.width &&
-                                y >= topLeft.y && y < topLeft.y + handle.size.height
+                    val pointerInRoot = down.position + state.rootOrigin
+                    // isAttached skips a handle whose icon has left composition (e.g. a list that
+                    // just shrank to one row).
+                    val hitHandle = state.handleCoordinates.entries.firstOrNull { (_, coords) ->
+                        coords.isAttached && coords.boundsInRoot().contains(pointerInRoot)
                     }
-                    if (hit == null || rowId == null || !overHandle || order.size <= 1) {
-                        // Not on a handle — leave the down unconsumed so the internal
-                        // scroll (Main pass) handles it and the list scrolls (DRAG-UI-016).
-                        continue
-                    }
+                    // A miss (or a single-row list, which draws no handle) leaves the down
+                    // unconsumed so the list scrolls it instead (DRAG-UI-016 / DRAG-UI-001).
+                    if (hitHandle == null || listState.layoutInfo.totalItemsCount <= 1) continue
+                    val rowId = hitHandle.key
+                    val row = listState.layoutInfo.visibleItemsInfo
+                        .firstOrNull { it.key == rowId } ?: continue
 
                     // On a handle: claim the gesture on the Initial pass so the internal
                     // scroll never starts, and wait for slop before committing to a drag
@@ -730,7 +721,7 @@ fun DragReorderList(
                     }
                     if (!startedDrag) continue
 
-                    state.pickUp(rowId, hit.offset, hit.size)
+                    state.pickUp(rowId, row.offset, row.size)
 
                     // Drive the drag on the Initial pass too, so every move is consumed
                     // before the internal scroll can act on it — the drag stays exclusive
