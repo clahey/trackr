@@ -10,6 +10,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.center
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -21,12 +22,83 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private class RecordingHapticFeedback : HapticFeedback {
     val events = mutableListOf<HapticFeedbackType>()
     override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {
         events.add(hapticFeedbackType)
     }
+}
+
+// --- Reusable drag drivers -------------------------------------------------------------
+//
+// Every drag here is driven as many small already-past-slop moveBy() steps (waitForIdle
+// between each) rather than one batched moveTo() jump. A single large moveTo() delivers
+// non-monotonic sub-events whose *net* on-screen travel varies with row height and density,
+// so a batched jump lands inconsistently across screen geometries — it undershot the empty
+// area below the list on a 7-inch tablet AVD, so drops there never registered. Small steps
+// make the net travel deterministic and, as a bonus, force a real recomposition between
+// move events (closer to how a device actually delivers a drag), which is what the pickup
+// regression guards below rely on.
+
+private val DRAG_STEP = 8.dp
+
+private fun ComposeContentTestRule.pressHandle(handleTag: String) {
+    onNodeWithTag(handleTag).performTouchInput { down(center) }
+}
+
+private fun ComposeContentTestRule.releaseHandle(handleTag: String) {
+    onNodeWithTag(handleTag).performTouchInput { up() }
+    waitForIdle()
+}
+
+/**
+ * Moves the active drag pointer on [handleTag] by [totalDy] px in [DRAG_STEP]-sized steps,
+ * letting the tree settle between each (and, cumulatively, crossing touch slop to pick the
+ * row up). [afterEachStep] runs after every settled step — used by the haptic-count checks.
+ */
+private fun ComposeContentTestRule.dragBy(
+    handleTag: String,
+    totalDy: Float,
+    afterEachStep: () -> Unit = {},
+) {
+    val stepPx = with(density) { DRAG_STEP.toPx() }
+    val steps = (abs(totalDy) / stepPx).roundToInt().coerceAtLeast(1)
+    val dir = if (totalDy < 0f) -stepPx else stepPx
+    repeat(steps) {
+        onNodeWithTag(handleTag).performTouchInput { moveBy(Offset(0f, dir)) }
+        waitForIdle()
+        afterEachStep()
+    }
+}
+
+/** Presses [handleTag] and crosses touch slop to pick the row up, holding the pointer down. */
+private fun ComposeContentTestRule.pickUpAndHold(handleTag: String) {
+    val slopPx = with(density) { 24.dp.toPx() }
+    pressHandle(handleTag)
+    dragBy(handleTag, slopPx)
+}
+
+/** Full press -> step -> release drag that lands the pointer at [targetYInRoot]. */
+private fun ComposeContentTestRule.dragRowToY(handleTag: String, targetYInRoot: Float) {
+    val startY = onNodeWithTag(handleTag).fetchSemanticsNode().boundsInRoot.center.y
+    pressHandle(handleTag)
+    dragBy(handleTag, targetYInRoot - startY)
+    releaseHandle(handleTag)
+}
+
+/**
+ * Full drag that drops [handleTag]'s row into the empty space past [lastRowTag] (end of
+ * list). Aims several row-heights below the last row, not just one: the widget tracks a
+ * point offset below the finger, and a nestable last row will capture a pointer that merely
+ * reaches its nest band — so the drop has to land unambiguously past the row's bottom. The
+ * stepped driver reaches this far target deterministically (a single moveTo() would not).
+ */
+private fun ComposeContentTestRule.dropRowPastEnd(handleTag: String, lastRowTag: String) {
+    val last = onNodeWithTag(lastRowTag).fetchSemanticsNode().boundsInRoot
+    dragRowToY(handleTag, last.bottom + last.height * 5)
 }
 
 @RunWith(AndroidJUnit4::class)
@@ -40,6 +112,11 @@ class DragReorderListTest {
 
     private fun flatItem(id: String) =
         DragListItem(id, canHaveChildren = false, canBecomeChild = true)
+
+    // A group row that can hold children but is itself ineligible to become one — the shape
+    // that triggers the "collapse every other row's children" rule (DRAG-UI-012).
+    private fun ineligibleRow(id: String, children: List<DragListItem> = emptyList()) =
+        DragListItem(id, canHaveChildren = true, canBecomeChild = false, children = children)
 
     // @spec DRAG-UI-001
     @Test
@@ -65,6 +142,9 @@ class DragReorderListTest {
     }
 
     // @spec DRAG-UI-010
+    // Aims into the empty space past the last row rather than at a specific band; because the
+    // drag is stepped (see the drag drivers), it also forces a recomposition mid-drag — the
+    // condition that once silently killed the gesture (see handleStaysMounted... below).
     @Test
     fun draggingHandlePastTheEndOfTheListReportsAMove() {
         var result: DragMoveResult? = null
@@ -76,21 +156,7 @@ class DragReorderListTest {
                 Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
             }
         }
-        // Aim well past the bottom of the list rather than into a specific drop band — the
-        // exact on-screen distance Compose UI testing reports for a single moveTo() doesn't
-        // line up 1:1 with the gesture's intended travel (touch slop + delivery behavior),
-        // so a large overshoot is the robust way to reliably exercise the end-of-list path.
-        val targetBounds = composeTestRule.onNodeWithTag("row_B").fetchSemanticsNode().boundsInRoot
-        val pastTheEnd = Offset(
-            targetBounds.center.x,
-            targetBounds.bottom + targetBounds.height * 5,
-        )
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput {
-            down(center)
-            moveTo(pastTheEnd)
-            up()
-        }
-        composeTestRule.waitForIdle()
+        composeTestRule.dropRowPastEnd(handleTag = "drag_handle_A", lastRowTag = "row_B")
 
         assertEquals(DragMoveResult("A", null, listOf("B", "A")), result)
     }
@@ -99,9 +165,8 @@ class DragReorderListTest {
     // Regression test: picking up a row once gated its drag handle's own composition on
     // `!isDraggedRow`, which removed the handle (and the pointerInput coroutine tracking
     // this very gesture) from the tree the moment pickup recomposed — silently killing the
-    // drag after its first event. A real device delivers move events as separate frames
-    // with a recomposition in between, which is what exposed it; a single batched
-    // down/moveTo/up (as below) does not.
+    // drag after its first event. Stepping the pickup forces the pickup-triggered
+    // recomposition to actually run mid-gesture, which is what exposes it.
     @Test
     fun handleStaysMountedForTheDraggedRowAcrossARecomposition() {
         composeTestRule.setContent {
@@ -109,51 +174,9 @@ class DragReorderListTest {
                 Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
             }
         }
-        // Cross touch slop to trigger pickup without releasing, then force the
-        // pickup-triggered recomposition to actually run before checking anything.
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput {
-            down(center)
-            moveBy(Offset(0f, 100f))
-        }
-        composeTestRule.waitForIdle()
+        composeTestRule.pickUpAndHold("drag_handle_A")
         composeTestRule.onNodeWithTag("drag_handle_A").assertExists()
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput { up() }
-    }
-
-    // @spec DRAG-UI-002, DRAG-UI-010
-    // End-to-end counterpart to the test above: splits the gesture across two
-    // performTouchInput calls with a real recomposition forced in between, modeling how a
-    // real device actually delivers touch input (vs. draggingHandlePastTheEndOfTheListReportsAMove's
-    // single batched gesture, which completes before Compose gets a chance to recompose
-    // mid-drag and so didn't catch this).
-    @Test
-    fun draggingAcrossARecompositionBetweenMoveEventsStillReportsTheMove() {
-        var result: DragMoveResult? = null
-        composeTestRule.setContent {
-            DragReorderList(
-                items = listOf(rowItem("A"), rowItem("B")),
-                onMove = { r, onSettled -> result = r; onSettled() },
-            ) { item ->
-                Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
-            }
-        }
-        val targetBounds = composeTestRule.onNodeWithTag("row_B").fetchSemanticsNode().boundsInRoot
-        val pastTheEnd = Offset(
-            targetBounds.center.x,
-            targetBounds.bottom + targetBounds.height * 5,
-        )
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput {
-            down(center)
-            moveBy(Offset(0f, 100f))
-        }
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput {
-            moveTo(pastTheEnd)
-            up()
-        }
-        composeTestRule.waitForIdle()
-
-        assertEquals(DragMoveResult("A", null, listOf("B", "A")), result)
+        composeTestRule.releaseHandle("drag_handle_A")
     }
 
     // @spec DRAG-UI-003
@@ -164,8 +187,8 @@ class DragReorderListTest {
     @Test
     fun placeholderIsIndentedToMatchTheDraggedRowsDepth() {
         // S1 is sandwiched among several depth-1 siblings under A, and every row is given
-        // generous padding so it's much taller than touch slop — that way, a small
-        // slop-crossing move reliably lands within S1's own (now tall) row, registering no
+        // generous padding so it's much taller than touch slop — that way, the small
+        // slop-crossing pickup reliably lands within S1's own (now tall) row, registering no
         // target (own-placeholder no-op) and leaving S1's depth at its untouched original
         // value; even if it did overshoot onto a neighbor, every plausible landing spot is
         // still a depth-1 sibling, so the *resulting* depth is robustly 1 either way.
@@ -178,20 +201,15 @@ class DragReorderListTest {
                 Text(item.id, modifier = Modifier.testTag("row_${item.id}").padding(vertical = 48.dp))
             }
         }
-        // Pick up S1 without releasing, forcing the pickup recomposition to settle so the
-        // placeholder is actually rendered before checking its bounds.
-        val slopCrossingPx = with(composeTestRule.density) { 24.dp.toPx() }
-        composeTestRule.onNodeWithTag("drag_handle_S1").performTouchInput {
-            down(center)
-            moveBy(Offset(0f, slopCrossingPx))
-        }
-        composeTestRule.waitForIdle()
+        // Pick up S1 without releasing, so the placeholder is actually rendered before we
+        // read its bounds.
+        composeTestRule.pickUpAndHold("drag_handle_S1")
 
         val placeholderBounds = composeTestRule.onNodeWithTag("drop_placeholder_S1").fetchSemanticsNode().boundsInRoot
         val expectedIndentPx = with(composeTestRule.density) { 40.dp.toPx() }
         assertEquals(expectedIndentPx, placeholderBounds.left, 2f)
 
-        composeTestRule.onNodeWithTag("drag_handle_S1").performTouchInput { up() }
+        composeTestRule.releaseHandle("drag_handle_S1")
     }
 
     // @spec DRAG-UI-002, DRAG-UI-003
@@ -214,22 +232,17 @@ class DragReorderListTest {
                 Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
             }
         }
+        val aBounds = composeTestRule.onNodeWithTag("row_A").fetchSemanticsNode().boundsInRoot
         val bBounds = composeTestRule.onNodeWithTag("row_B").fetchSemanticsNode().boundsInRoot
         val cBounds = composeTestRule.onNodeWithTag("row_C").fetchSemanticsNode().boundsInRoot
 
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput {
-            down(center)
-            moveTo(Offset(bBounds.center.x, bBounds.bottom - 5f))
-        }
-        composeTestRule.waitForIdle()
-        // A's placeholder has now reflowed into C's former slot. Move there again — this is
-        // "hovering the new location of the drop area" itself, not a different row.
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput {
-            moveTo(cBounds.center)
-        }
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput { up() }
-        composeTestRule.waitForIdle()
+        // Drag A down into B's lower half ("after B"); A's placeholder reflows into C's slot.
+        composeTestRule.pressHandle("drag_handle_A")
+        composeTestRule.dragBy("drag_handle_A", (bBounds.bottom - 5f) - aBounds.center.y)
+        // Now move onto that relocated placeholder itself (C's former position), not a
+        // different row — under the bug this cleared the target and lost the drop.
+        composeTestRule.dragBy("drag_handle_A", cBounds.center.y - (bBounds.bottom - 5f))
+        composeTestRule.releaseHandle("drag_handle_A")
 
         assertEquals(DragMoveResult("A", null, listOf("B", "A", "C")), result)
     }
@@ -240,15 +253,8 @@ class DragReorderListTest {
     // (target, zone) pairs that resolve to the exact same insertion position. Walking A
     // down through B and into C's top portion should cross exactly one *real* boundary —
     // "still basically where I started" to "now after B" — and tick exactly once for it,
-    // not once per (target, zone) pair it technically passes through along the way.
-    //
-    // Driven via many small relative moveBy() steps rather than one big moveTo() jump: a
-    // single moveTo() call was observed to deliver several internal sub-events whose
-    // positions don't progress smoothly toward the requested target (confirmed via
-    // diagnostic logging — one such call landed at roughly 99, then 110, then jumped
-    // straight to 194 on a 96px-tall row, overshooting the intended target by ~50px), so
-    // landing at a specific fraction of a specific row in one call isn't reliable. Many
-    // small already-past-slop steps are.
+    // not once per (target, zone) pair it technically passes through along the way. The
+    // stepped driver is essential here: the tick count is asserted after every step.
     @Test
     fun noSpuriousHapticWhenCrossingFromAfterOneRowToBeforeItsNextSibling() {
         val haptics = RecordingHapticFeedback()
@@ -265,18 +271,12 @@ class DragReorderListTest {
         val aBounds = composeTestRule.onNodeWithTag("row_A").fetchSemanticsNode().boundsInRoot
         val cBounds = composeTestRule.onNodeWithTag("row_C").fetchSemanticsNode().boundsInRoot
 
-        val stepPx = with(composeTestRule.density) { 8.dp.toPx() }
-        val totalSteps = ((cBounds.center.y - aBounds.center.y) / stepPx).toInt().coerceAtLeast(1)
-
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput { down(center) }
-        repeat(totalSteps) {
-            composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput { moveBy(Offset(0f, stepPx)) }
-            composeTestRule.waitForIdle()
+        composeTestRule.pressHandle("drag_handle_A")
+        composeTestRule.dragBy("drag_handle_A", cBounds.center.y - aBounds.center.y) {
             assertTrue("expected at most 1 tick, saw ${haptics.events.size}", haptics.events.size <= 1)
         }
         assertEquals(1, haptics.events.size)
-
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput { up() }
+        composeTestRule.releaseHandle("drag_handle_A")
     }
 
     // @spec DRAG-UI-004, DRAG-UI-015
@@ -304,27 +304,21 @@ class DragReorderListTest {
             }
         }
         val listBounds = composeTestRule.onNodeWithTag("drag_list").fetchSemanticsNode().boundsInRoot
+        val item1CenterY = composeTestRule.onNodeWithTag("drag_handle_Item1").fetchSemanticsNode().boundsInRoot.center.y
         val nearBottomY = listBounds.bottom - with(composeTestRule.density) { 20.dp.toPx() }
 
-        composeTestRule.onNodeWithTag("drag_handle_Item1").performTouchInput {
-            down(center)
-            moveTo(Offset(listBounds.center.x, nearBottomY))
-        }
-        composeTestRule.waitForIdle()
+        composeTestRule.pressHandle("drag_handle_Item1")
+        composeTestRule.dragBy("drag_handle_Item1", nearBottomY - item1CenterY)
 
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.mainClock.advanceTimeBy(3000)
         composeTestRule.mainClock.autoAdvance = true
         composeTestRule.waitForIdle()
 
-        // Nudge again and release — if the gesture survived the sustained auto-scroll,
-        // this still reports a move; if it was silently interrupted, onMove never fires.
-        composeTestRule.onNodeWithTag("drag_handle_Item1").performTouchInput {
-            moveBy(Offset(0f, 5f))
-        }
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("drag_handle_Item1").performTouchInput { up() }
-        composeTestRule.waitForIdle()
+        // Nudge again and release — if the gesture survived the sustained auto-scroll, this
+        // still reports a move; if it was silently interrupted, onMove never fires.
+        composeTestRule.dragBy("drag_handle_Item1", with(composeTestRule.density) { DRAG_STEP.toPx() })
+        composeTestRule.releaseHandle("drag_handle_Item1")
 
         assertNotNull("gesture appears to have been interrupted by auto-scroll", result)
     }
@@ -345,26 +339,13 @@ class DragReorderListTest {
                 Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
             }
         }
-        val cBounds = composeTestRule.onNodeWithTag("row_C").fetchSemanticsNode().boundsInRoot
-        val pastTheEnd = Offset(cBounds.center.x, cBounds.bottom + cBounds.height * 5)
-
         // Drop A at the end — onMove fires, but onSettled is deliberately not called yet,
         // simulating a caller still persisting the move (e.g. an in-flight database write).
-        composeTestRule.onNodeWithTag("drag_handle_A").performTouchInput {
-            down(center)
-            moveTo(pastTheEnd)
-            up()
-        }
-        composeTestRule.waitForIdle()
+        composeTestRule.dropRowPastEnd("drag_handle_A", "row_C")
         assertEquals(1, moveCount)
 
         // While frozen, trying to start a second drag must not succeed.
-        composeTestRule.onNodeWithTag("drag_handle_B").performTouchInput {
-            down(center)
-            moveBy(Offset(0f, 500f))
-            up()
-        }
-        composeTestRule.waitForIdle()
+        composeTestRule.dropRowPastEnd("drag_handle_B", "row_C")
         assertEquals(1, moveCount)
 
         // The caller finishes (persists or cancels, doesn't matter which) and calls onSettled.
@@ -372,12 +353,121 @@ class DragReorderListTest {
         composeTestRule.waitForIdle()
 
         // Now a new drag works again.
-        composeTestRule.onNodeWithTag("drag_handle_B").performTouchInput {
-            down(center)
-            moveBy(Offset(0f, 500f))
-            up()
-        }
-        composeTestRule.waitForIdle()
+        composeTestRule.dropRowPastEnd("drag_handle_B", "row_C")
         assertEquals(2, moveCount)
+    }
+
+    // @spec DRAG-UI-007
+    // End-to-end counterpart to DragReorderListLogicTest's nesting cases: proves the full
+    // gesture path (pointer -> onDragMove -> reported result) carries a nest drop through to
+    // a non-null newParentId, not merely that computeMoveResult can produce one. Which nest
+    // band applies (the 25/50/25 split for a childless target here, vs. the 50/50 split for
+    // a target that already has children, DRAG-UI-008) is exhaustively unit-tested; this
+    // covers only the wiring.
+    @Test
+    fun nestingARowUnderAnotherReportsTheNewParent() {
+        var result: DragMoveResult? = null
+        composeTestRule.setContent {
+            DragReorderList(
+                items = listOf(rowItem("A"), rowItem("B")),
+                onMove = { r, onSettled -> result = r; onSettled() },
+            ) { item ->
+                Text(item.id, modifier = Modifier.testTag("row_${item.id}").padding(vertical = 48.dp))
+            }
+        }
+        // Drag B's handle up onto A's vertical center — the middle (nest) band of a childless
+        // eligible target. The generous row padding makes that band tall enough to land in
+        // reliably despite per-step jitter.
+        val aCenterY = composeTestRule.onNodeWithTag("row_A").fetchSemanticsNode().boundsInRoot.center.y
+        composeTestRule.dragRowToY("drag_handle_B", aCenterY)
+
+        assertEquals(DragMoveResult("B", "A", listOf("B")), result)
+    }
+
+    // @spec DRAG-UI-011
+    // Picking up a row that has children collapses its own children for the duration of the
+    // drag and restores them on drop. The band math (shouldCollapseChildrenOf) is
+    // unit-tested; this checks that the collapse actually removes the child rows from the
+    // rendered list (AnimatedVisibility drops them from composition once the exit settles).
+    @Test
+    fun pickingUpAParentCollapsesItsOwnChildren() {
+        composeTestRule.setContent {
+            DragReorderList(
+                items = listOf(
+                    rowItem("A", children = listOf(flatItem("S1"), flatItem("S2"))),
+                    rowItem("B"),
+                ),
+                onMove = { _, onSettled -> onSettled() },
+            ) { item ->
+                Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
+            }
+        }
+        composeTestRule.onNodeWithTag("row_S1").assertExists()
+
+        composeTestRule.pickUpAndHold("drag_handle_A")
+        composeTestRule.onNodeWithTag("row_S1").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("row_S2").assertDoesNotExist()
+
+        // Dropping restores them.
+        composeTestRule.releaseHandle("drag_handle_A")
+        composeTestRule.onNodeWithTag("row_S1").assertExists()
+    }
+
+    // @spec DRAG-UI-012
+    // Picking up a row that is ineligible to become a child (canBecomeChild = false)
+    // collapses *every other* row's children, independently of whether the dragged row has
+    // children of its own. Here the dragged row B has none, and a sibling group A/S1 is the
+    // one whose child must disappear on pickup.
+    @Test
+    fun pickingUpAnIneligibleRowCollapsesEveryOtherRowsChildren() {
+        composeTestRule.setContent {
+            DragReorderList(
+                items = listOf(
+                    ineligibleRow("B"),
+                    rowItem("A", children = listOf(flatItem("S1"))),
+                ),
+                onMove = { _, onSettled -> onSettled() },
+            ) { item ->
+                Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
+            }
+        }
+        composeTestRule.onNodeWithTag("row_S1").assertExists()
+
+        composeTestRule.pickUpAndHold("drag_handle_B")
+        composeTestRule.onNodeWithTag("row_S1").assertDoesNotExist()
+
+        composeTestRule.releaseHandle("drag_handle_B")
+        composeTestRule.onNodeWithTag("row_S1").assertExists()
+    }
+
+    // @spec DRAG-UI-014
+    // The untested half of blocksANewDragUntilTheCallerCallsOnSettled: after a drop whose
+    // caller settles *without* persisting (items never change), the widget must stop
+    // rendering the dropped order and revert to `items` — the dropped row animates back to
+    // where it started rather than staying where it was dropped.
+    @Test
+    fun anUnpersistedDropAnimatesTheRowBackToItsOriginalPosition() {
+        var pendingOnSettled: (() -> Unit)? = null
+        composeTestRule.setContent {
+            DragReorderList(
+                items = listOf(flatItem("A"), flatItem("B"), flatItem("C")),
+                onMove = { _, onSettled -> pendingOnSettled = onSettled },
+            ) { item ->
+                Text(item.id, modifier = Modifier.testTag("row_${item.id}"))
+            }
+        }
+        fun topOf(id: String) =
+            composeTestRule.onNodeWithTag("row_$id").fetchSemanticsNode().boundsInRoot.top
+
+        // Drop A past the end. The caller captures onSettled but neither calls it nor updates
+        // items — modeling a persist still in flight (or a decision not to persist).
+        composeTestRule.dropRowPastEnd("drag_handle_A", "row_C")
+        // Until onSettled, the widget keeps rendering the dropped order: A is now last.
+        assertTrue("expected A to render below C before settle", topOf("A") > topOf("C"))
+
+        // Caller settles without persisting; items still read A, B, C, so the widget reverts.
+        pendingOnSettled?.invoke()
+        composeTestRule.waitForIdle()
+        assertTrue("expected A to animate back above B after settle", topOf("A") < topOf("B"))
     }
 }
