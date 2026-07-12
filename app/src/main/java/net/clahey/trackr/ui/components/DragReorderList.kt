@@ -239,7 +239,7 @@ internal fun dropZone(
     }
 }
 
-// @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008, DRAG-UI-010
+// @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008
 internal fun computeMoveResult(
     items: List<FlatNode>,
     draggedId: String,
@@ -262,12 +262,6 @@ internal fun computeMoveResult(
             DragMoveResult(draggedId, groupAnchorOf(items, targetId), ordered)
         }
     }
-}
-
-// @spec DRAG-UI-010
-internal fun endOfListMoveResult(items: List<FlatNode>, draggedId: String): DragMoveResult {
-    val topLevel = items.filter { it.depth == 0 && it.id != draggedId }.map { it.id }
-    return DragMoveResult(draggedId, null, topLevel + draggedId)
 }
 
 private fun countDescendants(items: List<FlatNode>, index: Int): Int {
@@ -407,7 +401,7 @@ private fun identityMoveResult(order: List<FlatNode>, draggedId: String): DragMo
  * time the pointer crosses that exact boundary, including right at pickup before the
  * pointer has moved anywhere meaningful at all.
  */
-// @spec DRAG-UI-002, DRAG-UI-003
+// @spec DRAG-UI-002, DRAG-UI-003, DRAG-UI-010
 internal fun computeDragTarget(
     order: List<FlatNode>,
     draggedId: String,

@@ -148,12 +148,6 @@ class DragReorderListLogicTest {
         assertNull(computeMoveResult(fixture, "A", DropTarget("A", DropZone.Before)))
     }
 
-    // @spec DRAG-UI-010
-    @Test fun `endOfListMoveResult appends as the last top-level item`() {
-        val result = endOfListMoveResult(fixture, draggedId = "D")
-        assertEquals(DragMoveResult("D", null, listOf("A", "B", "E", "D")), result)
-    }
-
     // @spec DRAG-UI-002
     @Test fun `hypotheticalOrder reorders and updates depth for before-after`() {
         val order = hypotheticalOrder(fixture, draggedId = "C", target = DropTarget("A", DropZone.Before))
