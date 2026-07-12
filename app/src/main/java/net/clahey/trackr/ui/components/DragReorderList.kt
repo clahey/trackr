@@ -462,13 +462,13 @@ internal class DragReorderState(val listState: LazyListState) {
     var currentTargetId by mutableStateOf<String?>(null)
     var currentZone by mutableStateOf<DropZone>(DropZone.None)
     var pointerYInList by mutableStateOf(0f)
-    var rootTop by mutableStateOf(0f)
 
-    // The root Box's left edge in root coordinates, so the interceptor (which spans the full
-    // list width, not just the handle column) can bound a touch-down against each handle's
-    // x-extent and not just its y-band — a touch on row content at the same y as a handle must
-    // not read as "on the handle" (DRAG-UI-001/DRAG-UI-016).
-    var rootLeft by mutableStateOf(0f)
+    // The root Box's origin in root coordinates. The interceptor spans the full list width (not
+    // just the handle column), so it bounds a touch-down against each handle's full x/y extent —
+    // a touch on row content at the same y as a handle must not read as "on the handle"
+    // (DRAG-UI-001/DRAG-UI-016). Kept as a point, not split coordinates: positionInRoot() hands
+    // back an Offset, and the two axes are always written and read together.
+    var rootOrigin by mutableStateOf(Offset.Zero)
     var draggingPointerId by mutableStateOf<PointerId?>(null)
 
     // Non-null from the moment of drop until the caller calls the onSettled callback passed
@@ -666,10 +666,7 @@ fun DragReorderList(
     }
 
     Box(
-        modifier = modifier.onGloballyPositioned {
-            state.rootTop = it.positionInRoot().y
-            state.rootLeft = it.positionInRoot().x
-        },
+        modifier = modifier.onGloballyPositioned { state.rootOrigin = it.positionInRoot() },
     ) {
         // @spec DRAG-UI-001, DRAG-UI-015, DRAG-UI-016 — the drag gesture, hosted on the
         // LazyColumn's own modifier rather than on each row's handle. This node is the list
@@ -701,7 +698,7 @@ fun DragReorderList(
                     // down.position is in this node's (the LazyColumn's) local space,
                     // whose origin is the root Box's origin — so it's directly comparable
                     // to visibleItemsInfo offsets and to handle bounds expressed in that
-                    // same (positionInRoot - rootTop/rootLeft) space.
+                    // same (positionInRoot - rootOrigin) space.
                     val order = state.renderedOrder
                     val x = down.position.x
                     val y = down.position.y
@@ -710,10 +707,10 @@ fun DragReorderList(
                     val rowId = hit?.let { order.getOrNull(it.index)?.id }
                     val handle = rowId?.let { state.handleCoordinates[it] }
                     val overHandle = handle != null && run {
-                        val left = handle.positionInRoot().x - state.rootLeft
-                        val top = handle.positionInRoot().y - state.rootTop
-                        x >= left && x < left + handle.size.width &&
-                                y >= top && y < top + handle.size.height
+                        // Handle top-left in the Box's local space (same space as down.position).
+                        val topLeft = handle.positionInRoot() - state.rootOrigin
+                        x >= topLeft.x && x < topLeft.x + handle.size.width &&
+                                y >= topLeft.y && y < topLeft.y + handle.size.height
                     }
                     if (hit == null || rowId == null || !overHandle || order.size <= 1) {
                         // Not on a handle — leave the down unconsumed so the internal
