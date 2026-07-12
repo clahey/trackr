@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
@@ -437,6 +440,146 @@ internal fun computeDragTarget(
 }
 
 /**
+ * Holds all of [DragReorderList]'s mutable drag state plus its [LazyListState], and owns the
+ * drag state *transitions* (pickup, per-move update, target/zone resolution, drop, cancel) —
+ * see `docs/llds/drag-reorder-list.md § Generic Widget API "Drag state holder"`. Collected into
+ * one container rather than a dozen loose `remember { mutableStateOf(...) }` so the transitions
+ * are auditable as a unit and the deferred node-graph refactor (LLD Open Questions § Deferred
+ * item 3) has one place to change [settledDisplayOrder]'s element type.
+ *
+ * The transitions take their volatile inputs — the haptic handle, the caller's `onMove`, the
+ * current flattened order — as arguments rather than capturing them, so the holder is correct
+ * regardless of which composition created it: the single pickup coroutine (see [DragReorderList])
+ * is launched once and never relaunched, and a captured-closure holder would silently bind to
+ * first-composition values.
+ */
+@Stable
+internal class DragReorderState(val listState: LazyListState) {
+    var draggedId by mutableStateOf<String?>(null)
+    var dragDelta by mutableStateOf(Offset.Zero)
+    var dragStartPosition by mutableStateOf<Offset?>(null)
+    var dragRowSize by mutableStateOf(IntSize.Zero)
+    var currentTargetId by mutableStateOf<String?>(null)
+    var currentZone by mutableStateOf<DropZone>(DropZone.None)
+    var pointerYInList by mutableStateOf(0f)
+    var rootTop by mutableStateOf(0f)
+
+    // The root Box's left edge in root coordinates, so the interceptor (which spans the full
+    // list width, not just the handle column) can bound a touch-down against each handle's
+    // x-extent and not just its y-band — a touch on row content at the same y as a handle must
+    // not read as "on the handle" (DRAG-UI-001/DRAG-UI-016).
+    var rootLeft by mutableStateOf(0f)
+    var draggingPointerId by mutableStateOf<PointerId?>(null)
+
+    // Non-null from the moment of drop until the caller calls the onSettled callback passed
+    // alongside that drop's result (DRAG-UI-014) — the order the list had at the moment of drop,
+    // kept frozen so the list doesn't snap back to the caller's (still-stale) `items` and then
+    // re-animate forward the instant `items` catches up. Also gates new pickups: see the
+    // exclusivity overlay and the interceptor in [DragReorderList].
+    var settledDisplayOrder by mutableStateOf<List<FlatNode>?>(null)
+
+    // The order the current layout actually reflects — what listState.layoutInfo's indices point
+    // into. [resolveTargetAndZone] hit-tests against this, not the live displayOrder, because the
+    // pointer coroutine runs ahead of layout: displayOrder can already describe an arrangement
+    // that hasn't been laid out yet, so hit-testing it against the still-old layoutInfo indices
+    // would resolve the wrong target/zone. [DragReorderList] advances this from a SideEffect, so
+    // it trails displayOrder by a frame in step with layout (see the note there).
+    var renderedOrder by mutableStateOf<List<FlatNode>>(emptyList())
+
+    // Each visible row's drag-handle icon bounds, so the interceptor can tell whether a
+    // touch-down landed on a handle (start a drag) versus elsewhere (fall through to scroll).
+    // Each row prunes its own entry on disposal, so the map tracks live rows, not every id seen.
+    val handleCoordinates = mutableMapOf<String, LayoutCoordinates>()
+
+    fun pickUp(rowId: String, rowOffset: Int, rowSize: Int) {
+        draggedId = rowId
+        dragDelta = Offset.Zero
+        currentTargetId = null
+        currentZone = DropZone.None
+        dragStartPosition = Offset(0f, rowOffset.toFloat())
+        dragRowSize = IntSize(0, rowSize)
+        pointerYInList = rowOffset + rowSize / 2f
+    }
+
+    fun onDragMove(change: PointerInputChange, amount: Offset, haptics: HapticFeedback) {
+        change.consume()
+        draggingPointerId = change.id
+        dragDelta += amount
+        dragStartPosition?.let { start ->
+            pointerYInList = start.y + dragDelta.y + dragRowSize.height / 2f
+        }
+        resolveTargetAndZone(haptics)
+    }
+
+    // The picked-up row is read from live state (draggedId / renderedOrder / currentTargetId
+    // / currentZone), never from a closure, so the single interceptor coroutine hosting the call
+    // is correct regardless of which row was grabbed. `currentItems` and `onMove` are passed in
+    // (rather than captured) for the same reason — see the class KDoc.
+    fun endDragAndMaybeMove(
+        currentItems: List<FlatNode>,
+        haptics: HapticFeedback,
+        onMove: (result: DragMoveResult, onSettled: () -> Unit) -> Unit,
+    ) {
+        val finalDraggedId = draggedId
+        val finalTarget = currentTargetId
+        val finalZone = currentZone
+        if (finalDraggedId != null && finalTarget != null) {
+            computeMoveResult(currentItems, finalDraggedId, finalTarget, finalZone)?.let { result ->
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                settledDisplayOrder =
+                    hypotheticalOrder(currentItems, finalDraggedId, finalTarget, finalZone)
+                onMove(result) { settledDisplayOrder = null }
+            }
+        }
+        reset()
+    }
+
+    fun cancelDrag() = reset()
+
+    // Recomputes everything from live state (draggedId / renderedOrder / currentTargetId /
+    // currentZone) rather than closing over outer vals — this is called from the pointerInput
+    // coroutine, launched once per row and never relaunched, so every read must go through live
+    // state or it stays bound to the row's first-composition closure.
+    private fun resolveTargetAndZone(haptics: HapticFeedback) {
+        val dId = draggedId ?: return
+        val order = renderedOrder
+        if (order.none { it.id == dId }) return
+        val visible = listState.layoutInfo.visibleItemsInfo.map {
+            VisibleRowGeometry(it.index, it.offset, it.size)
+        }
+        val (resolvedTarget, resolvedZone) = computeDragTarget(
+            order = order,
+            draggedId = dId,
+            pointerYInList = pointerYInList,
+            visible = visible,
+            canScrollForward = listState.canScrollForward,
+            currentTargetId = currentTargetId,
+            currentZone = currentZone,
+        )
+        if (resolvedTarget != currentTargetId || resolvedZone != currentZone) {
+            if (resolvedTarget != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            currentTargetId = resolvedTarget
+            currentZone = resolvedZone
+        }
+    }
+
+    private fun reset() {
+        draggedId = null
+        currentTargetId = null
+        currentZone = DropZone.None
+        dragDelta = Offset.Zero
+        draggingPointerId = null
+    }
+}
+
+/** Creates a [DragReorderState] scoped to the calling composition, retaining its scroll position. */
+@Composable
+private fun rememberDragReorderState(): DragReorderState {
+    val listState = rememberLazyListState()
+    return remember(listState) { DragReorderState(listState) }
+}
+
+/**
  * A drag-to-reorder list over an ordered tree of [DragListItem]s. A row is picked up by its
  * trailing drag handle and dragged to reorder among siblings or re-parent (nest / promote);
  * the rest of the list reflows live to show where a drop would land. Knows nothing about the
@@ -460,36 +603,11 @@ fun DragReorderList(
     modifier: Modifier = Modifier,
     content: @Composable (DragListItem) -> Unit,
 ) {
-    val listState = rememberLazyListState()
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
+    val state = rememberDragReorderState()
+    val listState = state.listState
 
-    var draggedId by remember { mutableStateOf<String?>(null) }
-    var dragDelta by remember { mutableStateOf(Offset.Zero) }
-    var dragStartPosition by remember { mutableStateOf<Offset?>(null) }
-    var dragRowSize by remember { mutableStateOf(IntSize.Zero) }
-    var currentTargetId by remember { mutableStateOf<String?>(null) }
-    var currentZone by remember { mutableStateOf<DropZone>(DropZone.None) }
-    var pointerYInList by remember { mutableStateOf(0f) }
-    var rootTop by remember { mutableStateOf(0f) }
-    // The root Box's left edge in root coordinates, so the interceptor (which spans the
-    // full list width, not just the handle column) can bound a touch-down against each
-    // handle's x-extent and not just its y-band — a touch on row content at the same y as
-    // a handle must not read as "on the handle" (DRAG-UI-001/DRAG-UI-016).
-    var rootLeft by remember { mutableStateOf(0f) }
-    var draggingPointerId by remember { mutableStateOf<PointerId?>(null) }
-    // Non-null from the moment of drop until the caller calls the onSettled callback
-    // passed alongside that drop's result (DRAG-UI-014) — the order the list had at the
-    // moment of drop, kept frozen so the list doesn't snap back to the caller's
-    // (still-stale) `items` and then re-animate forward the instant `items` catches up.
-    // Also gates new pickups: see the exclusivity overlay and onDragStart below.
-    var settledDisplayOrder by remember { mutableStateOf<List<FlatNode>?>(null) }
-    // Each visible row's drag-handle icon bounds, so the interceptor can tell whether a
-    // touch-down actually landed on a handle (start a drag) versus elsewhere in the list
-    // (let it fall through to the list's own scroll). Only visible rows' handles are looked
-    // up; each row prunes its own entry on disposal (DisposableEffect in the item lambda), so
-    // the map tracks live rows rather than every id seen this session.
-    val handleCoordinates = remember { mutableMapOf<String, LayoutCoordinates>() }
     // The drag math runs over the internal flattened representation; the public `items` tree
     // is flattened on input (DragListItem -> FlatNode). The interceptor's pointerInput
     // coroutine is launched once (keyed on Unit) and never relaunched, so anything it reads
@@ -500,7 +618,8 @@ fun DragReorderList(
     // the caller's `content`, which takes a (tree) DragListItem.
     val sourceNodes = remember(items) { nodesById(items) }
 
-    val draggedIndex = draggedId?.let { id -> currentItems.indexOfFirst { it.id == id } } ?: -1
+    val draggedIndex =
+        state.draggedId?.let { id -> currentItems.indexOfFirst { it.id == id } } ?: -1
     val draggedItem = if (draggedIndex >= 0) currentItems[draggedIndex] else null
     val draggedHasChildren = if (draggedIndex >= 0) hasChildrenStructurally(
         currentItems,
@@ -509,106 +628,38 @@ fun DragReorderList(
     ) else false
 
     val displayOrder = when {
-        draggedId != null && currentTargetId != null ->
-            hypotheticalOrder(currentItems, draggedId!!, currentTargetId!!, currentZone)
+        state.draggedId != null && state.currentTargetId != null ->
+            hypotheticalOrder(
+                currentItems, state.draggedId!!, state.currentTargetId!!, state.currentZone
+            )
 
-        settledDisplayOrder != null -> settledDisplayOrder!!
+        state.settledDisplayOrder != null -> state.settledDisplayOrder!!
         else -> currentItems
     }
 
-    // The single source of truth for "what's actually on screen right now" — mirrored
-    // from displayOrder below, once per settled composition. resolveTargetAndZone reads
-    // this instead of recomputing the hypothetical order live from currentTargetId/
-    // currentZone: several pointer-move events can fire within one un-recomposed frame,
-    // and each one recomputing its own fresh hypothetical order would get hit-tested
-    // against listState.layoutInfo indices that still belong to the *previous* frame's
-    // layout — a mismatch that reads as the wrong target/zone, flickering haptics, and a
-    // floating row that appears to jump. Tying hit-testing to the order that's actually
-    // rendered means a pointer move that lands within the dragged row's new, not-yet-
-    // laid-out position has no effect until the layout catches up — nothing is rendered
-    // there yet to hit.
-    var lastRenderedOrder by remember { mutableStateOf(currentItems) }
-    SideEffect { lastRenderedOrder = displayOrder }
-
-    // Recomputes everything from live state (draggedId / lastRenderedOrder / currentTargetId
-    // / currentZone) rather than closing over outer `val`s like `draggedItem`/`displayOrder` —
-    // this function is called from the pointerInput coroutine below, which is launched once
-    // per row and never relaunched, so it stays bound to whichever closure it captured on
-    // the row's *first* composition unless every read here goes through live state.
-    fun resolveTargetAndZone() {
-        val dId = draggedId ?: return
-        val order = lastRenderedOrder
-        if (order.none { it.id == dId }) return
-        val visible = listState.layoutInfo.visibleItemsInfo.map {
-            VisibleRowGeometry(it.index, it.offset, it.size)
-        }
-        val (resolvedTarget, resolvedZone) = computeDragTarget(
-            order = order,
-            draggedId = dId,
-            pointerYInList = pointerYInList,
-            visible = visible,
-            canScrollForward = listState.canScrollForward,
-            currentTargetId = currentTargetId,
-            currentZone = currentZone,
-        )
-        if (resolvedTarget != currentTargetId || resolvedZone != currentZone) {
-            if (resolvedTarget != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            currentTargetId = resolvedTarget
-            currentZone = resolvedZone
-        }
-    }
-
-    // The drop/cancel/move-step handlers read nothing about the picked-up row from a closure;
-    // they all go through live state (draggedId / currentTargetId / currentZone / currentItems),
-    // so the single interceptor coroutine hosting them is correct regardless of which row was
-    // grabbed.
-    fun endDragAndMaybeMove() {
-        val finalDraggedId = draggedId
-        val finalTarget = currentTargetId
-        val finalZone = currentZone
-        if (finalDraggedId != null && finalTarget != null) {
-            computeMoveResult(currentItems, finalDraggedId, finalTarget, finalZone)?.let { result ->
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                settledDisplayOrder =
-                    hypotheticalOrder(currentItems, finalDraggedId, finalTarget, finalZone)
-                onMove(result) { settledDisplayOrder = null }
-            }
-        }
-        draggedId = null
-        currentTargetId = null
-        currentZone = DropZone.None
-        dragDelta = Offset.Zero
-        draggingPointerId = null
-    }
-
-    fun cancelDrag() {
-        draggedId = null
-        currentTargetId = null
-        currentZone = DropZone.None
-        dragDelta = Offset.Zero
-        draggingPointerId = null
-    }
-
-    fun onDragMove(change: PointerInputChange, amount: Offset) {
-        change.consume()
-        draggingPointerId = change.id
-        dragDelta += amount
-        dragStartPosition?.let { start ->
-            pointerYInList = start.y + dragDelta.y + dragRowSize.height / 2f
-        }
-        resolveTargetAndZone()
-    }
+    // Advance the holder's renderedOrder to match this composition's displayOrder — but from a
+    // SideEffect, which runs only after the composition commits and its layout is applied (and
+    // only for the composition that actually commits, not a superseded one). So renderedOrder
+    // doesn't jump forward the instant displayOrder is recomputed; it advances on the frame
+    // boundary, staying in step with what listState.layoutInfo reflects. That one-frame trail is
+    // the point: the pointer coroutine reading renderedOrder mid-frame sees the order actually
+    // laid out, so a move that lands in the dragged row's new, not-yet-laid-out slot has no
+    // effect until layout catches up — nothing is rendered there yet to hit. Writing displayOrder
+    // in directly (during composition) would instead race ahead of the layout it's hit-tested
+    // against, reading as the wrong target/zone, flickering haptics, and a jumping floating row.
+    SideEffect { state.renderedOrder = displayOrder }
 
     // @spec DRAG-UI-004
-    LaunchedEffect(draggedId) {
+    LaunchedEffect(state.draggedId) {
         val edgePx = with(density) { 64.dp.toPx() }
-        while (isActive && draggedId != null) {
+        while (isActive && state.draggedId != null) {
             val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
             when {
-                pointerYInList < edgePx && listState.canScrollBackward -> listState.scrollBy(-10f)
-                pointerYInList > viewportHeight - edgePx && listState.canScrollForward -> listState.scrollBy(
-                    10f
-                )
+                state.pointerYInList < edgePx && listState.canScrollBackward ->
+                    listState.scrollBy(-10f)
+
+                state.pointerYInList > viewportHeight - edgePx && listState.canScrollForward ->
+                    listState.scrollBy(10f)
             }
             delay(16)
         }
@@ -616,8 +667,8 @@ fun DragReorderList(
 
     Box(
         modifier = modifier.onGloballyPositioned {
-            rootTop = it.positionInRoot().y
-            rootLeft = it.positionInRoot().x
+            state.rootTop = it.positionInRoot().y
+            state.rootLeft = it.positionInRoot().x
         },
     ) {
         // @spec DRAG-UI-001, DRAG-UI-015, DRAG-UI-016 — the drag gesture, hosted on the
@@ -645,22 +696,22 @@ fun DragReorderList(
                     )
                     // Settling (DRAG-UI-014) blocks new pickups; leave the touch for the
                     // exclusivity overlay, which is consuming it anyway.
-                    if (settledDisplayOrder != null) continue
+                    if (state.settledDisplayOrder != null) continue
 
                     // down.position is in this node's (the LazyColumn's) local space,
                     // whose origin is the root Box's origin — so it's directly comparable
                     // to visibleItemsInfo offsets and to handle bounds expressed in that
                     // same (positionInRoot - rootTop/rootLeft) space.
-                    val order = lastRenderedOrder
+                    val order = state.renderedOrder
                     val x = down.position.x
                     val y = down.position.y
                     val hit = listState.layoutInfo.visibleItemsInfo
                         .firstOrNull { y >= it.offset && y < it.offset + it.size }
                     val rowId = hit?.let { order.getOrNull(it.index)?.id }
-                    val handle = rowId?.let { handleCoordinates[it] }
+                    val handle = rowId?.let { state.handleCoordinates[it] }
                     val overHandle = handle != null && run {
-                        val left = handle.positionInRoot().x - rootLeft
-                        val top = handle.positionInRoot().y - rootTop
+                        val left = handle.positionInRoot().x - state.rootLeft
+                        val top = handle.positionInRoot().y - state.rootTop
                         x >= left && x < left + handle.size.width &&
                                 y >= top && y < top + handle.size.height
                     }
@@ -690,13 +741,7 @@ fun DragReorderList(
                     }
                     if (!startedDrag) continue
 
-                    draggedId = rowId
-                    dragDelta = Offset.Zero
-                    currentTargetId = null
-                    currentZone = DropZone.None
-                    dragStartPosition = Offset(0f, hit.offset.toFloat())
-                    dragRowSize = IntSize(0, hit.size)
-                    pointerYInList = hit.offset + hit.size / 2f
+                    state.pickUp(rowId, hit.offset, hit.size)
 
                     // Drive the drag on the Initial pass too, so every move is consumed
                     // before the internal scroll can act on it — the drag stays exclusive
@@ -709,10 +754,11 @@ fun DragReorderList(
                             completed = true
                             break
                         }
-                        onDragMove(change, change.positionChange())
+                        state.onDragMove(change, change.positionChange(), haptics)
                         change.consume()
                     }
-                    if (completed) endDragAndMaybeMove() else cancelDrag()
+                    if (completed) state.endDragAndMaybeMove(currentItems, haptics, onMove)
+                    else state.cancelDrag()
                 }
             }
         }
@@ -725,11 +771,11 @@ fun DragReorderList(
                 // stable row id, outside AnimatedVisibility so a collapse (which is not a
                 // disposal) doesn't drop a still-present row's bounds.
                 DisposableEffect(item.id) {
-                    onDispose { handleCoordinates.remove(item.id) }
+                    onDispose { state.handleCoordinates.remove(item.id) }
                 }
-                val isDraggedRow = item.id == draggedId
+                val isDraggedRow = item.id == state.draggedId
                 val parentId = if (item.depth > 0) groupAnchorOf(displayOrder, item.id) else null
-                val collapsed = draggedId != null && parentId != null && draggedItem != null &&
+                val collapsed = state.draggedId != null && parentId != null && draggedItem != null &&
                         shouldCollapseChildrenOf(parentId, draggedItem, draggedHasChildren)
                 // Animated, not a plain value: the row's *position* already glides smoothly
                 // via Modifier.animateItem() below, but depth (and so indent) can change in
@@ -757,7 +803,7 @@ fun DragReorderList(
                             // is communicated by this placeholder's own indentation (one
                             // level deeper than the target) alone — no separate highlight on
                             // the target row itself (DRAG-UI-003).
-                            val placeholderHeight = with(density) { dragRowSize.height.toDp() }
+                            val placeholderHeight = with(density) { state.dragRowSize.height.toDp() }
                             val placeholderShape = RoundedCornerShape(8.dp)
                             Box(
                                 modifier = Modifier
@@ -794,7 +840,7 @@ fun DragReorderList(
                                 contentDescription = stringResource(R.string.cd_drag_handle),
                                 modifier = Modifier
                                     .testTag("drag_handle_${item.id}")
-                                    .onGloballyPositioned { handleCoordinates[item.id] = it }
+                                    .onGloballyPositioned { state.handleCoordinates[item.id] = it }
                                     .size(48.dp)
                                     .alpha(if (isDraggedRow) 0f else 1f)
                                     // Padding comes after the size so it only shrinks what's
@@ -815,17 +861,17 @@ fun DragReorderList(
         // settling (draggingPointerId is null by then, so every touch — including a new
         // pickup attempt — gets consumed; the interceptor also declines pickups while
         // settledDisplayOrder is non-null).
-        if (draggedId != null || settledDisplayOrder != null) {
+        if (state.draggedId != null || state.settledDisplayOrder != null) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .zIndex(1f)
-                    .pointerInput(draggedId, settledDisplayOrder != null) {
+                    .pointerInput(state.draggedId, state.settledDisplayOrder != null) {
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent()
                                 event.changes.forEach { change ->
-                                    if (change.id != draggingPointerId) change.consume()
+                                    if (change.id != state.draggingPointerId) change.consume()
                                 }
                             }
                         }
@@ -834,8 +880,8 @@ fun DragReorderList(
         }
 
         // @spec DRAG-UI-002
-        if (draggedItem != null && dragStartPosition != null) {
-            val start = dragStartPosition!!
+        if (draggedItem != null && state.dragStartPosition != null) {
+            val start = state.dragStartPosition!!
             Surface(
                 tonalElevation = 8.dp,
                 shadowElevation = 8.dp,
@@ -843,8 +889,8 @@ fun DragReorderList(
                     .zIndex(2f)
                     .offset {
                         IntOffset(
-                            (start.x + dragDelta.x).roundToInt(),
-                            (start.y + dragDelta.y).roundToInt()
+                            (start.x + state.dragDelta.x).roundToInt(),
+                            (start.y + state.dragDelta.y).roundToInt()
                         )
                     },
             ) {
