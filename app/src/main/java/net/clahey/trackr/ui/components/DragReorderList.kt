@@ -645,15 +645,18 @@ fun DragReorderList(
 
     // @spec DRAG-UI-004
     LaunchedEffect(state.draggedId) {
-        val edgePx = with(density) { 64.dp.toPx() }
+        val maxEdgePx = with(density) { 64.dp.toPx() }
+        val scrollStepPx = with(density) { 4.dp.toPx() }
         while (isActive && state.draggedId != null) {
             val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
+            // Clamp so the top and bottom edge zones can't overlap in a short viewport.
+            val edgePx = maxEdgePx.coerceAtMost(viewportHeight / 2f)
             when {
                 state.pointerYInList < edgePx && listState.canScrollBackward ->
-                    listState.scrollBy(-10f)
+                    listState.scrollBy(-scrollStepPx)
 
                 state.pointerYInList > viewportHeight - edgePx && listState.canScrollForward ->
-                    listState.scrollBy(10f)
+                    listState.scrollBy(scrollStepPx)
             }
             delay(16)
         }
