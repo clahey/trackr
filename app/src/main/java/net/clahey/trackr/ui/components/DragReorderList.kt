@@ -489,13 +489,14 @@ internal class DragReorderState(val listState: LazyListState) {
     // Each row prunes its own entry on disposal, so the map tracks live rows, not every id seen.
     val handleCoordinates = mutableMapOf<String, LayoutCoordinates>()
 
-    fun pickUp(rowId: String, rowOffset: Int, rowSize: Int) {
+    fun pickUp(rowId: String) {
+        val row = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == rowId } ?: return
         draggedId = rowId
         dragDelta = Offset.Zero
         currentTarget = null
-        dragStartPosition = Offset(0f, rowOffset.toFloat())
-        dragRowSize = IntSize(0, rowSize)
-        pointerYInList = rowOffset + rowSize / 2f
+        dragStartPosition = Offset(0f, row.offset.toFloat())
+        dragRowSize = IntSize(0, row.size)
+        pointerYInList = row.offset + row.size / 2f
     }
 
     fun onDragMove(change: PointerInputChange, amount: Offset, haptics: HapticFeedback) {
@@ -698,8 +699,6 @@ fun DragReorderList(
                     // unconsumed so the list scrolls it instead (DRAG-UI-016 / DRAG-UI-001).
                     if (hitHandle == null || listState.layoutInfo.totalItemsCount <= 1) continue
                     val rowId = hitHandle.key
-                    val row = listState.layoutInfo.visibleItemsInfo
-                        .firstOrNull { it.key == rowId } ?: continue
 
                     // On a handle: claim the gesture on the Initial pass so the internal
                     // scroll never starts, and wait for slop before committing to a drag
@@ -721,7 +720,7 @@ fun DragReorderList(
                     }
                     if (!startedDrag) continue
 
-                    state.pickUp(rowId, row.offset, row.size)
+                    state.pickUp(rowId)
 
                     // Drive the drag on the Initial pass too, so every move is consumed
                     // before the internal scroll can act on it — the drag stays exclusive
