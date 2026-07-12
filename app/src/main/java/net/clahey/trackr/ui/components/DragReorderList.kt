@@ -124,7 +124,6 @@ internal sealed class DropZone {
     data object Before : DropZone()
     data object After : DropZone()
     data object Nest : DropZone()
-    data object None : DropZone()
 }
 
 /**
@@ -202,10 +201,11 @@ internal fun hasChildrenStructurally(
 
 /**
  * Resolves which [DropZone] the pointer is in over a target row, from the row's vertical band
- * geometry. The band layout depends on the target's role: a target that can't have children
- * is a 50/50 before/after split; a nest-eligible target is 25/50/25 when childless and 50/50
- * (before / nest-as-first-child) when it already has children; an ineligible drag
- * (`draggedCanBecomeChild = false`) never offers a nest band. See
+ * geometry, or null when the row offers no valid zone for this drag (an ineligible drag over a
+ * target that can't have children). The band layout depends on the target's role: a target that
+ * can't have children is a 50/50 before/after split; a nest-eligible target is 25/50/25 when
+ * childless and 50/50 (before / nest-as-first-child) when it already has children; an ineligible
+ * drag (`draggedCanBecomeChild = false`) never offers a nest band. See
  * `docs/llds/drag-reorder-list.md` § Drop Zone Geometry.
  *
  * @param targetCanHaveChildren whether the target row can accept a nest-drop
@@ -219,9 +219,9 @@ internal fun dropZone(
     targetHasChildren: Boolean,
     draggedCanBecomeChild: Boolean,
     pointerFraction: Float,
-): DropZone {
+): DropZone? {
     if (!draggedCanBecomeChild) {
-        if (!targetCanHaveChildren) return DropZone.None
+        if (!targetCanHaveChildren) return null
         return if (pointerFraction < 0.5f) DropZone.Before else DropZone.After
     }
     if (!targetCanHaveChildren) {
@@ -242,10 +242,10 @@ internal fun dropZone(
 internal fun computeMoveResult(
     items: List<FlatNode>,
     draggedId: String,
-    targetId: String,
-    zone: DropZone,
+    target: DropTarget,
 ): DragMoveResult? {
-    if (zone == DropZone.None || targetId == draggedId) return null
+    val (targetId, zone) = target
+    if (targetId == draggedId) return null
     return when (zone) {
         DropZone.Nest -> {
             val children = childrenOf(items, targetId).filter { it.id != draggedId }.map { it.id }
@@ -260,8 +260,6 @@ internal fun computeMoveResult(
             val ordered = siblingIds.toMutableList().apply { add(insertPos, draggedId) }
             DragMoveResult(draggedId, groupAnchorOf(items, targetId), ordered)
         }
-
-        DropZone.None -> null
     }
 }
 
@@ -283,17 +281,17 @@ private fun countDescendants(items: List<FlatNode>, index: Int): Int {
 }
 
 /**
- * The full flattened list as it would read if dropped at [targetId]/[zone] right now —
- * drives the live-reflow animation. Returns [items] unchanged for an invalid drop.
+ * The full flattened list as it would read if dropped at [target] right now — drives the
+ * live-reflow animation. Returns [items] unchanged for an invalid drop.
  */
 // @spec DRAG-UI-002
 internal fun hypotheticalOrder(
     items: List<FlatNode>,
     draggedId: String,
-    targetId: String,
-    zone: DropZone,
+    target: DropTarget,
 ): List<FlatNode> {
-    if (zone == DropZone.None || targetId == draggedId) return items
+    val (targetId, zone) = target
+    if (targetId == draggedId) return items
     val draggedIndex = items.indexOfFirst { it.id == draggedId }
     val draggedItem = items[draggedIndex]
     val subtreeEnd = draggedIndex + 1 + countDescendants(items, draggedIndex)
@@ -312,7 +310,6 @@ internal fun hypotheticalOrder(
         DropZone.Before -> targetIndex
         DropZone.Nest -> targetIndex + 1
         DropZone.After -> targetIndex + 1 + countDescendants(remaining, targetIndex)
-        DropZone.None -> targetIndex + 1 // unreachable — zone == None returned early above
     }
     return remaining.toMutableList().apply { addAll(insertionIndex, movedSubtree) }
 }
@@ -335,11 +332,14 @@ internal fun shouldCollapseChildrenOf(
 /** A visible row's position/size within the list, as reported by `LazyListItemInfo`. */
 internal data class VisibleRowGeometry(val index: Int, val offset: Int, val size: Int)
 
+/** A drop position: the target row's id and the zone within it. */
+internal data class DropTarget(val id: String, val zone: DropZone)
+
 /**
- * The raw (target, zone) the pointer is over right now, against [order] — the order
- * actually currently rendered (so [visible]'s indices stay valid against it). Returns
- * null when there's nothing to report: nothing hit, the hit row offers no valid zone, or
- * the hit row is the dragged row's own already-relocated placeholder.
+ * The raw drop position the pointer is over right now, against [order] — the order actually
+ * currently rendered (so [visible]'s indices stay valid against it). Returns null when there's
+ * nothing to report: nothing hit, the hit row offers no valid zone, or the hit row is the
+ * dragged row's own already-relocated placeholder.
  */
 private fun resolveHitDropCandidate(
     order: List<FlatNode>,
@@ -347,7 +347,7 @@ private fun resolveHitDropCandidate(
     pointerYInList: Float,
     visible: List<VisibleRowGeometry>,
     canScrollForward: Boolean,
-): Pair<String, DropZone>? {
+): DropTarget? {
     val hit =
         visible.firstOrNull { pointerYInList >= it.offset && pointerYInList < it.offset + it.size }
     if (hit != null) {
@@ -356,14 +356,15 @@ private fun resolveHitDropCandidate(
         val dItem = order.firstOrNull { it.id == draggedId } ?: return null
         val fraction = ((pointerYInList - hit.offset) / hit.size.toFloat()).coerceIn(0f, 1f)
         val targetHasChildren = hasChildrenStructurally(order, hit.index, excludeId = draggedId)
-        val zone =
-            dropZone(targetItem.canHaveChildren, targetHasChildren, dItem.canBecomeChild, fraction)
-        return if (zone != DropZone.None) targetItem.id to zone else null
+        val zone = dropZone(
+            targetItem.canHaveChildren, targetHasChildren, dItem.canBecomeChild, fraction
+        ) ?: return null
+        return DropTarget(targetItem.id, zone)
     }
     val lastInfo = visible.lastOrNull()
     if (lastInfo != null && pointerYInList >= lastInfo.offset + lastInfo.size && !canScrollForward) {
         val lastTopLevel = order.lastOrNull { it.depth == 0 && it.id != draggedId }
-        if (lastTopLevel != null) return lastTopLevel.id to DropZone.After
+        if (lastTopLevel != null) return DropTarget(lastTopLevel.id, DropZone.After)
     }
     return null
 }
@@ -388,7 +389,7 @@ private fun identityMoveResult(order: List<FlatNode>, draggedId: String): DragMo
  * pointer, against [order] — the order actually currently rendered (so [visible]'s
  * indices stay valid against it).
  *
- * Returns [currentTargetId]/[currentZone] **unchanged** whenever there's no genuinely new
+ * Returns [current] **unchanged** whenever there's no genuinely new
  * *position* to report. That includes the obvious cases (nothing hit; the hit row offers
  * no valid zone — DRAG-UI-003: "the gap simply stays at its last valid position"; the hit
  * row is the dragged row's own already-relocated placeholder, which would otherwise reset
@@ -412,10 +413,8 @@ internal fun computeDragTarget(
     pointerYInList: Float,
     visible: List<VisibleRowGeometry>,
     canScrollForward: Boolean,
-    currentTargetId: String?,
-    currentZone: DropZone,
-): Pair<String?, DropZone> {
-    val unchanged = currentTargetId to currentZone
+    current: DropTarget?,
+): DropTarget? {
     val candidate = resolveHitDropCandidate(
         order,
         draggedId,
@@ -423,20 +422,19 @@ internal fun computeDragTarget(
         visible,
         canScrollForward
     )
-        ?: return unchanged
-    if (candidate == unchanged) return unchanged
-    val (candidateId, candidateZone) = candidate
-    val candidateResult = computeMoveResult(order, draggedId, candidateId, candidateZone)
+        ?: return current
+    if (candidate == current) return current
+    val candidateResult = computeMoveResult(order, draggedId, candidate)
         ?: return candidate
-    val baselineResult = if (currentTargetId != null) {
-        computeMoveResult(order, draggedId, currentTargetId, currentZone)
+    val baselineResult = if (current != null) {
+        computeMoveResult(order, draggedId, current)
     } else {
         identityMoveResult(order, draggedId)
     }
     // Same resulting drop position (movedId is draggedId in both, so structural equality
     // on the whole result is equivalent to comparing parent + sibling order) — treat as no
-    // change: no haptic, no target/zone write.
-    return if (candidateResult == baselineResult) unchanged else candidate
+    // change: no haptic, no target write.
+    return if (candidateResult == baselineResult) current else candidate
 }
 
 /**
@@ -459,8 +457,7 @@ internal class DragReorderState(val listState: LazyListState) {
     var dragDelta by mutableStateOf(Offset.Zero)
     var dragStartPosition by mutableStateOf<Offset?>(null)
     var dragRowSize by mutableStateOf(IntSize.Zero)
-    var currentTargetId by mutableStateOf<String?>(null)
-    var currentZone by mutableStateOf<DropZone>(DropZone.None)
+    var currentTarget by mutableStateOf<DropTarget?>(null)
     var pointerYInList by mutableStateOf(0f)
 
     // The root Box's origin in root coordinates. The interceptor spans the full list width (not
@@ -494,8 +491,7 @@ internal class DragReorderState(val listState: LazyListState) {
     fun pickUp(rowId: String, rowOffset: Int, rowSize: Int) {
         draggedId = rowId
         dragDelta = Offset.Zero
-        currentTargetId = null
-        currentZone = DropZone.None
+        currentTarget = null
         dragStartPosition = Offset(0f, rowOffset.toFloat())
         dragRowSize = IntSize(0, rowSize)
         pointerYInList = rowOffset + rowSize / 2f
@@ -511,23 +507,22 @@ internal class DragReorderState(val listState: LazyListState) {
         resolveTargetAndZone(haptics)
     }
 
-    // The picked-up row is read from live state (draggedId / renderedOrder / currentTargetId
-    // / currentZone), never from a closure, so the single interceptor coroutine hosting the call
-    // is correct regardless of which row was grabbed. `currentItems` and `onMove` are passed in
-    // (rather than captured) for the same reason — see the class KDoc.
+    // The picked-up row is read from live state (draggedId / renderedOrder / currentTarget),
+    // never from a closure, so the single interceptor coroutine hosting the call is correct
+    // regardless of which row was grabbed. `currentItems` and `onMove` are passed in (rather than
+    // captured) for the same reason — see the class KDoc.
     fun endDragAndMaybeMove(
         currentItems: List<FlatNode>,
         haptics: HapticFeedback,
         onMove: (result: DragMoveResult, onSettled: () -> Unit) -> Unit,
     ) {
         val finalDraggedId = draggedId
-        val finalTarget = currentTargetId
-        val finalZone = currentZone
+        val finalTarget = currentTarget
         if (finalDraggedId != null && finalTarget != null) {
-            computeMoveResult(currentItems, finalDraggedId, finalTarget, finalZone)?.let { result ->
+            computeMoveResult(currentItems, finalDraggedId, finalTarget)?.let { result ->
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 settledDisplayOrder =
-                    hypotheticalOrder(currentItems, finalDraggedId, finalTarget, finalZone)
+                    hypotheticalOrder(currentItems, finalDraggedId, finalTarget)
                 onMove(result) { settledDisplayOrder = null }
             }
         }
@@ -536,10 +531,10 @@ internal class DragReorderState(val listState: LazyListState) {
 
     fun cancelDrag() = reset()
 
-    // Recomputes everything from live state (draggedId / renderedOrder / currentTargetId /
-    // currentZone) rather than closing over outer vals — this is called from the pointerInput
-    // coroutine, launched once per row and never relaunched, so every read must go through live
-    // state or it stays bound to the row's first-composition closure.
+    // Recomputes everything from live state (draggedId / renderedOrder / currentTarget) rather
+    // than closing over outer vals — this is called from the pointerInput coroutine, launched
+    // once per row and never relaunched, so every read must go through live state or it stays
+    // bound to the row's first-composition closure.
     private fun resolveTargetAndZone(haptics: HapticFeedback) {
         val dId = draggedId ?: return
         val order = renderedOrder
@@ -547,26 +542,23 @@ internal class DragReorderState(val listState: LazyListState) {
         val visible = listState.layoutInfo.visibleItemsInfo.map {
             VisibleRowGeometry(it.index, it.offset, it.size)
         }
-        val (resolvedTarget, resolvedZone) = computeDragTarget(
+        val resolved = computeDragTarget(
             order = order,
             draggedId = dId,
             pointerYInList = pointerYInList,
             visible = visible,
             canScrollForward = listState.canScrollForward,
-            currentTargetId = currentTargetId,
-            currentZone = currentZone,
+            current = currentTarget,
         )
-        if (resolvedTarget != currentTargetId || resolvedZone != currentZone) {
-            if (resolvedTarget != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            currentTargetId = resolvedTarget
-            currentZone = resolvedZone
+        if (resolved != currentTarget) {
+            if (resolved != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            currentTarget = resolved
         }
     }
 
     private fun reset() {
         draggedId = null
-        currentTargetId = null
-        currentZone = DropZone.None
+        currentTarget = null
         dragDelta = Offset.Zero
         draggingPointerId = null
     }
@@ -627,11 +619,11 @@ fun DragReorderList(
         excludeId = null
     ) else false
 
+    val draggedId = state.draggedId
+    val currentTarget = state.currentTarget
     val displayOrder = when {
-        state.draggedId != null && state.currentTargetId != null ->
-            hypotheticalOrder(
-                currentItems, state.draggedId!!, state.currentTargetId!!, state.currentZone
-            )
+        draggedId != null && currentTarget != null ->
+            hypotheticalOrder(currentItems, draggedId, currentTarget)
 
         state.settledDisplayOrder != null -> state.settledDisplayOrder!!
         else -> currentItems
