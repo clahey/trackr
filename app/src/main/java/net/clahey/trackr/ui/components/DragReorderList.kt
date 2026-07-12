@@ -695,9 +695,9 @@ fun DragReorderList(
                     val hitHandle = state.handleCoordinates.entries.firstOrNull { (_, coords) ->
                         coords.isAttached && coords.boundsInRoot().contains(pointerInRoot)
                     }
-                    // A miss (or a single-row list, which draws no handle) leaves the down
-                    // unconsumed so the list scrolls it instead (DRAG-UI-016 / DRAG-UI-001).
-                    if (hitHandle == null || listState.layoutInfo.totalItemsCount <= 1) continue
+                    // A miss leaves the down unconsumed so the list scrolls it (DRAG-UI-016); a
+                    // single-row list draws no handle, so it misses here too (DRAG-UI-001).
+                    if (hitHandle == null) continue
                     val rowId = hitHandle.key
 
                     // On a handle: claim the gesture on the Initial pass so the internal
