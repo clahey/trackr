@@ -15,7 +15,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -41,13 +40,13 @@ class CategoryListViewModelDragTest {
     // @spec CAT-UI-002, CAT-UI-080, CAT-UI-082
     @Test fun `onDragMove reorders top-level MetaCategories without changing parent and settles immediately`() = runTest {
         repo.setCategories(makeMetaCategory("a", sortOrder = 0), makeMetaCategory("b", sortOrder = 1))
-        var settled = false
-        vm.onDragMove(DragMoveResult("b", null, listOf("b", "a"))) { settled = true }
+        var settledCount = 0
+        vm.onDragMove(DragMoveResult("b", null, listOf("b", "a"))) { settledCount++ }
         val cats = repo.getCategories().first().associateBy { it.id }
         assertEquals(0, cats["b"]!!.sortOrder)
         assertEquals(1, cats["a"]!!.sortOrder)
         assertNull(vm.pendingValueTypeConfirmation.value)
-        assertTrue("expected onSettled to have been called", settled)
+        assertEquals("expected onSettled to be called exactly once", 1, settledCount)
     }
 
     // @spec CAT-UI-002, CAT-UI-080
@@ -128,11 +127,11 @@ class CategoryListViewModelDragTest {
         val child = makeSubCategory("child", oldParent) // inherits None -> Text: reversible, no warning
         repo.setCategories(oldParent, newParent, child)
         repo.setEvents(Event("e1", "child", Instant.parse("2024-01-15T12:00:00Z"), null, null, emptyList(), Instant.parse("2024-01-15T12:00:00Z")))
-        var settled = false
-        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settled = true }
+        var settledCount = 0
+        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settledCount++ }
         assertNull(vm.pendingValueTypeConfirmation.value)
         assertEquals("newParent", (repo.getCategoryById("child").first() as Category.SubCategory).parent.id)
-        assertTrue("expected onSettled to have been called", settled)
+        assertEquals("expected onSettled to be called exactly once", 1, settledCount)
     }
 
     // @spec CAT-UI-081
@@ -153,13 +152,13 @@ class CategoryListViewModelDragTest {
         val child = makeSubCategory("child", oldParent)
         repo.setCategories(oldParent, newParent, child)
         repo.setEvents(Event("e1", "child", Instant.parse("2024-01-15T12:00:00Z"), null, null, emptyList(), Instant.parse("2024-01-15T12:00:00Z")))
-        var settled = false
-        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settled = true }
+        var settledCount = 0
+        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settledCount++ }
         val pending = vm.pendingValueTypeConfirmation.value
         assertEquals(ValueTypeWarningTier.Unsafe, pending?.tier)
         // Nothing persisted yet — the move is abandoned until the user confirms.
         assertEquals("oldParent", (repo.getCategoryById("child").first() as Category.SubCategory).parent.id)
-        assertFalse("onSettled should not fire until the dialog is resolved", settled)
+        assertEquals("onSettled should not fire until the dialog is resolved", 0, settledCount)
     }
 
     // @spec CAT-UI-081, CAT-UI-082
@@ -169,13 +168,13 @@ class CategoryListViewModelDragTest {
         val child = makeSubCategory("child", oldParent)
         repo.setCategories(oldParent, newParent, child)
         repo.setEvents(Event("e1", "child", Instant.parse("2024-01-15T12:00:00Z"), null, null, emptyList(), Instant.parse("2024-01-15T12:00:00Z")))
-        var settled = false
-        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settled = true }
-        assertFalse(settled)
+        var settledCount = 0
+        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settledCount++ }
+        assertEquals("onSettled should not fire until the dialog is resolved", 0, settledCount)
         vm.confirmPendingValueTypeChange()
         assertNull(vm.pendingValueTypeConfirmation.value)
         assertEquals("newParent", (repo.getCategoryById("child").first() as Category.SubCategory).parent.id)
-        assertTrue("expected onSettled to have been called after confirm", settled)
+        assertEquals("expected onSettled exactly once after confirm", 1, settledCount)
     }
 
     // @spec CAT-UI-082, CAT-UI-084
@@ -218,13 +217,13 @@ class CategoryListViewModelDragTest {
         val child = makeSubCategory("child", oldParent)
         repo.setCategories(oldParent, newParent, child)
         repo.setEvents(Event("e1", "child", Instant.parse("2024-01-15T12:00:00Z"), null, null, emptyList(), Instant.parse("2024-01-15T12:00:00Z")))
-        var settled = false
-        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settled = true }
-        assertFalse(settled)
+        var settledCount = 0
+        vm.onDragMove(DragMoveResult("child", "newParent", listOf("child"))) { settledCount++ }
+        assertEquals("onSettled should not fire until the dialog is resolved", 0, settledCount)
         vm.cancelPendingValueTypeChange()
         assertNull(vm.pendingValueTypeConfirmation.value)
         assertEquals("oldParent", (repo.getCategoryById("child").first() as Category.SubCategory).parent.id)
-        assertTrue("expected onSettled to have been called after cancel", settled)
+        assertEquals("expected onSettled exactly once after cancel", 1, settledCount)
     }
 
     // ---------- Helpers ----------
