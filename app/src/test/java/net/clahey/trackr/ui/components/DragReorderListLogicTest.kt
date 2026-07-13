@@ -89,38 +89,38 @@ class DragReorderListLogicTest {
     // @spec DRAG-UI-009
     @Test fun `dropZone offers no zone when dragged is ineligible and target can't have children`() {
         assertNull(
-            dropZone(targetCanHaveChildren = false, targetHasChildren = false, draggedCanBecomeChild = false, pointerFraction = 0.5f),
+            dropZone(targetCanHaveChildren = false, targetHasChildren = false, draggedCanBecomeChild = false, rowFraction = 0.5f),
         )
     }
 
     @Test fun `dropZone is before-after only when dragged is ineligible but target can have children`() {
         assertEquals(
             DropZone.Before,
-            dropZone(targetCanHaveChildren = true, targetHasChildren = true, draggedCanBecomeChild = false, pointerFraction = 0.1f),
+            dropZone(targetCanHaveChildren = true, targetHasChildren = true, draggedCanBecomeChild = false, rowFraction = 0.1f),
         )
         assertEquals(
             DropZone.After,
-            dropZone(targetCanHaveChildren = true, targetHasChildren = true, draggedCanBecomeChild = false, pointerFraction = 0.9f),
+            dropZone(targetCanHaveChildren = true, targetHasChildren = true, draggedCanBecomeChild = false, rowFraction = 0.9f),
         )
     }
 
     // @spec DRAG-UI-006
     @Test fun `dropZone on a row that can't have children is a plain 50-50 split`() {
-        assertEquals(DropZone.Before, dropZone(false, false, draggedCanBecomeChild = true, pointerFraction = 0.49f))
-        assertEquals(DropZone.After, dropZone(false, false, draggedCanBecomeChild = true, pointerFraction = 0.51f))
+        assertEquals(DropZone.Before, dropZone(false, false, draggedCanBecomeChild = true, rowFraction = 0.49f))
+        assertEquals(DropZone.After, dropZone(false, false, draggedCanBecomeChild = true, rowFraction = 0.51f))
     }
 
     // @spec DRAG-UI-007
     @Test fun `dropZone on a childless eligible target is a 25-50-25 split`() {
-        assertEquals(DropZone.Before, dropZone(true, targetHasChildren = false, draggedCanBecomeChild = true, pointerFraction = 0.1f))
-        assertEquals(DropZone.Nest, dropZone(true, targetHasChildren = false, draggedCanBecomeChild = true, pointerFraction = 0.5f))
-        assertEquals(DropZone.After, dropZone(true, targetHasChildren = false, draggedCanBecomeChild = true, pointerFraction = 0.9f))
+        assertEquals(DropZone.Before, dropZone(true, targetHasChildren = false, draggedCanBecomeChild = true, rowFraction = 0.1f))
+        assertEquals(DropZone.Nest, dropZone(true, targetHasChildren = false, draggedCanBecomeChild = true, rowFraction = 0.5f))
+        assertEquals(DropZone.After, dropZone(true, targetHasChildren = false, draggedCanBecomeChild = true, rowFraction = 0.9f))
     }
 
     // @spec DRAG-UI-008
     @Test fun `dropZone on an eligible target that already has children is before-or-nest only`() {
-        assertEquals(DropZone.Before, dropZone(true, targetHasChildren = true, draggedCanBecomeChild = true, pointerFraction = 0.1f))
-        assertEquals(DropZone.Nest, dropZone(true, targetHasChildren = true, draggedCanBecomeChild = true, pointerFraction = 0.9f))
+        assertEquals(DropZone.Before, dropZone(true, targetHasChildren = true, draggedCanBecomeChild = true, rowFraction = 0.1f))
+        assertEquals(DropZone.Nest, dropZone(true, targetHasChildren = true, draggedCanBecomeChild = true, rowFraction = 0.9f))
     }
 
     // @spec DRAG-UI-008
@@ -194,7 +194,7 @@ class DragReorderListLogicTest {
     @Test fun `computeDragTarget resolves a genuinely new valid zone`() {
         // Dragging C (eligible), hovering A (childless, eligible target) dead center -> Nest.
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = 50f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = 50f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = null,
         )
         assertEquals(DropTarget("A", DropZone.Nest), result)
@@ -212,7 +212,7 @@ class DragReorderListLogicTest {
             item("E", depth = 0, canHaveChildren = true),
         )
         val result = computeDragTarget(
-            order = order, draggedId = "C", pointerYInList = 150f, visible = standardGeometry,
+            order = order, draggedId = "C", y = 150f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = DropTarget("A", DropZone.Nest),
         )
         assertEquals(DropTarget("A", DropZone.Nest), result)
@@ -223,7 +223,7 @@ class DragReorderListLogicTest {
         // Dragging B (ineligible to become a child); hovering C, which can't have children,
         // offers no zone at all for an ineligible dragged row (dropZone returns None).
         val result = computeDragTarget(
-            order = fixture, draggedId = "B", pointerYInList = 250f, visible = standardGeometry,
+            order = fixture, draggedId = "B", y = 250f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = DropTarget("A", DropZone.Before),
         )
         assertEquals(DropTarget("A", DropZone.Before), result)
@@ -232,7 +232,7 @@ class DragReorderListLogicTest {
     // @spec DRAG-UI-019
     @Test fun `computeDragTarget clamps a pointer above the top edge to the top row`() {
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = -50f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = -50f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = DropTarget("E", DropZone.After),
         )
         assertEquals(DropTarget("A", DropZone.Before), result)
@@ -243,7 +243,7 @@ class DragReorderListLogicTest {
         // Viewport ends at 490, so the last row (E, 400..500) is partially below the fold and
         // more can still scroll in; a pointer far below resolves against E as though at the edge.
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = 5000f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = 5000f, visible = standardGeometry,
             canScrollForward = true, viewportHeight = 490f, current = null,
         )
         assertEquals(DropTarget("E", DropZone.After), result)
@@ -252,7 +252,7 @@ class DragReorderListLogicTest {
     // @spec DRAG-UI-010
     @Test fun `computeDragTarget falls back to end-of-list when past the last row and unable to scroll`() {
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = 600f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = 600f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = null,
         )
         assertEquals(DropTarget("E", DropZone.After), result)
@@ -260,7 +260,7 @@ class DragReorderListLogicTest {
 
     @Test fun `computeDragTarget does not fall back to end-of-list while more content can still scroll into view`() {
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = 600f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = 600f, visible = standardGeometry,
             canScrollForward = true, viewportHeight = 500f, current = DropTarget("A", DropZone.Before),
         )
         assertEquals(DropTarget("A", DropZone.Before), result)
@@ -272,7 +272,7 @@ class DragReorderListLogicTest {
         // ("before B") — B is A's next top-level sibling, so this resolves to the exact
         // same insertion index as "after A". Must report unchanged: no haptic, no write.
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = 110f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = 110f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = DropTarget("A", DropZone.After),
         )
         assertEquals(DropTarget("A", DropZone.After), result)
@@ -283,7 +283,7 @@ class DragReorderListLogicTest {
         // Dragging E; current state is "before C" (C is B's current first child). The
         // pointer is now over B's bottom half ("nest as B's first child") — same result.
         val result = computeDragTarget(
-            order = fixture, draggedId = "E", pointerYInList = 190f, visible = standardGeometry,
+            order = fixture, draggedId = "E", y = 190f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = DropTarget("C", DropZone.Before),
         )
         assertEquals(DropTarget("C", DropZone.Before), result)
@@ -292,7 +292,7 @@ class DragReorderListLogicTest {
     // @spec DRAG-UI-002
     @Test fun `computeDragTarget still updates for a genuinely different position`() {
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = 450f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = 450f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = DropTarget("A", DropZone.Before),
         )
         assertEquals(DropTarget("E", DropZone.Nest), result)
@@ -304,7 +304,7 @@ class DragReorderListLogicTest {
         // already is, not a move — touch slop alone is often enough to land here right at
         // pickup, and it must not register a target (no haptic, no reflow) for it.
         val result = computeDragTarget(
-            order = fixture, draggedId = "C", pointerYInList = 310f, visible = standardGeometry,
+            order = fixture, draggedId = "C", y = 310f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = null,
         )
         assertEquals(null, result)
@@ -314,7 +314,7 @@ class DragReorderListLogicTest {
         // Dragging D; "after C" (C is D's own previous sibling) is also exactly where D
         // already is.
         val result = computeDragTarget(
-            order = fixture, draggedId = "D", pointerYInList = 290f, visible = standardGeometry,
+            order = fixture, draggedId = "D", y = 290f, visible = standardGeometry,
             canScrollForward = false, viewportHeight = 500f, current = null,
         )
         assertEquals(null, result)

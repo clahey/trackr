@@ -54,14 +54,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.round
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import net.clahey.trackr.R
-import kotlin.math.roundToInt
 
 /**
  * A node in the [DragReorderList] input tree. Each node carries its own ordered [children];
@@ -212,30 +210,30 @@ internal fun hasChildrenStructurally(
  * @param targetCanHaveChildren whether the target row can accept a nest-drop
  * @param targetHasChildren whether the target currently has children (read structurally)
  * @param draggedCanBecomeChild whether the dragged row is currently eligible to nest
- * @param pointerFraction the pointer's vertical position within the target row, 0f..1f
+ * @param rowFraction the fractional vertical position within the target row, 0f..1f
  */
 // @spec DRAG-UI-006, DRAG-UI-007, DRAG-UI-008, DRAG-UI-009
 internal fun dropZone(
     targetCanHaveChildren: Boolean,
     targetHasChildren: Boolean,
     draggedCanBecomeChild: Boolean,
-    pointerFraction: Float,
+    rowFraction: Float,
 ): DropZone? {
     if (!draggedCanBecomeChild) {
         if (!targetCanHaveChildren) return null
-        return if (pointerFraction < 0.5f) DropZone.Before else DropZone.After
+        return if (rowFraction < 0.5f) DropZone.Before else DropZone.After
     }
     if (!targetCanHaveChildren) {
-        return if (pointerFraction < 0.5f) DropZone.Before else DropZone.After
+        return if (rowFraction < 0.5f) DropZone.Before else DropZone.After
     }
     return if (!targetHasChildren) {
         when {
-            pointerFraction < 0.25f -> DropZone.Before
-            pointerFraction < 0.75f -> DropZone.Nest
+            rowFraction < 0.25f -> DropZone.Before
+            rowFraction < 0.75f -> DropZone.Nest
             else -> DropZone.After
         }
     } else {
-        if (pointerFraction < 0.5f) DropZone.Before else DropZone.Nest
+        if (rowFraction < 0.5f) DropZone.Before else DropZone.Nest
     }
 }
 
@@ -339,19 +337,19 @@ internal data class DropTarget(val id: String, val zone: DropZone)
 private fun resolveHitDropCandidate(
     order: List<FlatNode>,
     draggedId: String,
-    pointerYInList: Float,
+    y: Float,
     visible: List<VisibleRowGeometry>,
     canScrollForward: Boolean,
     viewportHeight: Float,
 ): DropTarget? {
-    // A pointer past the top or bottom edge resolves as though at that edge (DRAG-UI-019).
-    val y = pointerYInList.coerceIn(0f, viewportHeight)
-    val hit = visible.firstOrNull { y >= it.offset && y < it.offset + it.size }
+    // A y past the top or bottom edge resolves as though at that edge (DRAG-UI-019).
+    val clampedY = y.coerceIn(0f, viewportHeight)
+    val hit = visible.firstOrNull { clampedY >= it.offset && clampedY < it.offset + it.size }
     if (hit != null) {
         val targetItem = order.getOrNull(hit.index) ?: return null
         if (targetItem.id == draggedId) return null
         val dItem = order.firstOrNull { it.id == draggedId } ?: return null
-        val fraction = ((y - hit.offset) / hit.size.toFloat()).coerceIn(0f, 1f)
+        val fraction = ((clampedY - hit.offset) / hit.size.toFloat()).coerceIn(0f, 1f)
         val targetHasChildren = hasChildrenStructurally(order, hit.index, excludeId = draggedId)
         val zone = dropZone(
             targetItem.canHaveChildren, targetHasChildren, dItem.canBecomeChild, fraction
@@ -359,7 +357,7 @@ private fun resolveHitDropCandidate(
         return DropTarget(targetItem.id, zone)
     }
     val lastInfo = visible.lastOrNull()
-    if (lastInfo != null && y >= lastInfo.offset + lastInfo.size && !canScrollForward) {
+    if (lastInfo != null && clampedY >= lastInfo.offset + lastInfo.size && !canScrollForward) {
         val lastTopLevel = order.lastOrNull { it.depth == 0 && it.id != draggedId }
         if (lastTopLevel != null) return DropTarget(lastTopLevel.id, DropZone.After)
     }
@@ -407,7 +405,7 @@ private fun identityMoveResult(order: List<FlatNode>, draggedId: String): DragMo
 internal fun computeDragTarget(
     order: List<FlatNode>,
     draggedId: String,
-    pointerYInList: Float,
+    y: Float,
     visible: List<VisibleRowGeometry>,
     canScrollForward: Boolean,
     viewportHeight: Float,
@@ -416,7 +414,7 @@ internal fun computeDragTarget(
     val candidate = resolveHitDropCandidate(
         order,
         draggedId,
-        pointerYInList,
+        y,
         visible,
         canScrollForward,
         viewportHeight,
@@ -438,21 +436,26 @@ internal fun computeDragTarget(
 
 /**
  * One in-progress drag — held by [DragReorderState.activeDrag], non-null exactly while a drag is
- * active. [id], [startPosition], and [rowSize] are fixed at pickup; [delta], [target], [pointerY],
- * and [pointerId] change as the drag proceeds and are each their own [mutableStateOf], so a
- * per-frame update invalidates only their own readers rather than every reader of the drag (see
+ * active. [id] and [rowSize] are fixed at pickup; [currentPosition], [target], and [pointerId]
+ * change as the drag proceeds and are each their own [mutableStateOf], so a per-frame update
+ * invalidates only their own readers rather than every reader of the drag (see
  * docs/llds/drag-reorder-list.md § Generic Widget API "Drag state holder").
  */
 @Stable
 internal class ActiveDrag(
     val id: String,
-    val startPosition: Offset,
+    startPosition: Offset,
     val rowSize: IntSize,
 ) {
-    var delta by mutableStateOf(Offset.Zero)
+    // The dragged row's live top-left: seeded from its pickup position, advanced by each move.
+    var currentPosition by mutableStateOf(startPosition)
     var target by mutableStateOf<DropTarget?>(null)
-    var pointerY by mutableStateOf(startPosition.y + rowSize.height / 2f)
     var pointerId by mutableStateOf<PointerId?>(null)
+
+    // The dragged row's vertical center, in viewport coordinates — the position drop resolution
+    // and auto-scroll test against. Derived from currentPosition, not stored, so it can't fall out
+    // of sync.
+    val rowCenterY: Float get() = currentPosition.y + rowSize.height / 2f
 }
 
 /**
@@ -516,8 +519,7 @@ internal class DragReorderState(val listState: LazyListState) {
         change.consume()
         val drag = activeDrag ?: return
         drag.pointerId = change.id
-        drag.delta += amount
-        drag.pointerY = drag.startPosition.y + drag.delta.y + drag.rowSize.height / 2f
+        drag.currentPosition += amount
         resolveTargetAndZone(haptics)
     }
 
@@ -558,7 +560,7 @@ internal class DragReorderState(val listState: LazyListState) {
         val resolved = computeDragTarget(
             order = order,
             draggedId = drag.id,
-            pointerYInList = drag.pointerY,
+            y = drag.rowCenterY,
             visible = visible,
             canScrollForward = listState.canScrollForward,
             viewportHeight = listState.layoutInfo.viewportSize.height.toFloat(),
@@ -664,8 +666,8 @@ fun DragReorderList(
                 // Clamp so the top and bottom edge zones can't overlap in a short viewport.
                 val edgePx = maxEdgePx.coerceAtMost(viewportHeight / 2f)
                 val step = when {
-                    activeDrag.pointerY < edgePx && listState.canScrollBackward -> -scrollStepPx
-                    activeDrag.pointerY > viewportHeight - edgePx && listState.canScrollForward ->
+                    activeDrag.rowCenterY < edgePx && listState.canScrollBackward -> -scrollStepPx
+                    activeDrag.rowCenterY > viewportHeight - edgePx && listState.canScrollForward ->
                         scrollStepPx
 
                     else -> 0f
@@ -884,18 +886,12 @@ fun DragReorderList(
 
         // @spec DRAG-UI-002
         if (draggedItem != null && activeDrag != null) {
-            val start = activeDrag.startPosition
             Surface(
                 tonalElevation = 8.dp,
                 shadowElevation = 8.dp,
                 modifier = Modifier
                     .zIndex(2f)
-                    .offset {
-                        IntOffset(
-                            (start.x + activeDrag.delta.x).roundToInt(),
-                            (start.y + activeDrag.delta.y).roundToInt()
-                        )
-                    },
+                    .offset { activeDrag.currentPosition.round() },
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Box(modifier = Modifier.weight(1f)) { content(sourceNodes.getValue(draggedItem.id)) }
