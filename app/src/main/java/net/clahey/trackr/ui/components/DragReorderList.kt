@@ -342,14 +342,16 @@ private fun resolveHitDropCandidate(
     pointerYInList: Float,
     visible: List<VisibleRowGeometry>,
     canScrollForward: Boolean,
+    viewportHeight: Float,
 ): DropTarget? {
-    val hit =
-        visible.firstOrNull { pointerYInList >= it.offset && pointerYInList < it.offset + it.size }
+    // A pointer past the top or bottom edge resolves as though at that edge (DRAG-UI-019).
+    val y = pointerYInList.coerceIn(0f, viewportHeight)
+    val hit = visible.firstOrNull { y >= it.offset && y < it.offset + it.size }
     if (hit != null) {
         val targetItem = order.getOrNull(hit.index) ?: return null
         if (targetItem.id == draggedId) return null
         val dItem = order.firstOrNull { it.id == draggedId } ?: return null
-        val fraction = ((pointerYInList - hit.offset) / hit.size.toFloat()).coerceIn(0f, 1f)
+        val fraction = ((y - hit.offset) / hit.size.toFloat()).coerceIn(0f, 1f)
         val targetHasChildren = hasChildrenStructurally(order, hit.index, excludeId = draggedId)
         val zone = dropZone(
             targetItem.canHaveChildren, targetHasChildren, dItem.canBecomeChild, fraction
@@ -357,7 +359,7 @@ private fun resolveHitDropCandidate(
         return DropTarget(targetItem.id, zone)
     }
     val lastInfo = visible.lastOrNull()
-    if (lastInfo != null && pointerYInList >= lastInfo.offset + lastInfo.size && !canScrollForward) {
+    if (lastInfo != null && y >= lastInfo.offset + lastInfo.size && !canScrollForward) {
         val lastTopLevel = order.lastOrNull { it.depth == 0 && it.id != draggedId }
         if (lastTopLevel != null) return DropTarget(lastTopLevel.id, DropZone.After)
     }
@@ -401,13 +403,14 @@ private fun identityMoveResult(order: List<FlatNode>, draggedId: String): DragMo
  * time the pointer crosses that exact boundary, including right at pickup before the
  * pointer has moved anywhere meaningful at all.
  */
-// @spec DRAG-UI-002, DRAG-UI-003, DRAG-UI-010
+// @spec DRAG-UI-002, DRAG-UI-003, DRAG-UI-010, DRAG-UI-019
 internal fun computeDragTarget(
     order: List<FlatNode>,
     draggedId: String,
     pointerYInList: Float,
     visible: List<VisibleRowGeometry>,
     canScrollForward: Boolean,
+    viewportHeight: Float,
     current: DropTarget?,
 ): DropTarget? {
     val candidate = resolveHitDropCandidate(
@@ -415,7 +418,8 @@ internal fun computeDragTarget(
         draggedId,
         pointerYInList,
         visible,
-        canScrollForward
+        canScrollForward,
+        viewportHeight,
     )
         ?: return current
     if (candidate == current) return current
@@ -531,7 +535,7 @@ internal class DragReorderState(val listState: LazyListState) {
     // than closing over outer vals — this is called from the pointerInput coroutine, launched
     // once per row and never relaunched, so every read must go through live state or it stays
     // bound to the row's first-composition closure.
-    private fun resolveTargetAndZone(haptics: HapticFeedback) {
+    fun resolveTargetAndZone(haptics: HapticFeedback) {
         val dId = draggedId ?: return
         val order = renderedOrder
         if (order.none { it.id == dId }) return
@@ -544,6 +548,7 @@ internal class DragReorderState(val listState: LazyListState) {
             pointerYInList = pointerYInList,
             visible = visible,
             canScrollForward = listState.canScrollForward,
+            viewportHeight = listState.layoutInfo.viewportSize.height.toFloat(),
             current = currentTarget,
         )
         if (resolved != currentTarget) {
@@ -645,12 +650,19 @@ fun DragReorderList(
             val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
             // Clamp so the top and bottom edge zones can't overlap in a short viewport.
             val edgePx = maxEdgePx.coerceAtMost(viewportHeight / 2f)
-            when {
-                state.pointerYInList < edgePx && listState.canScrollBackward ->
-                    listState.scrollBy(-scrollStepPx)
-
+            val step = when {
+                state.pointerYInList < edgePx && listState.canScrollBackward -> -scrollStepPx
                 state.pointerYInList > viewportHeight - edgePx && listState.canScrollForward ->
-                    listState.scrollBy(scrollStepPx)
+                    scrollStepPx
+
+                else -> 0f
+            }
+            if (step != 0f) {
+                listState.scrollBy(step)
+                // Treat the scroll as a drag event: the finger is held still while rows move
+                // under it, so re-resolve the target against the newly-scrolled content instead
+                // of letting it freeze (DRAG-UI-004).
+                state.resolveTargetAndZone(haptics)
             }
             delay(16)
         }
