@@ -447,14 +447,16 @@ internal class ActiveDrag(
     startPosition: Offset,
     val rowSize: IntSize,
 ) {
-    // The dragged row's live top-left: seeded from its pickup position, advanced by each move.
+    // The dragged row's live top-left (viewport relative): seeded from its pickup position,
+    // advanced by each move.
     var currentPosition by mutableStateOf(startPosition)
     var target by mutableStateOf<DropTarget?>(null)
+    // Currently active pointer (can change with multi-touch)
     var pointerId by mutableStateOf<PointerId?>(null)
 
-    // The dragged row's vertical center, in viewport coordinates — the position drop resolution
-    // and auto-scroll test against. Derived from currentPosition, not stored, so it can't fall out
-    // of sync.
+    // The dragged row's vertical center (viewport relative) — the position drop resolution and
+    // auto-scroll test against. Derived from currentPosition, not stored, so it can't fall out of
+    // sync.
     val rowCenterY: Float get() = currentPosition.y + rowSize.height / 2f
 }
 
