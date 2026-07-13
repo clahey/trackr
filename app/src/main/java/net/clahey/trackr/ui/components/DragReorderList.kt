@@ -328,6 +328,9 @@ internal data class VisibleRowGeometry(val index: Int, val offset: Int, val size
 /** A drop position: the target row's id and the zone within it. */
 internal data class DropTarget(val id: String, val zone: DropZone)
 
+/** A LazyList scroll position — the first visible item's index and its pixel offset. */
+internal data class ScrollPin(val index: Int, val offset: Int)
+
 /**
  * The raw drop position the pointer is over right now, against [order] — the order actually
  * currently rendered (so [visible]'s indices stay valid against it). Returns null when there's
@@ -495,6 +498,13 @@ internal class DragReorderState(val listState: LazyListState) {
     // exclusivity overlay and the interceptor in [DragReorderList].
     var settledDisplayOrder by mutableStateOf<List<FlatNode>?>(null)
 
+    // A scroll position to re-assert after the next reflow, set when a target change is about to
+    // relocate the dragged row while it is the list's scroll anchor (the first visible row).
+    // Without it, LazyColumn's key-based scroll preservation follows the dragged placeholder's key
+    // as the reflow moves it and yanks the viewport (DRAG-UI-020). Consumed once, via
+    // requestScrollToItem, by [DragReorderList].
+    var pendingScrollPin by mutableStateOf<ScrollPin?>(null)
+
     // The order the current layout actually reflects — what listState.layoutInfo's indices point
     // into. [resolveTargetAndZone] hit-tests against this, not the live displayOrder, because the
     // pointer coroutine runs ahead of layout: displayOrder can already describe an arrangement
@@ -570,6 +580,19 @@ internal class DragReorderState(val listState: LazyListState) {
         )
         if (resolved != drag.target) {
             if (resolved != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            // Hold the scroll position across the reflow (DRAG-UI-020): re-assert the current
+            // (firstVisibleItemIndex, firstVisibleItemScrollOffset) after the reflow so LazyColumn
+            // doesn't move the viewport by following the dragged placeholder's key. The target is
+            // always a visible row (an off-edge pointer clamps to the edge-most visible row,
+            // DRAG-UI-019), so the placeholder never lands above the viewport — which makes holding
+            // the numeric scroll position always correct: a no-op when the top slot's occupant is
+            // unchanged, the fix when the dragged row leaves the top slot or its placeholder
+            // arrives in it. Read here, before the target write recomposes, so listState still
+            // reflects the pre-reflow layout.
+            pendingScrollPin = ScrollPin(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+            )
             drag.target = resolved
         }
     }
@@ -602,7 +625,7 @@ private fun rememberDragReorderState(): DragReorderState {
  * @param content renders one row; invoked lazily per visible row, for nested nodes as well as
  *   top-level ones
  */
-// @spec DRAG-UI-001, DRAG-UI-002, DRAG-UI-003, DRAG-UI-004, DRAG-UI-005, DRAG-UI-011, DRAG-UI-012, DRAG-UI-013, DRAG-UI-015
+// @spec DRAG-UI-001, DRAG-UI-002, DRAG-UI-003, DRAG-UI-004, DRAG-UI-005, DRAG-UI-011, DRAG-UI-012, DRAG-UI-013, DRAG-UI-015, DRAG-UI-020
 @Composable
 fun DragReorderList(
     items: List<DragListItem>,
@@ -653,7 +676,16 @@ fun DragReorderList(
     // effect until layout catches up — nothing is rendered there yet to hit. Writing displayOrder
     // in directly (during composition) would instead race ahead of the layout it's hit-tested
     // against, reading as the wrong target/zone, flickering haptics, and a jumping floating row.
-    SideEffect { state.renderedOrder = displayOrder }
+    SideEffect {
+        // Re-assert the pre-reflow scroll (DRAG-UI-020) before this frame's remeasure, so
+        // LazyColumn positions the reflowed order at the held scroll instead of following the
+        // dragged placeholder's key — the next row just fills the vacated top slot.
+        state.pendingScrollPin?.let { pin ->
+            listState.requestScrollToItem(pin.index, pin.offset)
+            state.pendingScrollPin = null
+        }
+        state.renderedOrder = displayOrder
+    }
 
     // @spec DRAG-UI-004
     // Scoped to the drag: the effect exists only while a drag is active, so it launches on pickup

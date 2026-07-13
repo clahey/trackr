@@ -1,5 +1,6 @@
 package net.clahey.trackr.ui.components
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -469,5 +470,85 @@ class DragReorderListTest {
         pendingOnSettled?.invoke()
         composeTestRule.waitForIdle()
         assertTrue("expected A to animate back above B after settle", topOf("A") < topOf("B"))
+    }
+
+    // @spec DRAG-UI-020
+    // Regression test: the dragged row's placeholder is a keyed LazyColumn item, so when the
+    // dragged row is the list's scroll anchor (the first visible row) and the live reflow
+    // relocates its placeholder, LazyColumn's key-based scroll preservation follows the
+    // placeholder key and yanks the viewport — cascading the list toward the far end. Item1 is
+    // dragged from the top (list scrolled to the top, so it is the first visible row) down past
+    // Item2. Fixed: the viewport stays put, Item2 slides into the top slot, and the far-down
+    // rows stay off-screen. Buggy: the viewport scrolls away, Item2 leaves the screen and
+    // bottom rows appear.
+    @Test
+    fun reflowKeepsTheViewportPutWhenTheDraggedRowIsTheScrollAnchor() {
+        val manyItems = (1..40).map { flatItem("Item$it") }
+        composeTestRule.setContent {
+            DragReorderList(
+                items = manyItems,
+                onMove = { _, onSettled -> onSettled() },
+                modifier = Modifier.testTag("drag_list").height(400.dp),
+            ) { item ->
+                Text(item.id, modifier = Modifier.testTag("row_${item.id}").padding(vertical = 12.dp))
+            }
+        }
+        val listTop = composeTestRule.onNodeWithTag("drag_list").fetchSemanticsNode().boundsInRoot.top
+        val rowHeight = composeTestRule.onNodeWithTag("row_Item1").fetchSemanticsNode().boundsInRoot.height
+
+        // Item1 is the first visible row. Drag it down past Item2 so the reflow relocates its
+        // placeholder below Item2 — which makes Item2 the first item regardless of exactly where
+        // Item1 lands.
+        composeTestRule.pressHandle("drag_handle_Item1")
+        composeTestRule.dragBy("drag_handle_Item1", rowHeight * 2.5f)
+
+        // The viewport must not have scrolled to follow the placeholder: Item2 is at the top and
+        // the far-down rows are still off-screen.
+        composeTestRule.onNodeWithTag("row_Item2").assertExists()
+        val row2Top = composeTestRule.onNodeWithTag("row_Item2").fetchSemanticsNode().boundsInRoot.top
+        assertTrue(
+            "expected Item2 pinned near the viewport top ($listTop) but it was at $row2Top",
+            abs(row2Top - listTop) < rowHeight,
+        )
+        composeTestRule.onNodeWithTag("row_Item40").assertDoesNotExist()
+
+        composeTestRule.releaseHandle("drag_handle_Item1")
+    }
+
+    // @spec DRAG-UI-020
+    // The mirror of the anchor cascade: dragging a row *up* to become the first item moves its
+    // placeholder into the first slot. Without the pin, LazyColumn keeps the old first row pinned
+    // and tucks the prepended placeholder above the viewport, so the drop preview disappears off
+    // the top (the "hiccup" scrolling up). Fixed: the placeholder renders in the top slot.
+    @Test
+    fun reflowKeepsThePreviewVisibleWhenTheDraggedRowBecomesTheFirstItem() {
+        val manyItems = (1..40).map { flatItem("Item$it") }
+        composeTestRule.setContent {
+            DragReorderList(
+                items = manyItems,
+                onMove = { _, onSettled -> onSettled() },
+                modifier = Modifier.testTag("drag_list").height(400.dp),
+            ) { item ->
+                Text(item.id, modifier = Modifier.testTag("row_${item.id}").padding(vertical = 12.dp))
+            }
+        }
+        val listTop = composeTestRule.onNodeWithTag("drag_list").fetchSemanticsNode().boundsInRoot.top
+        val rowHeight = composeTestRule.onNodeWithTag("row_Item1").fetchSemanticsNode().boundsInRoot.height
+
+        // Pick up Item3 and drag it up past the top (clamped to the top edge, DRAG-UI-019) so its
+        // placeholder lands before Item1 — the first slot.
+        composeTestRule.pressHandle("drag_handle_Item3")
+        composeTestRule.dragBy("drag_handle_Item3", -rowHeight * 4f)
+
+        // The preview must render in the top slot, not be hidden above the viewport.
+        composeTestRule.onNodeWithTag("drop_placeholder_Item3").assertExists()
+        val placeholderTop =
+            composeTestRule.onNodeWithTag("drop_placeholder_Item3").fetchSemanticsNode().boundsInRoot.top
+        assertTrue(
+            "expected Item3's placeholder in the top slot (near $listTop) but it was at $placeholderTop",
+            placeholderTop >= listTop - rowHeight * 0.5f && placeholderTop < listTop + rowHeight,
+        )
+
+        composeTestRule.releaseHandle("drag_handle_Item3")
     }
 }
