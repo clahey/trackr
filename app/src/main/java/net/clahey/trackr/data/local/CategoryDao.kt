@@ -45,6 +45,9 @@ abstract class CategoryDao {
     @Query("SELECT * FROM categories WHERE parentId = :parentId")
     abstract suspend fun getChildrenByParentIdOnce(parentId: String): List<CategoryEntity>
 
+    @Query("SELECT * FROM categories WHERE parentId IS NULL")
+    abstract suspend fun getTopLevelOnce(): List<CategoryEntity>
+
     @Transaction
     @Query("SELECT * FROM categories WHERE id = :id")
     abstract fun getByIdWithParent(id: String): Flow<CategoryWithParent?>

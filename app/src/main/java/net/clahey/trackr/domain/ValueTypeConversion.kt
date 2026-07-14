@@ -1,5 +1,30 @@
 package net.clahey.trackr.domain
 
+enum class ValueTypeWarningTier { IrreversibleSafe, Partial, Unsafe }
+
+// @spec CAT-UI-030, CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-039, CAT-UI-081
+// Shared by CategoryEditViewModel (explicit value-type edit) and CategoryListViewModel
+// (reparenting that changes an inherited value type) — both need the same tiering.
+fun warningTierFor(from: ValueType, to: ValueType): ValueTypeWarningTier? = when {
+    // Reversible pairs → no warning
+    (from == ValueType.None && to == ValueType.Text) ||
+    (from == ValueType.Scale && to == ValueType.Text) ||
+    (from == ValueType.Boolean && to == ValueType.Text) ||
+    (from == ValueType.Number && to == ValueType.Text) ||
+    (from == ValueType.Exercise && to == ValueType.Text) ||
+    (from == ValueType.Scale && to == ValueType.Number) -> null
+    // Fully safe but irreversible
+    from == ValueType.None ||
+    (from == ValueType.Duration && to == ValueType.Text) -> ValueTypeWarningTier.IrreversibleSafe
+    // Partially safe: migration attempted but some events may not convert
+    from == ValueType.Text && to in listOf(
+        ValueType.Boolean, ValueType.Number, ValueType.Scale, ValueType.None, ValueType.Exercise,
+    ) ||
+    (from == ValueType.Number && to == ValueType.Scale) -> ValueTypeWarningTier.Partial
+    // All other pairs: no migration
+    else -> ValueTypeWarningTier.Unsafe
+}
+
 sealed class ConversionOutcome {
     data class Converted(val value: EventValue) : ConversionOutcome()
     data class UsedDefault(val value: EventValue) : ConversionOutcome()

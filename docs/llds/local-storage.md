@@ -19,6 +19,8 @@ interface TrackrRepository {
     suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)  // atomic upsert + event migration
     suspend fun deleteCategory(id: String)  // promotes SubCategories if MetaCategory; atomic
     suspend fun reorderCategories(orderedIds: List<String>)  // reassigns sortOrder to match list
+    suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>)  // reparent + reindex destination group in one transaction
+    suspend fun moveCategoryAndMigrateEvents(category: Category, orderedSiblingIds: List<String>, fromType: ValueType)  // moveCategory + event migration when the effective valueType changed
     fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
     fun getSubCategoryCount(categoryId: String): Flow<Int>
 
@@ -104,7 +106,8 @@ This mirrors the `ErrorValue` forward-compatibility contract: an old app version
 | `getByIdWithParent(id)` | `Flow<CategoryWithParent?>` | `@Transaction`; uses `@Relation` to fetch parent row in a second query |
 | `countByParentId(parentId)` | `Flow<Int>` | |
 | `countByParentIdOnce(parentId)` | `Int` | suspend |
-| `getChildrenByParentIdOnce(parentId)` | `List<CategoryEntity>` | suspend |
+| `getChildrenByParentIdOnce(parentId)` | `List<CategoryEntity>` | suspend; a nest destination group's current members |
+| `getTopLevelOnce()` | `List<CategoryEntity>` | suspend; `parentId IS NULL` — a top-level destination group's current members |
 | `getMinSortOrder()` | `Int?` | suspend; null if no categories exist; used when inserting new category at top |
 | `updateSortOrders(ids: List<String>)` | `Unit` | suspend; reassigns sequential sortOrder values (0, 1, 2…) matching the provided order |
 | `upsert(entity)` | `Unit` | suspend |
@@ -146,6 +149,8 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 **`getCategories` sort order:** after `toDomainList()`, results are sorted hierarchically: MetaCategories by their own `sortOrder` ascending, with each MetaCategory's SubCategories appearing immediately after, sorted by their own `sortOrder`. SubCategories that surface as MetaCategories (per orphan handling below) sort by their own `sortOrder`.
 
 **`deleteCategory`:** runs inside a single Room transaction. Within the transaction: fetches child entities (by parentId); if any exist, upserts each child with `parentId = null` (resolving null emoji/color/valueType fields to the parent's stored values); collects image paths for the parent's own events; deletes the parent DB row (CASCADE removes its own events but not promoted children). Image file deletion happens after the transaction commits. When there are no children the transaction is a no-op promotion step followed by the same delete.
+
+**`moveCategory` / `moveCategoryAndMigrateEvents`:** the general "reparent a category and reorder its destination sibling group" capability. Both run inside a single Room transaction: upsert the reparented row (reusing `saveCategory`'s childlessness guard, DM-DATA-028), then re-read the destination group's *current* members within that same transaction (`getChildrenByParentIdOnce` for a nest, `getTopLevelOnce` for a top-level move) and dense-reindex them via `updateSortOrders`, ordering them by reconciling the caller's `orderedSiblingIds` against those live members through the pure function `reconcileSiblingOrder` (`domain/SiblingReindex.kt`) — shared by both this real repository and the test `FakeTrackrRepository`, and unit-tested in isolation, so the fake stays behavior-consistent with the real reindex. Re-reading membership *inside* the transaction — rather than reindexing the caller's `orderedSiblingIds` directly — closes a **read-outside-transaction (TOCTOU) gap**: the reindex list is derived from state read inside the transaction, so a concurrent change to the destination group between the caller's read and the commit can no longer strand a sibling at a stale, colliding `sortOrder`. This is general to any caller that supplies an explicit new order (drag today; a future menu/keyboard Move Up/Down would use the same method). The **source** group (when the move changes which group the row belongs to) is left untouched — `sortOrder` only has to express relative order among current siblings, and removing a member doesn't invalidate the relative order of the ones left behind, so no renumbering is needed there. The migrating variant additionally runs the `convertEventValue` pass over the category's own events, mirroring `saveCategoryAndMigrateEvents`. The reconcile ordering rule is specified by CAT-UI-083; the caller-side concern of *where `orderedSiblingIds` comes from* (a drag drop's snapshot, possibly held across a CAT-UI-081 dialog) is `category-management.md § Drag-to-Reorder: Adapter & Persistence`.
 
 **Orphaned SubCategory handling in `toDomainList()`:** if a `CategoryEntity` has a non-null `parentId` that is not present among the loaded entities, it is surfaced as a `Category.MetaCategory` using its own stored fields, with null-field fallbacks matching MetaCategory assembly (`"" / 0xFFE53935L / ValueType.None`). This can occur when a MetaCategory is deleted mid-session or when the DB is in an inconsistent state; see DM-PROC-022.
 

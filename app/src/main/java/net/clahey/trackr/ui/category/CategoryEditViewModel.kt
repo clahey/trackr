@@ -9,6 +9,8 @@ import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.EventValue
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.matchesValueType
+import net.clahey.trackr.domain.ValueTypeWarningTier
+import net.clahey.trackr.domain.warningTierFor
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.seconds
@@ -28,8 +30,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
-
-enum class ValueTypeWarningTier { IrreversibleSafe, Partial, Unsafe }
 
 enum class EmojiMode { INHERIT, CUSTOM }
 data class EmojiUIState(val mode: EmojiMode, val customValue: String)
@@ -342,27 +342,6 @@ class CategoryEditViewModel @Inject constructor(
 
     fun cancelDelete() {
         _pendingDeleteConfirmation.value = null
-    }
-
-    // @spec CAT-UI-030, CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-039
-    private fun warningTierFor(from: ValueType, to: ValueType): ValueTypeWarningTier? = when {
-        // Reversible pairs → no warning
-        (from == ValueType.None && to == ValueType.Text) ||
-        (from == ValueType.Scale && to == ValueType.Text) ||
-        (from == ValueType.Boolean && to == ValueType.Text) ||
-        (from == ValueType.Number && to == ValueType.Text) ||
-        (from == ValueType.Exercise && to == ValueType.Text) ||
-        (from == ValueType.Scale && to == ValueType.Number) -> null
-        // Fully safe but irreversible
-        from == ValueType.None ||
-        (from == ValueType.Duration && to == ValueType.Text) -> ValueTypeWarningTier.IrreversibleSafe
-        // Partially safe: migration attempted but some events may not convert
-        from == ValueType.Text && to in listOf(
-            ValueType.Boolean, ValueType.Number, ValueType.Scale, ValueType.None, ValueType.Exercise,
-        ) ||
-        (from == ValueType.Number && to == ValueType.Scale) -> ValueTypeWarningTier.Partial
-        // All other pairs: no migration
-        else -> ValueTypeWarningTier.Unsafe
     }
 
     // @spec CAT-UI-011, CAT-UI-011a, CAT-UI-066

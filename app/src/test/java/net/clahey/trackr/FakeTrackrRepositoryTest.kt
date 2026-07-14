@@ -1,6 +1,7 @@
 package net.clahey.trackr
 
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.ValueType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,8 +52,8 @@ class FakeTrackrRepositoryTest {
         repo.setCategories(parent, newParent, child)
         try {
             repo.saveCategory(makeSubCategory("parent", parent = newParent))
-            fail("Expected IllegalArgumentException")
-        } catch (e: IllegalArgumentException) {
+            fail("Expected CategoryHasChildrenException")
+        } catch (e: CategoryHasChildrenException) {
             // expected
         }
     }
@@ -80,10 +81,94 @@ class FakeTrackrRepositoryTest {
                 makeSubCategory("parent", parent = newParent),
                 fromType = ValueType.None,
             )
-            fail("Expected IllegalArgumentException")
-        } catch (e: IllegalArgumentException) {
+            fail("Expected CategoryHasChildrenException")
+        } catch (e: CategoryHasChildrenException) {
             // expected
         }
+    }
+
+    // @spec CAT-UI-080
+    @Test fun `moveCategory reindexes only the destination sibling group leaving other categories untouched`() = runTest {
+        val repo = FakeTrackrRepository()
+        val groupA = makeCategory("groupA", sortOrder = 0)
+        val a1 = makeSubCategory("a1", parent = groupA, sortOrder = 5)
+        val a2 = makeSubCategory("a2", parent = groupA, sortOrder = 9)
+        val groupB = makeCategory("groupB", sortOrder = 1)
+        repo.setCategories(groupA, a1, a2, groupB)
+        // Reorder a1/a2 within groupA — groupB's own sortOrder must be unaffected.
+        repo.moveCategory(a2, orderedSiblingIds = listOf("a2", "a1"))
+        val cats = repo.getCategories().first().associateBy { it.id }
+        assertEquals(0, (cats["a2"] as Category.SubCategory).sortOrder)
+        assertEquals(1, (cats["a1"] as Category.SubCategory).sortOrder)
+        assertEquals(1, (cats["groupB"] as Category.MetaCategory).sortOrder)
+    }
+
+    // @spec CAT-UI-080
+    @Test fun `moveCategory reparents a SubCategory to a new MetaCategory and reindexes the destination group`() = runTest {
+        val repo = FakeTrackrRepository()
+        val oldParent = makeCategory("oldParent")
+        val newParent = makeCategory("newParent")
+        val existingChild = makeSubCategory("existing", parent = newParent, sortOrder = 0)
+        val moved = makeSubCategory("moved", parent = oldParent, sortOrder = 0)
+        repo.setCategories(oldParent, newParent, existingChild, moved)
+        repo.moveCategory(moved.copy(parent = newParent), orderedSiblingIds = listOf("existing", "moved"))
+        val cats = repo.getCategories().first().associateBy { it.id }
+        val movedResult = cats["moved"] as Category.SubCategory
+        assertEquals("newParent", movedResult.parent.id)
+        assertEquals(1, movedResult.sortOrder)
+        assertEquals(0, (cats["existing"] as Category.SubCategory).sortOrder)
+    }
+
+    // @spec CAT-UI-080, CAT-UI-081
+    @Test fun `moveCategoryAndMigrateEvents reindexes siblings and converts the category's own events`() = runTest {
+        val repo = FakeTrackrRepository()
+        val oldParent = makeCategory("oldParent")
+        val newParent = makeCategory("newParent").copy(valueType = ValueType.Text)
+        val moved = makeSubCategory("moved", parent = oldParent, sortOrder = 0)  // inherits None -> Text
+        repo.setCategories(oldParent, newParent, moved)
+        val anchor = Instant.parse("2024-01-15T12:00:00Z")
+        repo.setEvents(Event("e1", "moved", anchor, null, null, emptyList(), anchor))
+        repo.moveCategoryAndMigrateEvents(
+            moved.copy(parent = newParent),
+            orderedSiblingIds = listOf("moved"),
+            fromType = ValueType.None,
+        )
+        val movedResult = repo.getCategoryById("moved").first() as Category.SubCategory
+        assertEquals("newParent", movedResult.parent.id)
+        assertEquals(0, movedResult.sortOrder)
+    }
+
+    // @spec CAT-UI-080, CAT-UI-083
+    @Test fun `moveCategory reindexes the destination group's live members, not the stale hint`() = runTest {
+        val repo = FakeTrackrRepository()
+        // Snapshot the top-level order [m1, m2, m3], then a concurrent create adds m4 at the
+        // top (sortOrder min-1, per CAT-UI-041) before the drop of m3-to-front is applied.
+        val m1 = makeCategory("m1", sortOrder = 0)
+        val m2 = makeCategory("m2", sortOrder = 1)
+        val m3 = makeCategory("m3", sortOrder = 2)
+        val m4 = makeCategory("m4", sortOrder = -1)
+        repo.setCategories(m1, m2, m3, m4)
+        // The widget's stale snapshot never saw m4.
+        repo.moveCategory(m3, orderedSiblingIds = listOf("m3", "m1", "m2"))
+        val cats = repo.getCategories().first()
+        // m4 (unknown to the hint, currently ahead of all) stays at the front; the user's
+        // arranged [m3, m1, m2] follows it — m4 is not stranded at a colliding sortOrder.
+        assertEquals(listOf("m4", "m3", "m1", "m2"), cats.map { it.id })
+        assertEquals(listOf(0, 1, 2, 3), cats.map { it.sortOrder })
+    }
+
+    // @spec CAT-UI-080, CAT-UI-083
+    @Test fun `moveCategory drops a hint id that is no longer a member of the destination group`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent", sortOrder = 0)
+        val a1 = makeSubCategory("a1", parent = parent, sortOrder = 0)
+        val a3 = makeSubCategory("a3", parent = parent, sortOrder = 2)
+        // a2 was in the snapshot but got deleted/reparented away before the drop applied.
+        repo.setCategories(parent, a1, a3)
+        repo.moveCategory(a3, orderedSiblingIds = listOf("a3", "a2", "a1"))
+        val cats = repo.getCategories().first().associateBy { it.id }
+        assertEquals(0, (cats["a3"] as Category.SubCategory).sortOrder)
+        assertEquals(1, (cats["a1"] as Category.SubCategory).sortOrder)
     }
 
     // @spec CAT-UI-001

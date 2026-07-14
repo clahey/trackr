@@ -6,6 +6,7 @@ import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.EventValue
 import net.clahey.trackr.domain.ValueType
+import net.clahey.trackr.domain.ValueTypeWarningTier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first

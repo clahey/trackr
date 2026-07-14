@@ -8,9 +8,12 @@ import androidx.room.withTransaction
 import net.clahey.trackr.data.ImageStore
 import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.SiblingSlot
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.convertEventValue
+import net.clahey.trackr.domain.reconcileSiblingOrder
 import net.clahey.trackr.ui.theme.DEFAULT_CATEGORY_COLOR
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -43,37 +46,75 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getCategoryById(id: String): Flow<Category?> =
         categoryDao.getByIdWithParent(id).map { it?.toDomain() }
 
+    private suspend fun requireNoChildren(category: Category) {
+        if (category is Category.SubCategory) {
+            val childCount = categoryDao.countByParentIdOnce(category.id)
+            if (childCount != 0) throw CategoryHasChildrenException(category.id, childCount)
+        }
+    }
+
+    private suspend fun migrateEventsForCategory(categoryId: String, targetType: ValueType) {
+        eventDao.getByCategoryIncludingChildrenWithNullTypeOnce(categoryId).forEach { entity ->
+            val event = entity.toDomain()
+            val newValue = convertEventValue(event.value, targetType)
+            if (newValue != event.value) {
+                eventDao.upsert(event.copy(value = newValue).toEntity())
+            }
+        }
+    }
+
     // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
         db.withTransaction {
-            if (category is Category.SubCategory) {
-                val childCount = categoryDao.countByParentIdOnce(category.id)
-                require(childCount == 0) {
-                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
-                }
-            }
+            requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
         }
     }
 
     // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021, DM-DATA-028
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
-        val targetType = category.resolvedValueType
         db.withTransaction {
-            if (category is Category.SubCategory) {
-                val childCount = categoryDao.countByParentIdOnce(category.id)
-                require(childCount == 0) {
-                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
-                }
-            }
+            requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
-            eventDao.getByCategoryIncludingChildrenWithNullTypeOnce(category.id).forEach { entity ->
-                val event = entity.toDomain()
-                val newValue = convertEventValue(event.value, targetType)
-                if (newValue != event.value) {
-                    eventDao.upsert(event.copy(value = newValue).toEntity())
-                }
-            }
+            migrateEventsForCategory(category.id, category.resolvedValueType)
+        }
+    }
+
+    // Re-reads the destination group's current members within the caller's transaction and
+    // dense-reindexes them, treating `orderedSiblingIds` as a stale ordering hint (CAT-UI-083)
+    // rather than an authoritative membership list — closing the read-outside-transaction gap.
+    private suspend fun reindexDestinationGroup(category: Category, orderedSiblingIds: List<String>) {
+        val members = when (category) {
+            is Category.MetaCategory -> categoryDao.getTopLevelOnce()
+            is Category.SubCategory -> categoryDao.getChildrenByParentIdOnce(category.parent.id)
+        }
+        val ordered = reconcileSiblingOrder(
+            members.map { SiblingSlot(it.id, it.sortOrder) },
+            orderedSiblingIds,
+        )
+        categoryDao.updateSortOrders(ordered)
+    }
+
+    // @spec CAT-UI-080, CAT-UI-083
+    override suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>) {
+        db.withTransaction {
+            requireNoChildren(category)
+            categoryDao.upsert(category.toEntity())
+            reindexDestinationGroup(category, orderedSiblingIds)
+        }
+    }
+
+    // @spec CAT-UI-080, CAT-UI-081, CAT-UI-083
+    override suspend fun moveCategoryAndMigrateEvents(
+        category: Category,
+        orderedSiblingIds: List<String>,
+        fromType: ValueType,
+    ) {
+        db.withTransaction {
+            requireNoChildren(category)
+            categoryDao.upsert(category.toEntity())
+            reindexDestinationGroup(category, orderedSiblingIds)
+            migrateEventsForCategory(category.id, category.resolvedValueType)
         }
     }
 

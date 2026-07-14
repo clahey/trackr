@@ -2,9 +2,12 @@ package net.clahey.trackr
 
 import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.SiblingSlot
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.convertEventValue
+import net.clahey.trackr.domain.reconcileSiblingOrder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -45,9 +48,7 @@ class FakeTrackrRepository : TrackrRepository {
                 val childCount = list.count { c ->
                     c is Category.SubCategory && c.parent.id == category.id
                 }
-                require(childCount == 0) {
-                    "Cannot nest category '${category.id}': it has $childCount SubCategory children"
-                }
+                if (childCount != 0) throw CategoryHasChildrenException(category.id, childCount)
             }
             val updated = list.filter { it.id != category.id } + category
             if (category is Category.MetaCategory) {
@@ -114,6 +115,55 @@ class FakeTrackrRepository : TrackrRepository {
                 is Category.SubCategory -> cat.copy(sortOrder = i)
             }
         }
+    }
+
+    // Reindexes sortOrder for just the given ids (a sibling group), leaving every other
+    // category's sortOrder untouched — unlike reorderCategories, which assumes its
+    // argument is the complete list.
+    private fun updateSortOrdersFor(orderedIds: List<String>) {
+        val positions = orderedIds.withIndex().associate { (i, id) -> id to i }
+        categories.update { list ->
+            list.map { cat ->
+                val newOrder = positions[cat.id] ?: return@map cat
+                when (cat) {
+                    is Category.MetaCategory -> cat.copy(sortOrder = newOrder)
+                    is Category.SubCategory -> cat.copy(sortOrder = newOrder)
+                }
+            }
+        }
+    }
+
+    // Mirrors LocalTrackrRepository.reindexDestinationGroup: re-reads the destination group's
+    // current members after the move and dense-reindexes them, using orderedSiblingIds only as
+    // a stale ordering hint (CAT-UI-083).
+    private fun reindexDestinationGroup(category: Category, orderedSiblingIds: List<String>) {
+        val list = categories.value
+        val members = when (category) {
+            is Category.MetaCategory -> list.filterIsInstance<Category.MetaCategory>()
+            is Category.SubCategory ->
+                list.filterIsInstance<Category.SubCategory>().filter { it.parent.id == category.parent.id }
+        }
+        val ordered = reconcileSiblingOrder(
+            members.map { SiblingSlot(it.id, it.sortOrder) },
+            orderedSiblingIds,
+        )
+        updateSortOrdersFor(ordered)
+    }
+
+    // @spec CAT-UI-080, CAT-UI-083
+    override suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>) {
+        saveCategory(category)  // constraint check is inside saveCategory
+        reindexDestinationGroup(category, orderedSiblingIds)
+    }
+
+    // @spec CAT-UI-080, CAT-UI-081, CAT-UI-083
+    override suspend fun moveCategoryAndMigrateEvents(
+        category: Category,
+        orderedSiblingIds: List<String>,
+        fromType: ValueType,
+    ) {
+        saveCategoryAndMigrateEvents(category, fromType)
+        reindexDestinationGroup(category, orderedSiblingIds)
     }
 
     override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> {

@@ -68,6 +68,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.R
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
+import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
 import net.clahey.trackr.ui.components.OutlinedFieldBox
