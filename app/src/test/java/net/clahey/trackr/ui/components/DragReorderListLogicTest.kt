@@ -172,18 +172,22 @@ class DragReorderListLogicTest {
 
     // @spec DRAG-UI-011, DRAG-UI-012
     @Test fun `shouldCollapseChildrenOf the dragged row itself follows tier 1`() {
-        val dragged = item("B", depth = 0, canHaveChildren = true, canBecomeChild = false)
-        assertTrue(shouldCollapseChildrenOf("B", dragged, draggedHasChildren = true))
-        assertFalse(shouldCollapseChildrenOf("B", dragged, draggedHasChildren = false))
+        // rowId == dragged.id: collapse iff the dragged row has children (canBecomeChild irrelevant).
+        val childless = DragListItem("B", canHaveChildren = true, canBecomeChild = false)
+        val withChild = childless.copy(children = listOf(DragListItem("C", false, true)))
+        assertTrue(shouldCollapseChildrenOf("B", withChild))
+        assertFalse(shouldCollapseChildrenOf("B", childless))
     }
 
     @Test fun `shouldCollapseChildrenOf another row follows tier 2 regardless of tier 1`() {
-        val ineligibleDragged = item("B", depth = 0, canHaveChildren = true, canBecomeChild = false)
-        assertTrue(shouldCollapseChildrenOf("A", ineligibleDragged, draggedHasChildren = true))
-        assertTrue(shouldCollapseChildrenOf("A", ineligibleDragged, draggedHasChildren = false))
+        // Ineligible dragged (canBecomeChild = false): every other row collapses, regardless of children.
+        val ineligible = DragListItem("B", canHaveChildren = true, canBecomeChild = false)
+        assertTrue(shouldCollapseChildrenOf("A", ineligible.copy(children = listOf(DragListItem("C", false, true)))))
+        assertTrue(shouldCollapseChildrenOf("A", ineligible))
 
-        val eligibleDragged = item("A", depth = 0, canHaveChildren = true, canBecomeChild = true)
-        assertFalse(shouldCollapseChildrenOf("B", eligibleDragged, draggedHasChildren = false))
+        // Eligible dragged (canBecomeChild = true): other rows don't collapse.
+        val eligible = DragListItem("A", canHaveChildren = true, canBecomeChild = true)
+        assertFalse(shouldCollapseChildrenOf("B", eligible))
     }
 
     // computeDragTarget — every fixture row laid out at a uniform 100px height, in order:

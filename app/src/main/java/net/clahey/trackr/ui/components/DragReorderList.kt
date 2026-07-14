@@ -35,14 +35,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -308,19 +306,15 @@ internal fun hypotheticalOrder(
 }
 
 /**
- * Whether [rowId]'s children should currently be collapsed during an active drag of
- * [dragged] — two independent tiers (docs/llds/drag-reorder-list.md § Collapse-on-pickup):
- * the dragged row's own children collapse whenever it has children; every other row's
- * children collapse whenever the dragged row isn't eligible to become a child, regardless
- * of whether the dragged row itself has children.
+ * Whether [rowId]'s children should currently be collapsed during a drag of the row [dragged] —
+ * two independent tiers (docs/llds/drag-reorder-list.md § Collapse-on-pickup): the dragged row's
+ * own children collapse whenever it has children; every other row's children collapse whenever the
+ * dragged row isn't eligible to become a child (`canBecomeChild`), regardless of whether the dragged
+ * row itself has children.
  */
 // @spec DRAG-UI-011, DRAG-UI-012
-internal fun shouldCollapseChildrenOf(
-    rowId: String,
-    dragged: FlatNode,
-    draggedHasChildren: Boolean,
-): Boolean =
-    if (rowId == dragged.id) draggedHasChildren else !dragged.canBecomeChild
+internal fun shouldCollapseChildrenOf(rowId: String, dragged: DragListItem): Boolean =
+    if (rowId == dragged.id) dragged.children.isNotEmpty() else !dragged.canBecomeChild
 
 /** A visible row's position/size within the list, as reported by `LazyListItemInfo`. */
 internal data class VisibleRowGeometry(val index: Int, val offset: Int, val size: Int)
@@ -439,14 +433,16 @@ internal fun computeDragTarget(
 
 /**
  * One in-progress drag — held by [DragReorderState.activeDrag], non-null exactly while a drag is
- * active. [id] and [rowSize] are fixed at pickup; [currentPosition], [target], and [pointerId]
- * change as the drag proceeds and are each their own [mutableStateOf], so a per-frame update
- * invalidates only their own readers rather than every reader of the drag (see
- * docs/llds/drag-reorder-list.md § Generic Widget API "Drag state holder").
+ * active. [id], [pointerId], and [rowSize] are fixed at pickup (the gesture tracks a single pointer
+ * for the whole drag); [currentPosition] and [target] change as the drag proceeds and are each
+ * their own [mutableStateOf], so a per-frame update invalidates only their own readers rather than
+ * every reader of the drag (see docs/llds/drag-reorder-list.md § Generic Widget API "Drag state
+ * holder").
  */
 @Stable
 internal class ActiveDrag(
     val id: String,
+    val pointerId: PointerId,
     startPosition: Offset,
     val rowSize: IntSize,
 ) {
@@ -454,8 +450,6 @@ internal class ActiveDrag(
     // advanced by each move.
     var currentPosition by mutableStateOf(startPosition)
     var target by mutableStateOf<DropTarget?>(null)
-    // Currently active pointer (can change with multi-touch)
-    var pointerId by mutableStateOf<PointerId?>(null)
 
     // The dragged row's vertical center (viewport relative) — the position drop resolution and
     // auto-scroll test against. Derived from currentPosition, not stored, so it can't fall out of
@@ -518,19 +512,18 @@ internal class DragReorderState(val listState: LazyListState) {
     // Each row prunes its own entry on disposal, so the map tracks live rows, not every id seen.
     val handleCoordinates = mutableMapOf<String, LayoutCoordinates>()
 
-    fun pickUp(rowId: String) {
+    fun pickUp(rowId: String, pointerId: PointerId) {
         val row = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == rowId } ?: return
         activeDrag = ActiveDrag(
             id = rowId,
+            pointerId = pointerId,
             startPosition = Offset(0f, row.offset.toFloat()),
             rowSize = IntSize(0, row.size),
         )
     }
 
-    fun onDragMove(change: PointerInputChange, amount: Offset, haptics: HapticFeedback) {
-        change.consume()
+    fun onDragMove(amount: Offset, haptics: HapticFeedback) {
         val drag = activeDrag ?: return
-        drag.pointerId = change.id
         drag.currentPosition += amount
         updateDropTarget(haptics)
     }
@@ -617,6 +610,38 @@ private fun rememberDragReorderState(): DragReorderState {
 }
 
 /**
+ * One row: the caller's [content] for [node] filling the width, with a trailing drag handle when
+ * [showHandle]. The handle registers its bounds in [handleCoordinates] (keyed by [node]'s id) for
+ * the interceptor's pickup hit-test. Used both for in-list rows and for the floating dragged copy —
+ * whose handle records its own on-screen position, which is where the visible handle actually is.
+ */
+@Composable
+private fun DraggableRow(
+    node: DragListItem,
+    showHandle: Boolean,
+    handleCoordinates: MutableMap<String, LayoutCoordinates>,
+    content: @Composable (DragListItem) -> Unit,
+) {
+    // Center the handle: the caller's content can be taller than the 48dp handle.
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.weight(1f)) { content(node) }
+        if (showHandle) {
+            Icon(
+                imageVector = Icons.Filled.DragHandle,
+                contentDescription = stringResource(R.string.cd_drag_handle),
+                modifier = Modifier
+                    .testTag("drag_handle_${node.id}")
+                    .onGloballyPositioned { handleCoordinates[node.id] = it }
+                    .size(48.dp)
+                    // Padding after size: shrinks only the drawn icon (24dp) within the 48dp
+                    // bounds the interceptor hit-tests.
+                    .padding(12.dp),
+            )
+        }
+    }
+}
+
+/**
  * A drag-to-reorder list over an ordered tree of [DragListItem]s. A row is picked up by its
  * trailing drag handle and dragged to reorder among siblings or re-parent (nest / promote);
  * the rest of the list reflows live to show where a drop would land. Knows nothing about the
@@ -656,14 +681,9 @@ fun DragReorderList(
     val sourceNodes = remember(items) { nodesById(items) }
 
     val activeDrag = state.activeDrag
-    val draggedIndex =
-        activeDrag?.let { drag -> currentItems.indexOfFirst { it.id == drag.id } } ?: -1
-    val draggedItem = if (draggedIndex >= 0) currentItems[draggedIndex] else null
-    val draggedHasChildren = if (draggedIndex >= 0) hasChildrenStructurally(
-        currentItems,
-        draggedIndex,
-        excludeId = null
-    ) else false
+    // The dragged row's source (tree) node — carries its id, canBecomeChild, and children; null if
+    // the dragged id is no longer in `items`. Drives the collapse decision and the floating row.
+    val draggedNode = activeDrag?.let { sourceNodes[it.id] }
 
     val displayOrder = when {
         activeDrag?.target != null ->
@@ -745,7 +765,7 @@ fun DragReorderList(
         // scroll are the same node.
         val gestureInterceptor = Modifier.pointerInput(Unit) {
             awaitPointerEventScope {
-                while (true) {
+                gesture@ while (true) {
                     // First look, ahead of the internal scroll (Initial vs Main pass).
                     val down = awaitFirstDown(
                         requireUnconsumed = false,
@@ -772,38 +792,41 @@ fun DragReorderList(
                     down.consume()
                     val touchSlop = viewConfiguration.touchSlop
                     var overSlop = Offset.Zero
-                    var startedDrag = false
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (change.changedToUpIgnoreConsumed()) break // released = tap
+                        // Pointer lost, or released before crossing slop (a tap): pick up nothing,
+                        // await the next gesture.
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: continue@gesture
+                        if (change.changedToUpIgnoreConsumed()) continue@gesture
                         overSlop += change.positionChange()
-                        if (overSlop.getDistance() >= touchSlop) {
-                            change.consume()
-                            startedDrag = true
-                            break
-                        }
+                        // Consume every move on the Initial pass so the internal scroll never
+                        // starts — we already claimed this pointer (down.consume() above) for a
+                        // possible drag.
+                        change.consume()
+                        if (overSlop.getDistance() >= touchSlop) break // slop crossed — commit
                     }
-                    if (!startedDrag) continue
 
-                    state.pickUp(rowId)
+                    state.pickUp(rowId, down.id)
 
                     // Drive the drag on the Initial pass too, so every move is consumed
                     // before the internal scroll can act on it — the drag stays exclusive
                     // for its whole lifetime, including throughout any auto-scroll.
-                    var completed = false
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (change.changedToUpIgnoreConsumed()) {
-                            completed = true
-                            break
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        // Pointer lost mid-drag: cancel and await the next gesture.
+                        if (change == null) {
+                            state.cancelDrag()
+                            continue@gesture
                         }
-                        state.onDragMove(change, change.positionChange(), haptics)
+                        // Released: report the drop and await the next gesture.
+                        if (change.changedToUpIgnoreConsumed()) {
+                            state.endDragAndMaybeMove(currentItems, haptics, onMove)
+                            continue@gesture
+                        }
+                        state.onDragMove(change.positionChange(), haptics)
                         change.consume()
                     }
-                    if (completed) state.endDragAndMaybeMove(currentItems, haptics, onMove)
-                    else state.cancelDrag()
                 }
             }
         }
@@ -820,8 +843,8 @@ fun DragReorderList(
                 }
                 val isDraggedRow = item.id == activeDrag?.id
                 val parentId = if (item.depth > 0) groupAnchorOf(displayOrder, item.id) else null
-                val collapsed = parentId != null && draggedItem != null &&
-                        shouldCollapseChildrenOf(parentId, draggedItem, draggedHasChildren)
+                val collapsed = parentId != null && draggedNode != null &&
+                        shouldCollapseChildrenOf(parentId, draggedNode)
                 // Animated, not a plain value: the row's *position* already glides smoothly
                 // via Modifier.animateItem() below, but depth (and so indent) can change in
                 // the same hypothetical-order update (e.g. crossing into/out of a nest) —
@@ -834,67 +857,33 @@ fun DragReorderList(
                 )
 
                 AnimatedVisibility(visible = !collapsed, modifier = Modifier.animateItem()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        // Center the handle on the row: the caller's content can be taller than
-                        // the 48dp handle, and without this the handle pins to the row's top
-                        // edge instead of sitting mid-height.
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isDraggedRow) {
-                            // Real content moved to the floating overlay below; this reserves
-                            // the row's own former height so the placeholder reads as a full
-                            // row-height box (DRAG-UI-003), not a collapsed empty one. A nest
-                            // is communicated by this placeholder's own indentation (one
-                            // level deeper than the target) alone — no separate highlight on
-                            // the target row itself (DRAG-UI-003).
-                            val placeholderHeight =
-                                with(density) { (activeDrag?.rowSize?.height ?: 0).toDp() }
-                            val placeholderShape = RoundedCornerShape(8.dp)
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(placeholderHeight)
-                                    .padding(start = indent)
-                                    // Placed after the depth indent so its reported
-                                    // semantics bounds (used by tests) reflect the indented
-                                    // region itself, not the full-width box the indent is
-                                    // carving it out of.
-                                    .testTag("drop_placeholder_${item.id}")
-                                    .padding(4.dp)
-                                    .clip(placeholderShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .border(
-                                        2.dp,
-                                        MaterialTheme.colorScheme.primary,
-                                        placeholderShape
-                                    ),
-                            )
-                        } else {
-                            Box(modifier = Modifier.weight(1f)) { content(sourceNodes.getValue(item.id)) }
-                        }
-                        // Purely a visual affordance — the drag gesture is hosted on the
-                        // LazyColumn interceptor above, not here. Kept mounted (not gated on
-                        // !isDraggedRow) even for the dragged row so its onGloballyPositioned
-                        // bounds stay current for the interceptor's pickup hit-testing; made
-                        // invisible (alpha 0, which doesn't affect layout or hit-testing, only
-                        // drawing) while dragged, so it doesn't read as left behind with the
-                        // static placeholder — a decorative copy floats with the row instead.
-                        if (displayOrder.size > 1) {
-                            Icon(
-                                imageVector = Icons.Filled.DragHandle,
-                                contentDescription = stringResource(R.string.cd_drag_handle),
-                                modifier = Modifier
-                                    .testTag("drag_handle_${item.id}")
-                                    .onGloballyPositioned { state.handleCoordinates[item.id] = it }
-                                    .size(48.dp)
-                                    .alpha(if (isDraggedRow) 0f else 1f)
-                                    // Padding comes after the size so it only shrinks what's
-                                    // drawn, not the 48dp bounds the interceptor hit-tests —
-                                    // the standard Material 24dp icon within a 48dp target.
-                                    .padding(12.dp),
-                            )
-                        }
+                    if (isDraggedRow) {
+                        // The dragged row's placeholder — marks the drop position at its drop depth
+                        // (indent), reserving the row's former height (DRAG-UI-003); the real content
+                        // floats in the overlay below. No handle, so it runs to the trailing edge.
+                        val placeholderHeight =
+                            with(density) { (activeDrag?.rowSize?.height ?: 0).toDp() }
+                        val placeholderShape = RoundedCornerShape(8.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(placeholderHeight)
+                                .padding(start = indent)
+                                // testTag after the indent so its semantics bounds (asserted by
+                                // tests) reflect the indented region, not the full width.
+                                .testTag("drop_placeholder_${item.id}")
+                                .padding(4.dp)
+                                .clip(placeholderShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, placeholderShape),
+                        )
+                    } else {
+                        DraggableRow(
+                            node = sourceNodes.getValue(item.id),
+                            showHandle = displayOrder.size > 1,
+                            handleCoordinates = state.handleCoordinates,
+                            content = content,
+                        )
                     }
                 }
             }
@@ -926,7 +915,7 @@ fun DragReorderList(
         }
 
         // @spec DRAG-UI-002
-        if (draggedItem != null && activeDrag != null) {
+        if (activeDrag != null && draggedNode != null) {
             Surface(
                 tonalElevation = 8.dp,
                 shadowElevation = 8.dp,
@@ -934,24 +923,12 @@ fun DragReorderList(
                     .zIndex(2f)
                     .offset { activeDrag.currentPosition.round() },
             ) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Box(modifier = Modifier.weight(1f)) { content(sourceNodes.getValue(draggedItem.id)) }
-                    // Decorative only — the real, interactive handle (which hosts the
-                    // active gesture) stays mounted at the placeholder's position, just
-                    // invisible there; this copy is what actually reads as "attached to
-                    // the thing you're dragging," matching the floating row it's part of.
-                    if (displayOrder.size > 1) {
-                        Icon(
-                            imageVector = Icons.Filled.DragHandle,
-                            contentDescription = null,
-                            // Same 48dp footprint / 24dp drawn icon as the real handle, for
-                            // visual consistency between the placeholder and floating rows.
-                            modifier = Modifier
-                                .size(48.dp)
-                                .padding(12.dp),
-                        )
-                    }
-                }
+                DraggableRow(
+                    node = draggedNode,
+                    showHandle = displayOrder.size > 1,
+                    handleCoordinates = state.handleCoordinates,
+                    content = content,
+                )
             }
         }
     }
