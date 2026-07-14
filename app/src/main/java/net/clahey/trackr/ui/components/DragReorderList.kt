@@ -506,7 +506,7 @@ internal class DragReorderState(val listState: LazyListState) {
     var pendingScrollPin by mutableStateOf<ScrollPin?>(null)
 
     // The order the current layout actually reflects — what listState.layoutInfo's indices point
-    // into. [resolveTargetAndZone] hit-tests against this, not the live displayOrder, because the
+    // into. [updateDropTarget] hit-tests against this, not the live displayOrder, because the
     // pointer coroutine runs ahead of layout: displayOrder can already describe an arrangement
     // that hasn't been laid out yet, so hit-testing it against the still-old layoutInfo indices
     // would resolve the wrong target/zone. [DragReorderList] advances this from a SideEffect, so
@@ -532,7 +532,7 @@ internal class DragReorderState(val listState: LazyListState) {
         val drag = activeDrag ?: return
         drag.pointerId = change.id
         drag.currentPosition += amount
-        resolveTargetAndZone(haptics)
+        updateDropTarget(haptics)
     }
 
     // The picked-up row is read from live state (activeDrag / renderedOrder), never from a
@@ -558,11 +558,17 @@ internal class DragReorderState(val listState: LazyListState) {
 
     fun cancelDrag() = reset()
 
+    // Hit-tests the pointer against the current layout and, when the resulting drop position
+    // differs from the current one, commits it — firing the haptic tick, capturing the scroll
+    // pin (DRAG-UI-020), and writing the new target. That target write is the reorder: it is the
+    // only trigger needed, since DragReorderList's displayOrder observes activeDrag.target and
+    // recomputes the hypothetical order (the live reflow) from it.
+    //
     // Recomputes everything from live state (activeDrag / renderedOrder) rather than closing
     // over outer vals — this is called from the pointerInput coroutine, launched once per row
     // and never relaunched, so every read must go through live state or it stays bound to the
     // row's first-composition closure.
-    fun resolveTargetAndZone(haptics: HapticFeedback) {
+    fun updateDropTarget(haptics: HapticFeedback) {
         val drag = activeDrag ?: return
         val order = renderedOrder
         if (order.none { it.id == drag.id }) return
@@ -593,6 +599,7 @@ internal class DragReorderState(val listState: LazyListState) {
                 listState.firstVisibleItemIndex,
                 listState.firstVisibleItemScrollOffset,
             )
+            // The reorder: displayOrder observes this and reflows from it (see the method comment).
             drag.target = resolved
         }
     }
@@ -711,7 +718,7 @@ fun DragReorderList(
                     // Treat the scroll as a drag event: the finger is held still while rows move
                     // under it, so re-resolve the target against the newly-scrolled content instead
                     // of letting it freeze (DRAG-UI-004).
-                    state.resolveTargetAndZone(haptics)
+                    state.updateDropTarget(haptics)
                 }
                 delay(16)
             }
