@@ -112,13 +112,14 @@ fun CategoryEditScreen(
     val previewEvent by viewModel.previewEvent.collectAsState()
     val isEditMode = viewModel.isEditMode
     val isDirty by viewModel.isDirty.collectAsState()
+    val hasUserEdits by viewModel.hasUserEdits.collectAsState()
 
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
     var showBackDiscardDialog by remember { mutableStateOf(false) }
 
-    // @spec CAT-NAV-006
-    BackHandler(enabled = isDirty) { showBackDiscardDialog = true }
+    // @spec CAT-NAV-006 — only warn once the user has actually edited a field
+    BackHandler(enabled = hasUserEdits) { showBackDiscardDialog = true }
 
     val categoryNotFound = stringResource(R.string.category_not_found)
     LaunchedEffect(navigateBack) {
@@ -157,7 +158,7 @@ fun CategoryEditScreen(
                 navigationIcon = {
                     // @spec CAT-NAV-006
                     IconButton(onClick = {
-                        if (isDirty) showBackDiscardDialog = true
+                        if (hasUserEdits) showBackDiscardDialog = true
                         else onNavigateBack(null)
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))

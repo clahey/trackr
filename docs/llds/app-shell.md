@@ -114,7 +114,7 @@ Two `NavigationBarItem`s:
 | Timeline | `timeline` | `Icons.Default.Home` |
 | Categories | `categoryList` | `Icons.Default.Label` |
 
-Visibility: shown when `currentDestination` matches `timeline` or `categoryList`; hidden otherwise.
+Visibility: shown when `currentDestination` matches `timeline` or `categoryList`; hidden otherwise. The bar is wrapped in `AnimatedVisibility` (slide + shrink) so it eases in/out rather than appearing/vanishing instantly. Without this, toggling it snaps the `Scaffold`'s bottom inset from bar-height to 0 the instant the route changes — which reflows the still-visible outgoing screen downward mid-transition, most noticeably a vertically-centered timeline empty state (EL-UI-092/093/094). Animating the bar's height eases that inset change instead of jolting it (APP-UI-002).
 
 Selecting an already-active tab is a no-op (no re-navigation).
 

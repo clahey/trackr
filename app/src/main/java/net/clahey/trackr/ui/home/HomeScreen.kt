@@ -150,13 +150,19 @@ fun HomeScreen(
     // Reopen the quick-log sheet after returning from an inline category-create excursion.
     // Read once per composition so it fires on return, not on the tap that starts the excursion.
     LaunchedEffect(Unit) {
+        // Always clear the one-shot result on return so a plain (non-sheet) create from the welcome
+        // screen can't leak a stale pre-selection into a later sheet create.
+        val newId = pendingCreatedCategoryId.value
+        if (newId != null) onCreatedCategoryConsumed()
+        // Only the sheet's "+ New" tiles set this flag, so it alone means "you came from the sheet."
         if (!quickLogVm.consumePendingCategoryCreate()) return@LaunchedEffect
         showSheet = true
-        val newId = pendingCreatedCategoryId.value ?: return@LaunchedEffect
-        onCreatedCategoryConsumed()
-        // The category may trail the nav result by a frame or two; wait for it, then pre-select (step 2).
-        val created = quickLogVm.categories.mapNotNull { list -> list.firstOrNull { it.id == newId } }.first()
-        quickLogVm.selectCategory(created)
+        if (newId != null) {
+            // Created from a sheet tile: pre-select at step 2 (await the row appearing).
+            val created = quickLogVm.categories.mapNotNull { list -> list.firstOrNull { it.id == newId } }.first()
+            quickLogVm.selectCategory(created)
+        }
+        // else cancelled from a sheet tile: reopen at step 1 (drill-down context preserved).
     }
 
     // Scroll to pre-filter day when filter applied
@@ -296,14 +302,11 @@ fun HomeScreen(
                 // @spec EL-UI-092, EL-UI-093, EL-UI-094
                 EmptyTimeline(
                     state = currentEmptyState,
-                    onAddStarters = {
-                        homeVm.addStarterCategories(starterInputs)
-                        showSheet = true
-                    },
-                    onCreateCategory = {
-                        quickLogVm.beginCategoryCreate()
-                        onNavigateToCreateCategory()
-                    },
+                    // Seed the categories only; the timeline then lands on the "No events" state,
+                    // which points the user at the FAB (rather than a picker appearing on its own).
+                    onAddStarters = { homeVm.addStarterCategories(starterInputs) },
+                    // Plain trip to category creation — no sheet reopen and no auto-log on return.
+                    onCreateCategory = onNavigateToCreateCategory,
                     onClearFilter = { homeVm.setFilter(ActiveFilter.All) },
                 )
             } else LazyColumn(

@@ -1,5 +1,10 @@
 package net.clahey.trackr.ui.navigation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -52,8 +57,15 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
     val showBottomBar = currentRoute == Routes.TIMELINE || currentRoute == Routes.CATEGORY_LIST
 
     Scaffold(
+        // @spec APP-UI-002 — animate the bar in/out so its bottom-inset contribution eases rather
+        // than snapping when navigating to/from a detail screen, which otherwise jolts content
+        // (most visibly a vertically-centered empty state) down as the bar disappears.
         bottomBar = {
-            if (showBottomBar) {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically { it } + expandVertically(),
+                exit = slideOutVertically { it } + shrinkVertically(),
+            ) {
                 NavigationBar {
                     NavigationBarItem(
                         selected = currentRoute == Routes.TIMELINE,

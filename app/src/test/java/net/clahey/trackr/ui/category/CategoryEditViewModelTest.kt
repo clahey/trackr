@@ -181,6 +181,27 @@ class CategoryEditViewModelTest {
         assertEquals("c1", vm.savedCategoryId.value)
     }
 
+    // ---------- Back-guard edit tracking (CAT-NAV-006) ----------
+
+    // @spec CAT-NAV-006
+    @Test fun `hasUserEdits is false on a fresh create screen even though Save shows`() = runTest {
+        assertFalse(vm.hasUserEdits.value)
+        assertTrue(vm.isDirty.value) // create mode: Save button visible immediately (CAT-UI-067)
+    }
+
+    // @spec CAT-NAV-006
+    @Test fun `hasUserEdits becomes true after editing a field`() = runTest {
+        vm.setName("Running")
+        assertTrue(vm.hasUserEdits.value)
+    }
+
+    // @spec CAT-NAV-006
+    @Test fun `hasUserEdits is false on a freshly loaded edit screen`() = runTest {
+        repo.saveCategory(makeCategory("c1"))
+        vm = editVm("c1")
+        assertFalse(vm.hasUserEdits.value)
+    }
+
     // ---------- ValueType warning tiers ----------
 
     // @spec CAT-UI-030
