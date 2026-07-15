@@ -96,6 +96,8 @@ import net.clahey.trackr.ui.components.formatValue
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
@@ -109,8 +111,12 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun HomeScreen(
     onNavigateToEventEdit: (eventId: String, filterCategoryId: String?) -> Unit,
+    onNavigateToCreateCategory: () -> Unit = {},
+    onNavigateToCreateSubCategory: (parentId: String) -> Unit = {},
     pendingSnackbarMessage: StateFlow<String?> = MutableStateFlow(null),
     onSnackbarMessageConsumed: () -> Unit = {},
+    pendingCreatedCategoryId: StateFlow<String?> = MutableStateFlow(null),
+    onCreatedCategoryConsumed: () -> Unit = {},
     homeVm: HomeViewModel = hiltViewModel(),
     quickLogVm: QuickLogViewModel = hiltViewModel(),
 ) {
@@ -133,6 +139,19 @@ fun HomeScreen(
         val msg = snackbarMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         onSnackbarMessageConsumed()
+    }
+
+    // @spec EL-NAV-021
+    // Reopen the quick-log sheet after returning from an inline category-create excursion.
+    // Read once per composition so it fires on return, not on the tap that starts the excursion.
+    LaunchedEffect(Unit) {
+        if (!quickLogVm.consumePendingCategoryCreate()) return@LaunchedEffect
+        showSheet = true
+        val newId = pendingCreatedCategoryId.value ?: return@LaunchedEffect
+        onCreatedCategoryConsumed()
+        // The category may trail the nav result by a frame or two; wait for it, then pre-select (step 2).
+        val created = quickLogVm.categories.mapNotNull { list -> list.firstOrNull { it.id == newId } }.first()
+        quickLogVm.selectCategory(created)
     }
 
     // Scroll to pre-filter day when filter applied
@@ -318,6 +337,8 @@ fun HomeScreen(
             QuickLogSheet(
                 categories = categories,
                 viewModel = quickLogVm,
+                onNavigateToCreateCategory = onNavigateToCreateCategory,
+                onNavigateToCreateSubCategory = onNavigateToCreateSubCategory,
                 onDismiss = {
                     scope.launch { sheetState.hide() }
                     quickLogVm.reset()
@@ -447,12 +468,25 @@ private fun CategoryTile(emoji: String?, name: String, color: Long, onClick: () 
     }
 }
 
+// @spec EL-UI-090, EL-UI-091
+@Composable
+private fun AddCategoryTile(name: String, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(24.dp))
+            Text(name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
 // EL-UI-054, EL-UI-055b, EL-UI-072, EL-UI-073, EL-UI-074, EL-NAV-002, EL-PROC-001
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickLogSheet(
     categories: List<Category>,
     viewModel: QuickLogViewModel,
+    onNavigateToCreateCategory: () -> Unit,
+    onNavigateToCreateSubCategory: (parentId: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val selectedCategory by viewModel.selectedCategory.collectAsState()
@@ -560,6 +594,13 @@ private fun QuickLogSheet(
                             onClick = { viewModel.selectCategory(sub) },
                         )
                     }
+                    // @spec EL-UI-091, EL-NAV-020
+                    item(key = "add-subcategory") {
+                        AddCategoryTile(name = stringResource(R.string.quick_log_new_subcategory)) {
+                            viewModel.beginCategoryCreate()
+                            onNavigateToCreateSubCategory(expandedMeta.id)
+                        }
+                    }
                 }
             } else {
                 // Top-level MetaCategory grid
@@ -579,6 +620,13 @@ private fun QuickLogSheet(
                                 else viewModel.selectCategory(meta)
                             },
                         )
+                    }
+                    // @spec EL-UI-090, EL-NAV-020
+                    item(key = "add-category") {
+                        AddCategoryTile(name = stringResource(R.string.quick_log_new_category)) {
+                            viewModel.beginCategoryCreate()
+                            onNavigateToCreateCategory()
+                        }
                     }
                 }
             }

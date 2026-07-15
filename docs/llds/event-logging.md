@@ -62,6 +62,10 @@ Grid of MetaCategory items (resolved emoji + name; colored border using the cate
 
 When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has SubCategories, the quick-log opens directly in the drill-down view for that MetaCategory, skipping the initial tap. When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has no SubCategories, step 2 opens directly (existing behaviour). When `ActiveFilter.Sub` is active, step 2 opens directly for the subcategory.
 
+**Inline category creation.** The top-level grid always ends with a persistent **"+ New category"** tile; the drill-down grid always ends with a **"+ New subcategory"** tile (creating a child of the expanded MetaCategory). On a fresh install with no categories, step 1 shows the "Choose a category" heading over a grid holding only the "+ New category" tile — the primary action (FAB → step 1) is never a dead end (EL-UI-090, EL-UI-091). Tapping "+ New category" navigates to Category Edit for a new top-level category; "+ New subcategory" navigates with `parentId` set to the expanded MetaCategory. Both first set `QuickLogViewModel.pendingCategoryCreate` so the sheet reopens on return; navigating away dismisses the sheet, but `QuickLogViewModel` survives on the back stack, preserving `expandedMetaCategoryId` (EL-NAV-020).
+
+**Reopen after inline create.** On the next return to the timeline, `HomeScreen` consumes `pendingCategoryCreate` and reopens the sheet. If Category Edit reported a new category id on the timeline back-stack entry's `SavedStateHandle` (`created_category_id`, written synchronously before it popped — see `docs/llds/category-management.md § CategoryEditViewModel`), the sheet awaits that category appearing in `categories`, `selectCategory`s it, and opens at **step 2** ready to log; otherwise (cancel/back, no id) it reopens at **step 1**, with the preserved `expandedMetaCategoryId` restoring any drill-down context. The reopen intent is read once per `HomeScreen` composition (a `LaunchedEffect(Unit)`), so it fires only on return from the create excursion, not on the tap that starts it (EL-NAV-021).
+
 **Step 2 — Value + details**
 - Value input (see Value Input section below); for Number, Text, and Duration types the input field is automatically focused on entry so the keyboard rises without an extra tap
 - Optional: single photo (camera or gallery picker)
@@ -268,6 +272,7 @@ sealed class DayEntry {
 - `save()`: calls `validateValueForSave(value.value, category)`; if it returns a field name, emits `SaveResult.ValidationError` and returns. Otherwise calls `value.value.toEventValue()`, generates a UUID, writes image to `ImageStore.newFile()` if present, calls `repository.saveEvent()`, clears `imagePath` to null (transferring ownership of the file to the repository), emits `SaveResult.Success`.
 - `reset()`: called when sheet is dismissed (with or without saving); clears all form state — including `value` back to `ValueUIState.None`, `valueDirty` back to `false`, and `saveResult` back to `Idle` — and deletes any captured-but-unsaved image file (if `imagePath` is still non-null, meaning `save()` did not run)
 - **Deleted category guard:** observes `categories`; if `selectedCategory` is no longer present in the list (deleted externally while sheet is open), resets `selectedCategory` to null and returns the user to step 1. If a MetaCategory is deleted while the user is in its drill-down view, the view collapses back to the top-level grid.
+- `pendingCategoryCreate: StateFlow<Boolean>` — reopen intent, set by `beginCategoryCreate()` when the user taps a "+ New category"/"+ New subcategory" tile, before `HomeScreen` navigates to Category Edit. `consumePendingCategoryCreate(): Boolean` atomically reads and clears it; `HomeScreen` calls it once per composition to detect a return from the create excursion. It lives on the ViewModel (not `HomeScreen` local state) because the ViewModel outlives the disposed-and-recomposed `HomeScreen` across the navigation round-trip (EL-NAV-020, EL-NAV-021). Not touched by `reset()` — an in-flight create intent must survive a sheet dismissal.
 
 ### EventEditViewModel
 
@@ -317,6 +322,8 @@ Home (timeline)
     ├── [FAB]              → Quick-Log Sheet (bottom sheet)
     │       ├── [save]     → dismiss sheet, timeline refreshes via Flow
     │       ├── [dismiss]  → reset(), delete any unsaved image
+    │       ├── [+ New category]           → Category Edit (new top-level) → reopen sheet on return
+    │       ├── [+ New subcategory]        → Category Edit (new sub, parentId) → reopen sheet on return
     │       ├── [back in step 2]           → step 1 (selectedCategory = null; expandedMetaCategoryId preserved → drill-down if present)
     │       └── [back in step 1 drill-down] → top-level grid (expandedMetaCategoryId = null)
     └── [tap event]        → Event Edit
@@ -348,6 +355,9 @@ System back and edge swipe are intercepted by `BackHandler` within the sheet: st
 | Undo mechanism | Hard delete + restore via `saveEvent` | Soft delete (pending flag in DB) | No schema change needed; restore is a normal save; soft delete complicates all queries with a filter |
 | Category filter UI | Horizontal chip row; single selection; "All" chip | Toolbar dropdown; drawer; no filter in v1 | Chip row keeps filters always visible and one tap away; single selection covers the common case without multi-select complexity |
 | Filter + FAB interaction | Active filter pre-selects category in quick-log step 2 | Ignore filter; always show picker | If the user filtered to a category, they likely want to log to it — skipping the picker saves a tap |
+| First-run empty state | Persistent "+ New category" tile in the step-1 grid, shown for everyone | Dedicated empty-state screen; disable the FAB until a category exists | One affordance serves both first-run and returning users; keeps the primary action live on a fresh install; no first-run/returning mode split to maintain |
+| Post-create landing | Reopen the sheet pre-selected at step 2; a cancelled create reopens at step 1 | Return to the timeline (tap FAB again); always reopen at step 1 | Keeps the user in the logging flow they started; fewest taps from "I need a category" to logging against it |
+| Reopen-intent signal | `pendingCategoryCreate` flag on the surviving ViewModel, read once per `HomeScreen` composition; new category id carried separately via the nav result | Drive reopen purely off the `created_category_id` nav result | A nav result only exists for the create case; the flag also reopens on cancel. Reading it per-composition (not via an effect keyed on the flag) fires it on return, not on the initiating tap, sidestepping the set-then-navigate race |
 | Scale widget | Horizontal slider with integer snap | Segmented row (10 buttons) | Slider conveys the continuous 1–10 range visually; segmented row adds tap-target complexity for 10 values |
 | Boolean widget | Two-button row (Yes / No) | Toggle switch | Toggle is ambiguous about which state is "on"; two-button row is explicit and symmetric |
 | Duration widget | Three separate H / M / S numeric fields | Single seconds field; HH:MM:SS text entry | Three fields allow independent editing of each component; single seconds field is unintuitive for durations > 60s |
@@ -365,7 +375,13 @@ System back and edge swipe are intercepted by `BackHandler` within the sheet: st
 
 ### Open questions
 
-1. **Empty timeline state** — what the home screen shows when there are no events yet. Copy/illustration TBD.
+1. **Empty timeline state** — what the home screen shows when there are no events yet. Copy/illustration TBD. Distinct from the empty *category picker* (the quick-log step-1 grid with no categories), whose dead-end is resolved by the always-present "+ New category" tile (EL-UI-090).
+
+### Resolved edges — inline category creation (EL-UI-090/091, EL-NAV-020/021)
+
+- **Room-`Flow` lag on reopen:** the `created_category_id` result is present immediately on return (written before the pop), but the new category row may trail it by a frame or two in `categories`. The step-2 reopen awaits the row's appearance before `selectCategory`, so it never selects a not-yet-loaded category.
+- **Create-then-delete id:** an id naming a category that isn't in `categories` (only reachable out-of-flow — the reopened sheet offers no delete) is a natural no-op: reopen is gated on `pendingCategoryCreate`, not on the id resolving, so the sheet still reopens at step 1 and the step-2 advance simply never fires. No hang, no bound needed.
+- **Active filter vs. explicit create:** when a filter pre-selected a category and the user instead created one inline, the reopen selects the *created* category (explicit intent wins over the filter's pre-selection).
 
 ### Deferred until after MVP
 

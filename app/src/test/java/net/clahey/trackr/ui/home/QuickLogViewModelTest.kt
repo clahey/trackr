@@ -433,4 +433,31 @@ class QuickLogViewModelTest {
         vm.selectCategory(cat)
         assertEquals(ValueUIState.Exercise("3", "15"), vm.value.value)
     }
+
+    // ---------- Inline category creation (EL-NAV-020, EL-NAV-021) ----------
+
+    // @spec EL-NAV-020
+    @Test fun `beginCategoryCreate sets pendingCategoryCreate`() = runTest {
+        vm.beginCategoryCreate()
+        assertTrue(vm.pendingCategoryCreate.value)
+    }
+
+    // @spec EL-NAV-021
+    @Test fun `consumePendingCategoryCreate returns true and clears when set`() = runTest {
+        vm.beginCategoryCreate()
+        assertTrue(vm.consumePendingCategoryCreate())
+        assertFalse(vm.pendingCategoryCreate.value)
+    }
+
+    // @spec EL-NAV-021
+    @Test fun `consumePendingCategoryCreate returns false when not set`() = runTest {
+        assertFalse(vm.consumePendingCategoryCreate())
+    }
+
+    // @spec EL-NAV-020
+    @Test fun `reset does not clear pendingCategoryCreate`() = runTest {
+        vm.beginCategoryCreate()
+        vm.reset()
+        assertTrue(vm.pendingCategoryCreate.value)
+    }
 }

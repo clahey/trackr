@@ -100,10 +100,23 @@ fun AppNavHost(
                 onNavigateToEventEdit = { eventId, filterCategoryId ->
                     navController.navigate(Routes.eventEdit(eventId, filterCategoryId))
                 },
+                // @spec EL-NAV-020
+                onNavigateToCreateCategory = {
+                    navController.navigate(Routes.categoryEdit(null))
+                },
+                onNavigateToCreateSubCategory = { parentId ->
+                    navController.navigate(Routes.categoryEditNewSubCategory(parentId))
+                },
                 pendingSnackbarMessage = entry.savedStateHandle
                     .getStateFlow<String?>("snackbar_message", null),
                 onSnackbarMessageConsumed = {
                     entry.savedStateHandle.remove<String>("snackbar_message")
+                },
+                // @spec EL-NAV-021
+                pendingCreatedCategoryId = entry.savedStateHandle
+                    .getStateFlow<String?>("created_category_id", null),
+                onCreatedCategoryConsumed = {
+                    entry.savedStateHandle.remove<String>("created_category_id")
                 },
             )
         }
@@ -168,6 +181,12 @@ fun AppNavHost(
                 // @spec CAT-NAV-010
                 onNavigateToCreateSubCategory = { parentId ->
                     navController.navigate(Routes.categoryEditNewSubCategory(parentId))
+                },
+                // @spec CAT-NAV-020 — report the new id to whoever initiated the create
+                onCategoryCreated = { id ->
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("created_category_id", id)
                 },
             )
         }

@@ -157,6 +157,30 @@ class CategoryEditViewModelTest {
         assertEquals(0xFF43A047L, getSavedCategoryById("c1").color)
     }
 
+    // ---------- Created-id reporting (CAT-NAV-020) ----------
+
+    // @spec CAT-NAV-020
+    @Test fun `savedCategoryId is null before save`() = runTest {
+        assertNull(vm.savedCategoryId.value)
+    }
+
+    // @spec CAT-NAV-020
+    @Test fun `new category save reports the persisted id via savedCategoryId`() = runTest {
+        vm.setName("Running")
+        vm.setEmojiUIState(EmojiUIState(EmojiMode.CUSTOM, "🏃"))
+        vm.save()
+        assertEquals(getSavedCategory().id, vm.savedCategoryId.value)
+    }
+
+    // @spec CAT-NAV-020
+    @Test fun `edit save sets savedCategoryId to the existing id`() = runTest {
+        repo.saveCategory(makeCategory("c1"))
+        vm = editVm("c1")
+        vm.setName("Renamed")
+        vm.save()
+        assertEquals("c1", vm.savedCategoryId.value)
+    }
+
     // ---------- ValueType warning tiers ----------
 
     // @spec CAT-UI-030

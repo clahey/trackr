@@ -114,6 +114,8 @@
     <string name="timeline_day_yesterday">Yesterday</string>
     <string name="quick_log_choose_category">Choose a category</string>
     <string name="quick_log_log_directly">Log to %s directly</string>
+    <string name="quick_log_new_category">New category</string>
+    <string name="quick_log_new_subcategory">New subcategory</string>
     <string name="add_image_dialog_title">Add image</string>
 
     <!-- Delete category dialog -->

@@ -51,6 +51,10 @@ class QuickLogViewModel @Inject constructor(
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
 
+    // @spec EL-NAV-020, EL-NAV-021
+    private val _pendingCategoryCreate = MutableStateFlow(false)
+    val pendingCategoryCreate: StateFlow<Boolean> = _pendingCategoryCreate.asStateFlow()
+
     init {
         viewModelScope.launch {
             repository.getCategories().collect { cats ->
@@ -112,6 +116,18 @@ class QuickLogViewModel @Inject constructor(
 
     fun expandMetaCategory(id: String?) {
         expandedMetaCategoryId.value = id
+    }
+
+    // @spec EL-NAV-020
+    fun beginCategoryCreate() {
+        _pendingCategoryCreate.value = true
+    }
+
+    // @spec EL-NAV-021
+    fun consumePendingCategoryCreate(): Boolean {
+        val pending = _pendingCategoryCreate.value
+        _pendingCategoryCreate.value = false
+        return pending
     }
 
     suspend fun save() {

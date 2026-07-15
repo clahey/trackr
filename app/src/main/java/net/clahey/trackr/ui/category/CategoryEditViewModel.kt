@@ -160,6 +160,10 @@ class CategoryEditViewModel @Inject constructor(
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
 
+    // @spec CAT-NAV-020
+    private val _savedCategoryId = MutableStateFlow<String?>(null)
+    val savedCategoryId: StateFlow<String?> = _savedCategoryId.asStateFlow()
+
     private val _originalValueType = MutableStateFlow<ValueType?>(null)
 
     // @spec CAT-UI-030
@@ -314,6 +318,8 @@ class CategoryEditViewModel @Inject constructor(
             repository.saveCategory(category)
         }
         _isDirty.value = false
+        // @spec CAT-NAV-020
+        _savedCategoryId.value = category.id
         _saveResult.value = SaveResult.Success
     }
 
