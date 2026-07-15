@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ElevatedCard
@@ -77,6 +78,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import net.clahey.trackr.ui.rememberStarterCategoryInputs
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import net.clahey.trackr.R
@@ -113,6 +116,7 @@ fun HomeScreen(
     onNavigateToEventEdit: (eventId: String, filterCategoryId: String?) -> Unit,
     onNavigateToCreateCategory: () -> Unit = {},
     onNavigateToCreateSubCategory: (parentId: String) -> Unit = {},
+    onNavigateToAbout: () -> Unit = {},
     pendingSnackbarMessage: StateFlow<String?> = MutableStateFlow(null),
     onSnackbarMessageConsumed: () -> Unit = {},
     pendingCreatedCategoryId: StateFlow<String?> = MutableStateFlow(null),
@@ -121,6 +125,7 @@ fun HomeScreen(
     quickLogVm: QuickLogViewModel = hiltViewModel(),
 ) {
     val dayGroups by homeVm.dayGroups.collectAsState()
+    val emptyState by homeVm.emptyState.collectAsState()
     val activeFilter by homeVm.activeFilter.collectAsState()
     val pendingDelete by homeVm.pendingDelete.collectAsState()
     val preFilterTopDay by homeVm.preFilterTopDay.collectAsState()
@@ -189,8 +194,20 @@ fun HomeScreen(
         }
     }
 
+    val starterInputs = rememberStarterCategoryInputs()
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.timeline_title)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.timeline_title)) },
+                actions = {
+                    // @spec APP-NAV-010
+                    IconButton(onClick = onNavigateToAbout) {
+                        Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.cd_about))
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             // @spec EL-NAV-001, EL-UI-013, EL-UI-075
             FloatingActionButton(onClick = {
@@ -274,7 +291,22 @@ fun HomeScreen(
                 }
             }
 
-            LazyColumn(
+            val currentEmptyState = emptyState
+            if (currentEmptyState != null) {
+                // @spec EL-UI-092, EL-UI-093, EL-UI-094
+                EmptyTimeline(
+                    state = currentEmptyState,
+                    onAddStarters = {
+                        homeVm.addStarterCategories(starterInputs)
+                        showSheet = true
+                    },
+                    onCreateCategory = {
+                        quickLogVm.beginCategoryCreate()
+                        onNavigateToCreateCategory()
+                    },
+                    onClearFilter = { homeVm.setFilter(ActiveFilter.All) },
+                )
+            } else LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 88.dp),
@@ -403,6 +435,63 @@ private fun UndoPlaceholderRow(event: Event, onUndo: () -> Unit) {
         )
         TextButton(onClick = onUndo) { Text(stringResource(R.string.action_undo)) }
     }
+}
+
+// @spec EL-UI-092, EL-UI-093, EL-UI-094
+@Composable
+private fun EmptyTimeline(
+    state: TimelineEmptyState,
+    onAddStarters: () -> Unit,
+    onCreateCategory: () -> Unit,
+    onClearFilter: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        when (state) {
+            is TimelineEmptyState.NoCategories -> {
+                EmptyText(
+                    title = stringResource(R.string.empty_no_categories_title),
+                    body = stringResource(R.string.empty_no_categories_body),
+                )
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onAddStarters) { Text(stringResource(R.string.action_add_starter_categories)) }
+                TextButton(onClick = onCreateCategory) { Text(stringResource(R.string.empty_create_category)) }
+            }
+            is TimelineEmptyState.NoEvents -> EmptyText(
+                title = stringResource(R.string.empty_no_events_title),
+                body = stringResource(R.string.empty_no_events_body),
+            )
+            is TimelineEmptyState.NoFilterMatch -> {
+                EmptyText(
+                    title = stringResource(R.string.empty_no_match_title, filterLabel(state.filter)),
+                    body = stringResource(R.string.empty_no_match_body),
+                )
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onClearFilter) { Text(stringResource(R.string.action_clear_filter)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyText(title: String, body: String) {
+    Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+    Spacer(Modifier.height(8.dp))
+    Text(
+        body,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+private fun filterLabel(filter: ActiveFilter): String = when (filter) {
+    is ActiveFilter.TopLevel -> "${filter.category.resolvedEmoji} ${filter.category.name}"
+    is ActiveFilter.Sub -> "${filter.sub.resolvedEmoji} ${filter.sub.name}"
+    is ActiveFilter.All -> ""
 }
 
 @Composable

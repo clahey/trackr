@@ -22,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import net.clahey.trackr.ui.about.AboutScreen
 import net.clahey.trackr.ui.category.CategoryEditScreen
 import net.clahey.trackr.ui.category.CategoryListScreen
 import net.clahey.trackr.ui.home.EventEditScreen
@@ -32,6 +33,7 @@ object Routes {
     const val CATEGORY_LIST = "categoryList"
     const val EVENT_EDIT = "eventEdit/{eventId}?filterCategoryId={filterCategoryId}"
     const val CATEGORY_EDIT = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
+    const val ABOUT = "about"
 
     fun eventEdit(eventId: String, filterCategoryId: String? = null) =
         if (filterCategoryId != null) "eventEdit/$eventId?filterCategoryId=$filterCategoryId"
@@ -107,6 +109,8 @@ fun AppNavHost(
                 onNavigateToCreateSubCategory = { parentId ->
                     navController.navigate(Routes.categoryEditNewSubCategory(parentId))
                 },
+                // @spec APP-NAV-010
+                onNavigateToAbout = { navController.navigate(Routes.ABOUT) },
                 pendingSnackbarMessage = entry.savedStateHandle
                     .getStateFlow<String?>("snackbar_message", null),
                 onSnackbarMessageConsumed = {
@@ -189,6 +193,10 @@ fun AppNavHost(
                         ?.set("created_category_id", id)
                 },
             )
+        }
+        // @spec APP-UI-010, APP-NAV-010
+        composable(Routes.ABOUT) {
+            AboutScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

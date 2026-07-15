@@ -47,6 +47,7 @@ LLD: `docs/llds/local-storage.md`
 
 - [x] **LS-BE-080**: The system shall persist a `next_category_color_index` integer in DataStore Preferences, initialized to 0 and never reset.
 - [x] **LS-BE-081**: `getAndIncrementNextCategoryColorIndex(paletteSize: Int)` shall atomically return the current stored index and store `(current + 1) % paletteSize`, keeping the stored value in `[0, paletteSize)` so that concurrent calls never return the same index and the counter cycles at the caller-supplied palette size.
+- [x] **LS-BE-093**: `addStarterCategories(specs)` shall, within a single transaction, read the existing category names and insert only the specs whose name is not already present (case-insensitive), assigning each a top-of-list `sortOrder` preserving the given order, and return the number inserted. The insert-selection and ordering logic is the pure `starterCategoriesToInsert` function shared with the test repository.
 
 ## ImageStore
 

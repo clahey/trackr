@@ -97,6 +97,10 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-075**: The category edit screen shall render the Color section (color picker) inside an `OutlinedFieldBox` labeled "Color", with the label embedded in the box's border in the visual style of `OutlinedTextField`'s floating label.
 - [x] **CAT-UI-076**: When the emoji field fails validation (CAT-UI-021, CAT-UI-022), the Emoji `OutlinedFieldBox`'s border and label shall render in the error color (`MaterialTheme.colorScheme.error`), matching `OutlinedTextField`'s `isError` styling, in addition to the existing inline error text below the field.
 
+## Starter Categories
+
+- [x] **CAT-UI-090**: The system shall define a fixed starter set — Mood (Scale), Sleep (Duration), Water (Number, unit "glasses"), Exercise (Exercise), Medication (Number, unit "mg"), Pain (Scale) — as ordinary top-level categories with preset palette colors. "Add starter categories" shall create, in a single transaction, those whose name is not already present (case-insensitive), placing them at the top of the list in the listed order; if all are already present it shall create none. It shall be reachable from the timeline empty state (EL-UI-092) and from the About screen (APP-UI-010) at any time.
+
 ## Navigation
 
 - [ ] **CAT-NAV-001**: When the user taps the FAB on the category list screen, the system shall navigate to the category edit screen in create mode for a new MetaCategory.

@@ -2,6 +2,7 @@ package net.clahey.trackr.data
 
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.StarterCategoryInput
 import net.clahey.trackr.domain.ValueType
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
@@ -31,6 +32,9 @@ interface TrackrRepository {
     suspend fun deleteEventFiles(imagePaths: List<String>)
 
     suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int
+
+    // @spec CAT-UI-090, LS-BE-093
+    suspend fun addStarterCategories(specs: List<StarterCategoryInput>): Int
 
     suspend fun onStartup()
 }

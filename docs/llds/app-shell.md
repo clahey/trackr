@@ -67,6 +67,7 @@ object Routes {
     const val CATEGORY_LIST  = "categoryList"
     const val EVENT_EDIT     = "eventEdit/{eventId}?filterCategoryId={filterCategoryId}"
     const val CATEGORY_EDIT  = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
+    const val ABOUT          = "about"
 
     fun eventEdit(eventId: String, filterCategoryId: String? = null) = ...
     fun categoryEdit(categoryId: String?, parentId: String? = null) = buildString {
@@ -83,6 +84,7 @@ Full graph:
 AppNavHost (startDestination = timeline)
 ├── timeline
 │       ├── [FAB]            → quickLog (bottom sheet overlay)
+│       ├── [About action]   → about
 │       └── [tap event row]  → eventEdit/{eventId}?filterCategoryId={filterCategoryId}
 ├── eventEdit/{eventId}?filterCategoryId={filterCategoryId}
 │       ├── [save]           → popBackStack
@@ -91,11 +93,15 @@ AppNavHost (startDestination = timeline)
 ├── categoryList
 │       ├── [FAB]            → categoryEdit (no arg)
 │       └── [tap row]        → categoryEdit/{categoryId}
-└── categoryEdit?categoryId={categoryId}&parentId={parentId}
-        ├── [save]           → popBackStack
-        ├── [delete]         → popBackStack
+├── categoryEdit?categoryId={categoryId}&parentId={parentId}
+│       ├── [save]           → popBackStack
+│       ├── [delete]         → popBackStack
+│       └── [back]           → popBackStack
+└── about
         └── [back]           → popBackStack
 ```
+
+The **About** screen (APP-UI-010, reached via an info action in the timeline top app bar, APP-NAV-010) is a static info destination: the app's positioning copy (kept in sync with the store listing — see `publishing.md`), a source-code link (opened via `LocalUriHandler`), the app version (read from `PackageInfo`), and an "Add starter categories" action (CAT-UI-090) that reports the created count via a snackbar. It takes no nav arguments and, like the other detail destinations, shows no bottom bar.
 
 The quick-log sheet is a `ModalBottomSheet` managed inside the `timeline` composable rather than a separate nav destination — this avoids animation jank and keeps the timeline state alive beneath the sheet.
 

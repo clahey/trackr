@@ -5,9 +5,11 @@ import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.SiblingSlot
+import net.clahey.trackr.domain.StarterCategoryInput
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.convertEventValue
 import net.clahey.trackr.domain.reconcileSiblingOrder
+import net.clahey.trackr.domain.starterCategoriesToInsert
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -214,6 +216,17 @@ class FakeTrackrRepository : TrackrRepository {
         val current = nextColorIndex
         nextColorIndex = (nextColorIndex + 1) % paletteSize
         return current
+    }
+
+    // @spec CAT-UI-090, LS-BE-093
+    override suspend fun addStarterCategories(specs: List<StarterCategoryInput>): Int {
+        val toInsert = starterCategoriesToInsert(
+            categories.value.map { it.name },
+            categories.value.minOfOrNull { it.sortOrder },
+            specs,
+        )
+        categories.update { it + toInsert }
+        return toInsert.size
     }
 
     override suspend fun onStartup() {}

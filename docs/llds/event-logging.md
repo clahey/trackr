@@ -53,6 +53,16 @@ When `ActiveFilter.TopLevel` is active, the FAB quick-log sheet opens in an expa
 
 **Filter scroll behavior:** Day groups with no matching events are hidden when a filter is active. When a filter is applied (including switching between active filters), the timeline scrolls to keep the same calendar day approximately at the top (or the nearest earlier day that has matching events, if the current day has none). The pre-filter scroll position (top day) is recorded only on the transition from no filter to a filter — switching between active filters preserves the existing record so that clearing always returns to the original unfiltered position. When the filter is cleared, if the user has not manually scrolled since the filter was first applied, the timeline restores to the recorded pre-filter position. Manual scrolling (user-initiated only; not the system-initiated anchor scroll) discards the recorded position.
 
+### Timeline Empty States
+
+When the timeline has no rows to show, `HomeViewModel` exposes which of three empty states applies via `emptyState: StateFlow<TimelineEmptyState?>` (null when there is content), computed from the day groups, the category list, and the active filter:
+
+- **`NoCategories`** (no categories exist): a welcome state offering **Add starter categories** (creates the starter set per CAT-UI-090 and immediately opens the quick-log sheet so the first event is logged against a real, user-owned category) and **Create a category** (inline creation, reusing the `pendingCategoryCreate` reopen path, EL-NAV-020).
+- **`NoEvents`** (categories exist, nothing logged, no filter): "No events yet — tap + to log your first one." No category prompt — they already have categories; the FAB is the action.
+- **`NoFilterMatch`** (a filter is active with no matching events): names the filtered category and offers **Clear filter** (`setFilter(All)`), so it never reads as though the whole app is empty.
+
+`emptyState` is derived in the ViewModel (not the composable) so the branch logic is unit-tested directly. The filter chip row still renders above the empty view in the `NoEvents`/`NoFilterMatch` cases (EL-UI-093/094); it is naturally absent in `NoCategories` (no categories to chip).
+
 ### Quick-Log Sheet
 
 A bottom sheet opened from the timeline FAB. Two-step flow to minimize taps:
@@ -358,6 +368,8 @@ System back and edge swipe are intercepted by `BackHandler` within the sheet: st
 | First-run empty state | Persistent "+ New category" tile in the step-1 grid, shown for everyone | Dedicated empty-state screen; disable the FAB until a category exists | One affordance serves both first-run and returning users; keeps the primary action live on a fresh install; no first-run/returning mode split to maintain |
 | Post-create landing | Reopen the sheet pre-selected at step 2; a cancelled create reopens at step 1 | Return to the timeline (tap FAB again); always reopen at step 1 | Keeps the user in the logging flow they started; fewest taps from "I need a category" to logging against it |
 | Reopen-intent signal | `pendingCategoryCreate` flag on the surviving ViewModel, read once per `HomeScreen` composition; new category id carried separately via the nav result | Drive reopen purely off the `created_category_id` nav result | A nav result only exists for the create case; the flag also reopens on cancel. Reading it per-composition (not via an effect keyed on the flag) fires it on return, not on the initiating tap, sidestepping the set-then-navigate race |
+| Timeline empty states | Three distinct states (`NoCategories` / `NoEvents` / `NoFilterMatch`) derived in `HomeViewModel` | One generic "nothing here" view; compute in the composable | First-run, empty-but-set-up, and filtered-no-match want different copy and actions — a generic view either nags set-up users or reads as broken under a filter. Deriving in the VM keeps the branch logic unit-testable |
+| First-run starter path | "Add starter categories" then open the log sheet | Auto-create a "day zero" milestone event | Every event needs a real category — a milestone event would need a synthetic "Trackr" category that clutters the filter/quick-log UI and injects data the user didn't log. Opening the sheet gets the same "it works, timeline has content" payoff with the user's own first event |
 | Scale widget | Horizontal slider with integer snap | Segmented row (10 buttons) | Slider conveys the continuous 1–10 range visually; segmented row adds tap-target complexity for 10 values |
 | Boolean widget | Two-button row (Yes / No) | Toggle switch | Toggle is ambiguous about which state is "on"; two-button row is explicit and symmetric |
 | Duration widget | Three separate H / M / S numeric fields | Single seconds field; HH:MM:SS text entry | Three fields allow independent editing of each component; single seconds field is unintuitive for durations > 60s |

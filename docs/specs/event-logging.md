@@ -13,6 +13,12 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-005**: Each event row shall display the category color as a filled circle avatar on the left; the category emoji shall be centered inside the circle using the WCAG foreground color computed by `foregroundColorForBackground(categoryColor)`.
 - [x] **EL-UI-003**: Day group headers shall display "Today" for the current date, "Yesterday" for the prior date, and the full date for all older days.
 
+## Timeline Empty States
+
+- [x] **EL-UI-092**: When the timeline has no events and no categories exist, the screen shall show a welcome empty state offering "Add starter categories" — which creates the starter set (CAT-UI-090) and opens the quick-log sheet — and "Create a category," which starts inline category creation (EL-NAV-020).
+- [x] **EL-UI-093**: When the timeline has no events but at least one category exists and no filter is active, the screen shall show a "No events yet — tap + to log your first one" empty state, without prompting to create a category.
+- [x] **EL-UI-094**: When a category filter is active and no events match it, the screen shall show a distinct empty state that names the filtered category and offers to clear the filter, rather than the whole-app "no events yet" state.
+
 ## Category Filter
 
 - [x] **EL-UI-010**: The timeline screen shall display a horizontally scrollable row of category filter chips; an "All" chip shall appear first, followed by one chip per MetaCategory.
