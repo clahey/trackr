@@ -163,6 +163,8 @@ fun AppNavHost(
                 onNavigateToCategoryEdit = { categoryId ->
                     navController.navigate(Routes.categoryEdit(categoryId))
                 },
+                // @spec APP-NAV-010
+                onNavigateToAbout = { navController.navigate(Routes.ABOUT) },
                 pendingSnackbarMessage = entry.savedStateHandle
                     .getStateFlow<String?>("snackbar_message", null),
                 onSnackbarMessageConsumed = {

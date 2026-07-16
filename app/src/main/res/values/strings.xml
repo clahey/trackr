@@ -155,11 +155,16 @@
     <!-- About -->
     <string name="about_title">About</string>
     <string name="cd_about">About Trackr</string>
-    <string name="about_tagline">Trackr is built for logging fast.</string>
-    <string name="about_body_fast">Define the things you care about, then capture each one in a couple of taps — no forms, no friction.</string>
-    <string name="about_body_local">On-device first. It works fully offline and your phone holds the source of truth; backup and sync, when they arrive, are optional — never required.</string>
-    <string name="about_body_account">No account required, ever — not to use it, not even to back it up.</string>
+    <string name="about_hero_slogan_lead">Log anything.</string>
+    <string name="about_hero_slogan_accent">Fast.</string>
+    <string name="about_point_fast_title">Log fast</string>
+    <string name="about_point_fast_body">Define the things you care about, then capture each one in a couple of taps.</string>
+    <string name="about_point_local_title">On-device first</string>
+    <string name="about_point_local_body">Works fully offline; your phone holds the source of truth. Backup and sync, when they arrive, are optional.</string>
+    <string name="about_point_account_title">No account required</string>
+    <string name="about_point_account_body">Ever — not to use it, not even to back it up.</string>
     <string name="about_source_code">View source code</string>
+    <string name="about_feedback">Feedback &amp; feature requests</string>
     <string name="about_version">Version %s</string>
     <string name="about_starters_all_present">Starter categories already added.</string>
     <plurals name="starters_added">

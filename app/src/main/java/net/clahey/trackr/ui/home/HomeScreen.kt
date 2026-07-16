@@ -75,10 +75,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 import net.clahey.trackr.ui.rememberStarterCategoryInputs
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -555,19 +563,51 @@ private fun CategoryTile(emoji: String?, name: String, color: Long, onClick: () 
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (emoji != null) Text(emoji, style = MaterialTheme.typography.headlineSmall)
-            Text(name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1)
+            // Auto-shrink long names to one line (e.g. "Medication" in the narrow 3-column grid).
+            AutoShrinkLabel(name, MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
         }
     }
 }
 
-// @spec EL-UI-090, EL-UI-091
+// @spec EL-UI-090, EL-UI-091 — full-width "+ New …" tile at the end of the grid
 @Composable
 private fun AddCategoryTile(name: String, onClick: () -> Unit) {
     OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(24.dp))
-            Text(name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1)
+        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+// Shrink the label down to a floor to fit on one line, then ellipsize if it still overflows
+// (BOM 2025.01.01 predates BasicText autoSize, so measure-and-step manually).
+@Composable
+private fun AutoShrinkLabel(text: String, style: TextStyle, minFontSize: TextUnit = 9.sp) {
+    val maxFontSize = if (style.fontSize != TextUnit.Unspecified) style.fontSize else 14.sp
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val measurer = rememberTextMeasurer()
+        val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx().toInt() }
+        val fontSize = remember(text, maxWidthPx, style) {
+            var size = maxFontSize
+            while (size.value > minFontSize.value) {
+                val laid = measurer.measure(
+                    text = text,
+                    style = style.copy(fontSize = size),
+                    maxLines = 1,
+                    constraints = Constraints(maxWidth = maxWidthPx),
+                )
+                if (!laid.hasVisualOverflow) break
+                size = (size.value - 1f).sp
+            }
+            size
         }
+        Text(
+            text,
+            style = style.copy(fontSize = fontSize),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -687,8 +727,8 @@ private fun QuickLogSheet(
                         )
                     }
                     // @spec EL-UI-091, EL-NAV-020
-                    item(key = "add-subcategory") {
-                        AddCategoryTile(name = stringResource(R.string.quick_log_new_subcategory)) {
+                    item(key = "add-subcategory", span = { GridItemSpan(maxLineSpan) }) {
+                        AddCategoryTile(stringResource(R.string.quick_log_new_subcategory)) {
                             viewModel.beginCategoryCreate()
                             onNavigateToCreateSubCategory(expandedMeta.id)
                         }
@@ -714,8 +754,8 @@ private fun QuickLogSheet(
                         )
                     }
                     // @spec EL-UI-090, EL-NAV-020
-                    item(key = "add-category") {
-                        AddCategoryTile(name = stringResource(R.string.quick_log_new_category)) {
+                    item(key = "add-category", span = { GridItemSpan(maxLineSpan) }) {
+                        AddCategoryTile(stringResource(R.string.quick_log_new_category)) {
                             viewModel.beginCategoryCreate()
                             onNavigateToCreateCategory()
                         }

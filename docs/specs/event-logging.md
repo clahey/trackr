@@ -99,8 +99,9 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-074**: The first tile in the drill-down view shall allow the user to log an event directly to the MetaCategory (not to a SubCategory); tapping it shall advance to step 2 with the MetaCategory as the selected category.
 - [x] **EL-UI-075**: While ActiveFilter.TopLevel is active for a MetaCategory that has SubCategories, opening the quick-log sheet shall present step 1 in the drill-down view for that MetaCategory.
 - [x] **EL-UI-076**: When a MetaCategory is deleted while the quick-log sheet step 1 is showing that MetaCategory's drill-down view, the system shall return to the top-level grid.
-- [x] **EL-UI-090**: The quick-log step-1 top-level grid shall always end with a "+ New category" tile; when no categories exist, the grid shall show only that tile beneath the "Choose a category" heading, so opening the quick-log sheet on a fresh install is never a dead end.
-- [x] **EL-UI-091**: The quick-log step-1 drill-down view for a MetaCategory shall always end with a "+ New subcategory" tile that, when tapped, creates a new SubCategory of that MetaCategory.
+- [x] **EL-UI-090**: The quick-log step-1 top-level grid shall always end with a full-width "+ New category" tile spanning the grid width; when no categories exist, the grid shall show only that tile beneath the "Choose a category" heading, so opening the quick-log sheet on a fresh install is never a dead end.
+- [x] **EL-UI-091**: The quick-log step-1 drill-down view for a MetaCategory shall always end with a full-width "+ New subcategory" tile that, when tapped, creates a new SubCategory of that MetaCategory.
+- [x] **EL-UI-095**: A category tile's name label in the quick-log step-1 grid shall shrink to fit on a single line down to a minimum size, then ellipsize if it still overflows, so longer names (e.g. "Medication") stay readable in the narrow multi-column grid without clipping.
 
 ## Value Type Mismatch UI
 

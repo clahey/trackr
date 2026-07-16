@@ -36,6 +36,7 @@ All color constants live in `Color.kt`; `Theme.kt` assembles them into schemes. 
 - Green: `#148244`
 - Yellow: `#fcd214`
 - Light blue: `#47aadc`
+- Darker yellow: `#ebc413` — the brand yellow at 92% brightness (V), same hue and saturation, for warm accents against light surfaces where the bright yellow vanishes (e.g. the About "log fast" icon in light mode).
 
 The fallback palette in `Color.kt` was seeded from `#37618E` (borrowed from GolfScore). It could be regenerated from the true brand colors using the [Material Theme Builder](https://material-foundation.github.io/material-theme-builder/) with the dark blue `#04325C` as the primary seed. `Theme.kt` is unchanged if the brand color ever changes — only `Color.kt` needs replacing.
 

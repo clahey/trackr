@@ -19,7 +19,7 @@
 - [x] **APP-NAV-002**: The start destination shall be the timeline screen.
 - [x] **APP-NAV-003**: `EventEditViewModel` shall read its required `eventId` argument from `SavedStateHandle` under the key `"eventId"`.
 - [x] **APP-NAV-004**: `CategoryEditViewModel` shall read its optional `categoryId` argument from `SavedStateHandle` under the key `"categoryId"`; a null value indicates create mode.
-- [x] **APP-NAV-010**: The timeline top app bar shall provide an About action that navigates to the About screen; the About screen shall provide back navigation and, like other detail destinations, shall not show the bottom navigation bar.
+- [x] **APP-NAV-010**: The timeline and category-list top app bars shall each provide an About action that navigates to the About screen; the About screen shall provide back navigation and, like other detail destinations, shall not show the bottom navigation bar.
 
 ## Bottom Navigation
 
@@ -31,7 +31,7 @@
 
 ## About Screen
 
-- [x] **APP-UI-010**: The About screen shall display the app's positioning (log fast; on-device first; no account required — ever), a link to the source code, the app version, and an "Add starter categories" action that reports how many categories it created.
+- [x] **APP-UI-010**: The About screen shall display a branded hero (app icon, wordmark, and slogan with an accent word) over the brand gradient, the app's positioning as labelled points (log fast; on-device first; no account required — ever), a link to the source code, a link to report a bug or request a feature, the app version, and an "Add starter categories" action that reports how many categories it created.
 
 ## Startup
 
