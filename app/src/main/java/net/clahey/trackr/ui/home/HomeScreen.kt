@@ -554,6 +554,7 @@ private fun CategoryGrid(content: LazyGridScope.() -> Unit) {
     )
 }
 
+// @spec EL-UI-095
 @Composable
 private fun CategoryTile(emoji: String?, name: String, color: Long, onClick: () -> Unit) {
     OutlinedButton(
