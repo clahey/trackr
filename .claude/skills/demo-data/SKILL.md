@@ -95,17 +95,26 @@ each screen:
 ./screenshots.sh shot shot-03-quicklog.png
 #   ...back to timeline, tap a filter chip...
 ./screenshots.sh shot shot-04-filtered.png
+#   ...back to timeline, tap the About (info) icon in the top bar...
+./screenshots.sh shot shot-05-about.png
 ./screenshots.sh demo off
 ```
 
 Shots land in `docs/store-listing/screenshots/`. Navigation between calls is
 manual on purpose — scripting it would need hardcoded `input tap` coordinates,
 which shift with AVD density. Read `screenshots.sh` for the exact adb commands
-each subcommand runs.
+each subcommand runs. (Tip for driving the UI: `adb shell uiautomator dump` then
+tap the element's bounds center — but note the filter chips render as
+"<emoji> <name>", so match the chip by that, not the bare category name which
+also appears on event rows.)
 
 Suggested shots (the demo data is built to show these off): timeline (hero),
-quick-log sheet, category list, filtered-by-chip timeline, and optionally an
-event detail/edit and the category value-type picker.
+quick-log sheet (shows the colorful picker + "+ New category" tile), category
+list, filtered-by-chip timeline, the About screen (branded hero), and optionally
+an event detail/edit and the category value-type picker.
+
+Repeat the whole pass per device — the phone (`Screenshot_Phone`, `shot-*.png`)
+and the 7" tablet (`7_inch_Tablet_API_30`, `tablet7-*.png`) — via `SERIAL=...`.
 
 ## Snapshot an existing install (reverse direction)
 
