@@ -9,6 +9,12 @@ privacy framed around *defaults and opt-in* (not absolutes) so an optional futur
 sync/server wouldn't contradict it. No health-tool framing (matches the "no health
 features" declaration).
 
+Note: the app seeds a few starter categories including Medication and Pain, but
+these are neutral *user data*, not a health feature (see
+`docs/llds/publishing.md` — Target-audience decision). The listing intentionally
+stays health-neutral (non-health examples) to preserve the "no health features"
+declaration, even though first-run offers those starters.
+
 ---
 
 ## App title (max 30 chars)
