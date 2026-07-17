@@ -143,6 +143,7 @@ The repository is injected into `TrackrApplication` via field injection (`@Injec
 | `applicationId` | `net.clahey.trackr` | `com.trackr.app` (initial placeholder) | Reverse domain under owner's control; placeholder could not be used for Play Store publish |
 | Top-level navigation | Bottom nav bar, two tabs | Toolbar icon; navigation drawer | Two tabs is exactly the right count for bottom nav; always one tap away; no discoverability problem |
 | Quick-log sheet | `ModalBottomSheet` inside timeline composable | Separate nav destination | Avoids nav animation jank; timeline state (scroll position, filter) stays alive beneath the sheet |
+| Test tags as resource-ids | `testTagsAsResourceId = true` on the app root, unconditionally | Debug-only gating; no tags | Lets tooling (the screenshot script, uiautomator) target elements by stable id instead of coordinates/text. FOSS app — nothing to hide by exposing ids in release, so gating would add plumbing for no benefit |
 | ViewModel arguments | `SavedStateHandle` | `@AssistedInject` | Idiomatic Hilt + Navigation pattern; survives process death and back-stack restoration automatically |
 | Hilt module split | Three modules (Database, DataStore, Repository) | One monolithic module | Each module is independently testable; standard Android practice |
 | DataStore placement | Top-level `preferencesDataStore` delegate on Application | Manual `DataStore` construction | Delegate is the recommended API; guarantees singleton; no manual scope management |

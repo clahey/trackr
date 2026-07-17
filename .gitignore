@@ -24,6 +24,10 @@ google-services.json
 # Scratch (local working files, never commit)
 scratch/
 
+# Python (demo-data screenshot tooling)
+__pycache__/
+*.pyc
+
 # OS
 .DS_Store
 Thumbs.db

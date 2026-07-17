@@ -29,8 +29,13 @@ frames, and physical devices are off-limits for this kind of work here.
 
 - `sqlite3` on the PATH (`apt install sqlite3` — a dev-machine tool, not a
   project dependency).
-- `adb`, and a running emulator with the **debug** build installed
-  (`net.clahey.trackr`, no debug suffix).
+- `adb` — but you do **not** need it on `PATH`. `screenshots.py` resolves it
+  itself: `PATH`, then `$ANDROID_HOME/platform-tools`, then `~/Android/Sdk`
+  (Linux) / `~/Library/Android/sdk` (macOS). Only export `ANDROID_HOME` if your
+  SDK lives somewhere non-standard. (The raw `adb` snippets elsewhere in this
+  doc do assume it's on PATH — prefix them if it isn't.)
+- A running emulator with the **debug** build installed (`net.clahey.trackr`,
+  no debug suffix).
 
 ## Build the database
 
@@ -80,41 +85,33 @@ reusing a named device: Tools → Device Manager → Create Virtual Device → N
 Hardware Profile, set the resolution to 1080×1920 (16:9), save, then pick a
 recent system image. (The `Screenshot_Phone` AVD is exactly this.)
 
-The `screenshots.sh` script in this directory exposes the reliable steps as
-subcommands, so the caller does the UI navigation and invokes a primitive at
-each screen:
+The `screenshots.py` script in this directory drives the whole capture itself.
+The app exposes its Compose testTags as resource-ids (`testTagsAsResourceId` is
+set on the app root), so the script navigates by tapping elements by **id** —
+no hardcoded pixels, no text/emoji ambiguity.
+
+Run it **once per device**, selecting the device by adb serial (from
+`adb devices`) via `-s/--serial` or `$ANDROID_SERIAL`, plus a filename prefix.
+It never hardcodes AVD names, which are local to each machine:
 
 ```
-./screenshots.sh seed                        # (re)build + load the demo DB
-./screenshots.sh demo on                     # clean status bar
-./screenshots.sh launch                      # start the app
-./screenshots.sh shot shot-01-timeline.png   # on the timeline
-#   ...navigate to Categories...
-./screenshots.sh shot shot-02-categories.png
-#   ...open the quick-log sheet...
-./screenshots.sh shot shot-03-quicklog.png
-#   ...back to timeline, tap a filter chip...
-./screenshots.sh shot shot-04-filtered.png
-#   ...back to timeline, tap the About (info) icon in the top bar...
-./screenshots.sh shot shot-05-about.png
-./screenshots.sh demo off
+./screenshots.py -s <phone-serial>  capture shot-       # 1080x1920 phone
+./screenshots.py -s <tablet-serial> capture tablet7-    # 7" tablet
+# or: ANDROID_SERIAL=<serial> ./screenshots.py capture shot-
 ```
 
-Shots land in `docs/store-listing/screenshots/`. Navigation between calls is
-manual on purpose — scripting it would need hardcoded `input tap` coordinates,
-which shift with AVD density. Read `screenshots.sh` for the exact adb commands
-each subcommand runs. (Tip for driving the UI: `adb shell uiautomator dump` then
-tap the element's bounds center — but note the filter chips render as
-"<emoji> <name>", so match the chip by that, not the bare category name which
-also appears on event rows.)
+Each `capture` run seeds the demo DB, turns on the clean status bar, launches
+the app, takes the five shots by resource-id, then restores the status bar.
+Shots land in `docs/store-listing/screenshots/` (override with `OUT_DIR=...`).
 
-Suggested shots (the demo data is built to show these off): timeline (hero),
-quick-log sheet (shows the colorful picker + "+ New category" tile), category
-list, filtered-by-chip timeline, the About screen (branded hero), and optionally
-an event detail/edit and the category value-type picker.
+The shots (the demo data is built to show these off): timeline (hero), the
+About screen (branded hero), quick-log picker (colorful tiles + "+ New
+category"), filtered-by-chip timeline, and the category list.
 
-Repeat the whole pass per device — the phone (`Screenshot_Phone`, `shot-*.png`)
-and the 7" tablet (`7_inch_Tablet_API_30`, `tablet7-*.png`) — via `SERIAL=...`.
+Primitives are also exposed for manual/one-off use (all take `-s <serial>` or
+`$ANDROID_SERIAL`): `seed`, `demo on|off`, `launch`, `shot <name>`, and `tap
+<resource-id>` (handy for finding a new id — run `adb -s <serial> exec-out
+uiautomator dump /dev/tty` to see the ids).
 
 ## Snapshot an existing install (reverse direction)
 

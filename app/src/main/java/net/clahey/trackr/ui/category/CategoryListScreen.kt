@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import net.clahey.trackr.R
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.domain.Category
@@ -99,7 +100,7 @@ fun CategoryListScreen(
                 title = { Text(stringResource(R.string.categories_title)) },
                 actions = {
                     // @spec APP-NAV-010
-                    IconButton(onClick = onNavigateToAbout) {
+                    IconButton(onClick = onNavigateToAbout, modifier = Modifier.testTag("about_action")) {
                         Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.cd_about))
                     }
                 },

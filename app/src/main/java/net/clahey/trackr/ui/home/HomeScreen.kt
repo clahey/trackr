@@ -79,6 +79,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -216,7 +217,7 @@ fun HomeScreen(
                 title = { Text(stringResource(R.string.timeline_title)) },
                 actions = {
                     // @spec APP-NAV-010
-                    IconButton(onClick = onNavigateToAbout) {
+                    IconButton(onClick = onNavigateToAbout, modifier = Modifier.testTag("about_action")) {
                         Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.cd_about))
                     }
                 },
@@ -224,7 +225,7 @@ fun HomeScreen(
         },
         floatingActionButton = {
             // @spec EL-NAV-001, EL-UI-013, EL-UI-075
-            FloatingActionButton(onClick = {
+            FloatingActionButton(modifier = Modifier.testTag("log_event_fab"), onClick = {
                 when (val f = activeFilter) {
                     is ActiveFilter.Sub -> quickLogVm.selectCategory(f.sub)
                     is ActiveFilter.TopLevel -> {
@@ -252,6 +253,7 @@ fun HomeScreen(
                 ) {
                     item {
                         FilterChip(
+                            modifier = Modifier.testTag("filter_all"),
                             selected = activeFilter is ActiveFilter.All,
                             onClick = { homeVm.setFilter(ActiveFilter.All) },
                             label = { Text(stringResource(R.string.filter_all)) },
@@ -526,6 +528,7 @@ private fun DayHeader(date: LocalDate) {
 private fun CategoryFilterChip(category: Category, selected: Boolean, onClick: () -> Unit) {
     val color = Color(category.resolvedColor)
     FilterChip(
+        modifier = Modifier.testTag("filter_chip_${category.id}"),
         selected = selected,
         onClick = onClick,
         label = { Text("${category.resolvedEmoji} ${category.name}") },

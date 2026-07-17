@@ -17,8 +17,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import net.clahey.trackr.R
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -49,6 +53,7 @@ object Routes {
 }
 
 // @spec APP-NAV-001, APP-NAV-002, APP-UI-001, APP-UI-002, APP-UI-003, APP-UI-004, APP-UI-005
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun AppScaffold(navController: NavHostController = rememberNavController()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -57,6 +62,9 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
     val showBottomBar = currentRoute == Routes.TIMELINE || currentRoute == Routes.CATEGORY_LIST
 
     Scaffold(
+        // Expose Compose testTags as resource-ids so tooling (screenshots, uiautomator) can target
+        // elements by id rather than fragile text/coordinates. Fine to ship — the app is FOSS.
+        modifier = Modifier.semantics { testTagsAsResourceId = true },
         // @spec APP-UI-002 — animate the bar in/out so its bottom-inset contribution eases rather
         // than snapping when navigating to/from a detail screen, which otherwise jolts content
         // (most visibly a vertically-centered empty state) down as the bar disappears.
@@ -68,6 +76,7 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
             ) {
                 NavigationBar {
                     NavigationBarItem(
+                        modifier = Modifier.testTag("nav_timeline"),
                         selected = currentRoute == Routes.TIMELINE,
                         onClick = {
                             if (currentRoute != Routes.TIMELINE) {
@@ -80,6 +89,7 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
                         label = { Text(stringResource(R.string.nav_timeline)) },
                     )
                     NavigationBarItem(
+                        modifier = Modifier.testTag("nav_categories"),
                         selected = currentRoute == Routes.CATEGORY_LIST,
                         onClick = {
                             if (currentRoute != Routes.CATEGORY_LIST) {
