@@ -80,6 +80,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -616,7 +619,7 @@ private fun AutoShrinkLabel(text: String, style: TextStyle, minFontSize: TextUni
 }
 
 // EL-UI-054, EL-UI-055b, EL-UI-072, EL-UI-073, EL-UI-074, EL-NAV-002, EL-PROC-001
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 private fun QuickLogSheet(
     categories: List<Category>,
@@ -699,7 +702,15 @@ private fun QuickLogSheet(
             categories.filterIsInstance<Category.SubCategory>().filter { it.parent.id == meta.id }
         }
 
-        Column(modifier = Modifier.padding(16.dp)) {
+        // A ModalBottomSheet renders in its own window that doesn't inherit testTagsAsResourceId
+        // from the nav-host root, so its testTags aren't visible to uiautomator/screenshot tooling.
+        // Re-enable it here and tag the picker so the tooling can confirm the sheet opened.
+        Column(
+            modifier = Modifier
+                .semantics { testTagsAsResourceId = true }
+                .testTag("quick_log_sheet")
+                .padding(16.dp)
+        ) {
             if (expandedMeta != null && expandedSubCats != null) {
                 // Drill-down: subcategory picker for the selected MetaCategory
                 Row(verticalAlignment = Alignment.CenterVertically) {

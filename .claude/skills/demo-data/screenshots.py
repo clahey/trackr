@@ -131,6 +131,21 @@ class Adb:
         time.sleep(1)  # element is in the tree but may still be animating in (e.g. a nav
         self.tap(*xy)  # transition); let it finish drawing so the tap isn't dropped
 
+    def tap_until(self, tap_rid: str, appear_rid: str, attempts: int = 4, settle: int = 6) -> None:
+        """Tap `tap_rid` until `appear_rid` shows up, re-tapping if the first press was dropped.
+
+        A tap fired while its control is still animating in gets swallowed, leaving nothing on
+        screen (seen opening the quick-log sheet on slower AVDs). Polling for the expected result
+        and re-tapping is deterministic where a blind sleep silently produces the wrong screenshot.
+        """
+        for _ in range(attempts):
+            self.tap_id(tap_rid)
+            for _ in range(settle):
+                if self.find(appear_rid) is not None:
+                    return
+                time.sleep(1)
+        raise CaptureError(f"'{appear_rid}' did not appear after tapping '{tap_rid}'")
+
 
 def seed(adb: Adb) -> None:
     if not SEED_SQL.exists():
@@ -201,8 +216,11 @@ def capture(adb: Adb, prefix: str) -> None:
     # Shots 03-05 are all reachable from the timeline with no intervening navigation,
     # so their taps land on a settled screen. Categories (02) needs a nav, so it goes
     # last — a FAB tap immediately after a nav transition gets dropped mid-animation.
-    adb.tap_id("log_event_fab")
-    time.sleep(2)
+    # Open the quick-log sheet. A FAB tap fired while the button is still animating in can be
+    # dropped, leaving the timeline with no sheet (seen on slower phone AVDs); wait for the sheet's
+    # picker (testTag quick_log_sheet) and re-tap if it didn't open, rather than blind-sleeping.
+    adb.tap_until("log_event_fab", "quick_log_sheet")
+    time.sleep(1)  # let the sheet finish animating in before the shot
     shot(adb, f"{prefix}03-quicklog.png")
     adb.back()
 
