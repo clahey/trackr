@@ -84,6 +84,7 @@ Chosen approach: extend the icon's own visual language rather than a text-only g
 ## References
 
 - `docs/llds/app-shell.md § App Identity` — `applicationId = "net.clahey.trackr"`, the permanent Play Store identity (distinct from this LLD's concern, which is the listing/creative around that identity, not the identity itself)
+- `docs/llds/app-shell.md` — About screen (APP-UI-010): the in-app positioning copy (slogan + "log fast / on-device first / no account required" points) that must stay in sync with the listing text and slogan here (see Deferred #2)
 - `docs/high-level-design.md § Goals` — "log any event in under three taps," echoed in the chosen slogan
 - `app/src/main/res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml` — source of truth for the gradient and accent colors, and the layers the store icon + feature graphic are composed from
 - `docs/store-listing/icon-512.svg` / `icon-512.png` — the 512×512 Play high-res store icon (editable master + exported asset)

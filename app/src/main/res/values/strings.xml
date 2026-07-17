@@ -158,7 +158,7 @@
     <string name="about_hero_slogan_lead">Log anything.</string>
     <string name="about_hero_slogan_accent">Fast.</string>
     <string name="about_point_fast_title">Log fast</string>
-    <string name="about_point_fast_body">Define the things you care about, then capture each one in a couple of taps.</string>
+    <string name="about_point_fast_body">Define the things you care about, then capture each one in as few as three taps.</string>
     <string name="about_point_local_title">On-device first</string>
     <string name="about_point_local_body">Works fully offline; your phone holds the source of truth. Backup and sync, when they arrive, are optional.</string>
     <string name="about_point_account_title">No account required</string>
