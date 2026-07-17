@@ -93,5 +93,6 @@ Chosen approach: extend the icon's own visual language rather than a text-only g
 - `docs/store-listing/icon-512.svg` / `icon-512.png` — the 512×512 Play high-res store icon (editable master + exported asset)
 - `docs/store-listing/feature-graphic.svg` / `feature-graphic.png` — the 1024×500 Play feature graphic (editable master + exported asset)
 - `docs/store-listing/listing-copy.md` — the Play listing text (app title, short + full description), source of truth
+- `docs/store-listing/release-notes.md` — the Play "What's new" text per release (source of truth), newest first
 - `PRIVACY.md` (repo root) — the privacy policy; hosted for Play at `https://github.com/clahey/trackr/blob/master/PRIVACY.md` (currently served from the `after-rename` branch URL until merged to master)
 - `app/src/main/res/xml/backup_rules.xml`, `data_extraction_rules.xml`, `AndroidManifest.xml` — the actual data model the privacy policy and data-safety declaration are grounded in (no permissions declared; backup/transfer scope limited to `trackr.db`, `images`, `datastore`)
