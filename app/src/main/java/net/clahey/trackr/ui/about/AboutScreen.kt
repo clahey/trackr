@@ -56,13 +56,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.R
 import net.clahey.trackr.ui.rememberStarterCategoryInputs
 
-// Brand palette — source of truth is the launcher icon (res/drawable/ic_launcher_*), per publishing.md.
+// Brand palette — canonical definition in docs/brand.md (update there; `rg docs/brand.md` finds every hardcoded copy).
 private val BrandTop = Color(0xFF47AADC)      // light blue
 private val BrandBottom = Color(0xFF04325C)   // dark blue
 private val BrandAccent = Color(0xFFFCD214)   // yellow
 private val BrandDarkYellow = Color(0xFFEBC413) // brand yellow at V=0.92 (same hue/sat), for light surfaces
 
-// About point-icon colors — from the brand palette (docs/llds/theme.md § Brand colors). "Log fast"
+// About point-icon colors — from the brand palette (docs/brand.md). "Log fast"
 // flips per mode (see AboutScreen): bright brand yellow on dark, the darker same-hue yellow on light
 // (bright yellow vanishes on white). On-device stays light blue (dark blue read as black on white);
 // no-account stays green — both legible in both modes.

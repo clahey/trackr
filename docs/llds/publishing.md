@@ -24,10 +24,12 @@ The long poles are usually Play Console account activation and store-listing ass
 
 ## Store Listing Assets
 
+Every color named below is from the brand palette — canonical definition in `docs/brand.md`; this doc names the colors rather than restating their hex.
+
 **App icon.** Already built as the adaptive launcher icon (`res/drawable/ic_launcher_*.xml`): a white EKG/heartbeat line on a diagonal gradient background, with a yellow dot at the peak.
 
-- Background gradient: `#47AADC` (light blue, top-left) → `#04325C` (dark navy, bottom-right), 135°.
-- Foreground: white EKG stroke; yellow dot (`#FCD214`) at the heartbeat's peak.
+- Background gradient: brand light blue (top-left) → brand dark navy (bottom-right), 135°.
+- Foreground: white EKG stroke; the brand-yellow dot at the heartbeat's peak.
 
 The Play Console also requires a **512×512 high-res store icon** (a static PNG, separate from the in-app adaptive icon). Rather than screenshot a launcher, the store icon is composed directly from the same two vector layers so it stays pixel-exact and re-exportable. Source of truth: `docs/store-listing/icon-512.svg` (editable master, viewBox `0 0 108 108` to match the adaptive canvas), exported to `docs/store-listing/icon-512.png` (exactly 512×512, 32-bit RGBA, fully opaque — produced and uploaded 2026-07-04). Generated with `rsvg-convert -w 512 -h 512` + `magick ... -define png:color-type=6`. Full-bleed square: Play applies its own corner masking on display, so the uploaded asset carries no rounding or transparency of its own.
 
@@ -35,11 +37,11 @@ The Play Console also requires a **512×512 high-res store icon** (a static PNG,
 
 Chosen approach: extend the icon's own visual language rather than a text-only graphic or a screenshot composite (see Decisions below). Source of truth: `docs/store-listing/feature-graphic.svg` (editable master), exported to `docs/store-listing/feature-graphic.png` (the exact 1024×500 asset for the Play listing — produced and uploaded 2026-07-04).
 
-- Same background gradient as the launcher icon (`#47AADC` → `#04325C`, 135°), full-bleed (no transparent margins).
+- Same background gradient as the launcher icon (brand light blue → brand dark navy, 135°), full-bleed (no transparent margins).
 - **Layout:** two separated bands so the EKG line never crosses the type — text block (wordmark + slogan) on the **left**, heartbeat trace on the **right**. An earlier version overlapped them and read muddy.
-- Foreground: the heartbeat/EKG line is repeated across the canvas (five copies) and faded via a horizontal luminance mask that peaks bright on the right-of-center "hero" beat and falls off toward both edges, giving depth/motion. The hero beat carries the yellow `#FCD214` R-peak dot from the icon. Hand-authored SVG (path lifted verbatim from the launcher icon), editable in Inkscape or any SVG tool.
+- Foreground: the heartbeat/EKG line is repeated across the canvas (five copies) and faded via a horizontal luminance mask that peaks bright on the right-of-center "hero" beat and falls off toward both edges, giving depth/motion. The hero beat carries the brand-yellow R-peak dot from the icon. Hand-authored SVG (path lifted verbatim from the launcher icon), editable in Inkscape or any SVG tool.
 - Wordmark "Trackr" in white, clean sans-serif.
-- Slogan **"Log anything. Fast."** under the wordmark, with **"Fast."** set bold in the yellow accent (`#FCD214`, matching the icon's dot). The bold word — rather than a colored period — is the accent: it stays legible at thumbnail size and puts the emphasis on the value prop. One yellow note on each side (slogan + hero dot) balances the composition left-to-right.
+- Slogan **"Log anything. Fast."** under the wordmark, with **"Fast."** set bold in the brand-yellow accent (matching the icon's dot). The bold word — rather than a colored period — is the accent: it stays legible at thumbnail size and puts the emphasis on the value prop. One yellow note on each side (slogan + hero dot) balances the composition left-to-right.
 - Export: exactly 1024×500px, **PNG** (Play does not accept SVG), sRGB (not CMYK), fully opaque with the alpha channel stripped (Play rejects transparency in this asset). Generated with `rsvg-convert` + `magick -alpha remove -alpha off`.
 
 **Slogan: "Log anything. Fast."** Used on the feature graphic and available for the short description / store-listing copy generally.
@@ -86,7 +88,8 @@ Chosen approach: extend the icon's own visual language rather than a text-only g
 - `docs/llds/app-shell.md § App Identity` — `applicationId = "net.clahey.trackr"`, the permanent Play Store identity (distinct from this LLD's concern, which is the listing/creative around that identity, not the identity itself)
 - `docs/llds/app-shell.md` — About screen (APP-UI-010): the in-app positioning copy (slogan + "log fast / on-device first / no account required" points) that must stay in sync with the listing text and slogan here (see Deferred #2)
 - `docs/high-level-design.md § Goals` — "log any event in under three taps," echoed in the chosen slogan
-- `app/src/main/res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml` — source of truth for the gradient and accent colors, and the layers the store icon + feature graphic are composed from
+- `docs/brand.md` — the brand palette (the colors named throughout this doc); canonical source of truth for every brand hex
+- `app/src/main/res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml` — the launcher icon layers the store icon + feature graphic are composed from (they carry literal brand hex per `docs/brand.md`)
 - `docs/store-listing/icon-512.svg` / `icon-512.png` — the 512×512 Play high-res store icon (editable master + exported asset)
 - `docs/store-listing/feature-graphic.svg` / `feature-graphic.png` — the 1024×500 Play feature graphic (editable master + exported asset)
 - `docs/store-listing/listing-copy.md` — the Play listing text (app title, short + full description), source of truth
