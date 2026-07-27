@@ -62,6 +62,17 @@ Grid of MetaCategory items (resolved emoji + name; colored border using the cate
 
 When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has SubCategories, the quick-log opens directly in the drill-down view for that MetaCategory, skipping the initial tap. When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has no SubCategories, step 2 opens directly (existing behaviour). When `ActiveFilter.Sub` is active, step 2 opens directly for the subcategory.
 
+**Opening directly at an explicit target (`QuickLogTarget`).** The FAB/`ActiveFilter` path above is one way to reach step 1/2 directly; a second, independent way exists for callers outside a chip tap — specifically, `reminders` (`docs/llds/reminders.md § Notifications`) opening the sheet from a notification tap:
+
+```kotlin
+sealed class QuickLogTarget {
+    data class DrillDown(val meta: Category.MetaCategory) : QuickLogTarget()  // opens straight into the drill-down view
+    data class DirectEntry(val category: Category) : QuickLogTarget()        // opens straight to step 2
+}
+```
+
+`HomeViewModel` accepts an optional `quickLogCategoryId: String?` navigation argument (`SavedStateHandle`-sourced, default null; the notification `PendingIntent` → `MainActivity` → nav-graph wiring that populates it is `app-shell.md`'s concern, not this ViewModel's — by the time `HomeViewModel` sees it, it's just a normal nav argument, indistinguishable from any other route arg). Consumed once on init: resolves the category, builds the corresponding `QuickLogTarget` (`DrillDown` for a MetaCategory with SubCategories, `DirectEntry` otherwise), and opens the sheet against it directly — **not** by first setting `ActiveFilter` and relying on the table above to derive the page, the reverse of the FAB path. For the `DrillDown` case only, this same init-time handling *also* calls `HomeViewModel`'s existing chip-tap filter-set function to set `ActiveFilter.TopLevel(meta)` — a real, permanent filter change exactly like a chip tap, made *in addition to*, not in order to produce, the direct `DrillDown` open. For `DirectEntry`, `ActiveFilter` is never read or written at all. See `docs/llds/reminders.md § Notifications` for why the two mechanisms (`ActiveFilter`-derived vs. direct `QuickLogTarget`) are kept decoupled rather than just setting a filter and relying on the table above.
+
 **Step 2 — Value + details**
 - Value input (see Value Input section below); for Number, Text, and Duration types the input field is automatically focused on entry so the keyboard rises without an extra tap
 - Optional: single photo (camera or gallery picker)
@@ -384,4 +395,5 @@ System back and edge swipe are intercepted by `BackHandler` within the sheet: st
 - `docs/llds/data-model.md` — `Event`, `Category`, `EventValue`, `ValueType`
 - `docs/llds/local-storage.md` — `TrackrRepository` interface, `ImageStore`
 - `docs/llds/category-management.md` — category list and edit flows (parallel segment)
+- `docs/llds/reminders.md` — `QuickLogTarget`'s caller (notification tap), the `ActiveFilter.TopLevel(meta)` side-effect call
 - `docs/high-level-design.md` — three-tap goal, image capture sources
