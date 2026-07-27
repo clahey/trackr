@@ -51,6 +51,9 @@ class QuickLogViewModel @Inject constructor(
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
 
+    private val _lastSavedEventId = MutableStateFlow<String?>(null)
+    val lastSavedEventId: StateFlow<String?> = _lastSavedEventId.asStateFlow()
+
     init {
         viewModelScope.launch {
             repository.getCategories().collect { cats ->
@@ -114,6 +117,7 @@ class QuickLogViewModel @Inject constructor(
         expandedMetaCategoryId.value = id
     }
 
+    // @spec EL-UI-077
     suspend fun save() {
         val category = selectedCategory.value ?: return
         val invalidField = validateValueForSave(value.value, category)
@@ -134,6 +138,7 @@ class QuickLogViewModel @Inject constructor(
         )
         repository.saveEvent(event)
         imagePath.value = null
+        _lastSavedEventId.value = event.id
         _saveResult.value = SaveResult.Success
     }
 
@@ -168,5 +173,6 @@ class QuickLogViewModel @Inject constructor(
         value.value = ValueUIState.None
         valueDirty.value = false
         _saveResult.value = SaveResult.Idle
+        _lastSavedEventId.value = null
     }
 }

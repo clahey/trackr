@@ -118,6 +118,7 @@ fun HomeScreen(
     val activeFilter by homeVm.activeFilter.collectAsState()
     val pendingDelete by homeVm.pendingDelete.collectAsState()
     val preFilterTopDay by homeVm.preFilterTopDay.collectAsState()
+    val scrollTarget by homeVm.scrollTarget.collectAsState()
     val categories by quickLogVm.categories.collectAsState()
 
     var showSheet by remember { mutableStateOf(false) }
@@ -141,9 +142,26 @@ fun HomeScreen(
         val idx = dayGroups.indexOfFirst { it.date <= targetDay }
         if (idx >= 0) {
             isProgrammaticScroll = true
+            try {
+                listState.animateScrollToItem(idx)
+            } finally {
+                isProgrammaticScroll = false
+            }
+        }
+    }
+
+    // @spec EL-UI-077
+    // Scroll to a newly saved event once it appears in dayGroups
+    LaunchedEffect(scrollTarget, dayGroups) {
+        val targetId = scrollTarget ?: return@LaunchedEffect
+        val idx = flattenedIndexOfEvent(dayGroups, targetId) ?: return@LaunchedEffect
+        isProgrammaticScroll = true
+        try {
             listState.animateScrollToItem(idx)
+        } finally {
             isProgrammaticScroll = false
         }
+        homeVm.consumeScrollTarget()
     }
 
     // Detect user scroll and discard pre-filter position
@@ -302,6 +320,12 @@ fun HomeScreen(
 
         LaunchedEffect(saveResult) {
             if (saveResult is SaveResult.Success) {
+                // @spec EL-UI-077
+                val savedId = quickLogVm.lastSavedEventId.value
+                val savedCategory = quickLogVm.selectedCategory.value
+                if (savedId != null && savedCategory != null) {
+                    homeVm.onEventLogged(savedId, savedCategory)
+                }
                 sheetState.hide()
                 showSheet = false
                 quickLogVm.reset()
@@ -326,6 +350,18 @@ fun HomeScreen(
             )
         }
     }
+}
+
+// @spec EL-UI-077
+private fun flattenedIndexOfEvent(dayGroups: List<DayGroup>, eventId: String): Int? {
+    var index = 0
+    for (group in dayGroups) {
+        index++ // day header item
+        val within = group.events.indexOfFirst { it is DayEntry.Entry && it.event.id == eventId }
+        if (within >= 0) return index + within
+        index += group.events.size
+    }
+    return null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

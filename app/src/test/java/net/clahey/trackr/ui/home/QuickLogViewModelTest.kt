@@ -98,6 +98,16 @@ class QuickLogViewModelTest {
         assertEquals("test note", event.notes)
     }
 
+    // @spec EL-UI-077
+    @Test fun `save exposes the saved event's id via lastSavedEventId`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        vm.selectCategory(cat)
+        vm.save()
+        val persistedId = repo.getEvents().first().first().id
+        assertEquals(persistedId, vm.lastSavedEventId.value)
+    }
+
     // @spec EL-PROC-001
     @Test fun `reset deletes captured but unsaved image`() {
         val path = "/images/unsaved.jpg"

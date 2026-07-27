@@ -67,9 +67,11 @@ When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has S
 - Optional: single photo (camera or gallery picker)
 - Optional: notes text field
 - Timestamp: defaults to now; rendered via the shared `TimestampField` component (see `## Timestamp Field`)
-- **Save** button — writes event and dismisses sheet; scrolling the timeline to the newly saved event is deferred (EL-UI-077)
+- **Save** button — writes event, dismisses sheet, and scrolls the timeline to the newly saved event (see Save scroll behavior below)
 
 For `ValueType.None` categories, step 2 has no value input — save is immediately accessible, achieving the three-tap goal (FAB → category → save).
+
+**Save scroll behavior:** When a quick-log save succeeds, the sheet dismisses and, if the logged category matches the timeline's active filter at the moment of save (per the same `ActiveFilter` matching `dayGroups` already uses), the timeline scrolls to bring the new event's row into view — an exact row position, not the approximate day-level positioning used by filter scroll. If the logged category does not match the active filter, the timeline does not scroll and the filter is left as the user set it. The scroll target is armed once, at save time, from the filter in effect then; it resolves on the next `dayGroups` update that contains the event (normally the very next emission, since `saveEvent` writing to Room and `dayGroups`'s reactive `Flow` are the only things in between), and is discarded — without scrolling — if the active filter changes before that happens, so a stale target can never fire a surprise scroll later.
 
 ### Event Edit Screen
 
@@ -222,8 +224,11 @@ Mismatch detection occurs at the ViewModel layer (not inside `ValueInputField`).
 - `activeFilter: StateFlow<ActiveFilter>` — current filter state (`All`, `TopLevel`, or `Sub`); see sealed class above
 - `dayGroups: StateFlow<List<DayGroup>>` — derived from `repository.getEventsByCategoryIdIncludingChildren(id)` when a filter is active (`TopLevel` uses MetaCategory id, `Sub` uses SubCategory id), `repository.getEvents()` otherwise; grouped by calendar day of `timestamp` in local timezone; events with no matching category in the current category list are omitted (handles the brief `combine()` window where the two flows are out of sync after a deletion)
 - `preFilterTopDay: StateFlow<LocalDate?>` — the calendar day that was at the top of the timeline when a filter was first applied (transition from no filter); null if no filter is active or if the user has manually scrolled since the filter was first applied. Not updated when switching between active filters.
-- `setFilter(filter: ActiveFilter)` — sets `activeFilter`; records the current top day in `preFilterTopDay` only when transitioning from `All` to a non-`All` filter; switching between two non-`All` filters preserves the existing `preFilterTopDay`; `All` clears the filter
+- `setFilter(filter: ActiveFilter)` — sets `activeFilter`; records the current top day in `preFilterTopDay` only when transitioning from `All` to a non-`All` filter; switching between two non-`All` filters preserves the existing `preFilterTopDay`; `All` clears the filter; also clears `scrollTarget` (any pending save-scroll is discarded on a filter change, per Save scroll behavior above)
 - `onUserScrolled()` — called by the UI when the user manually scrolls; clears `preFilterTopDay`
+- `scrollTarget: StateFlow<String?>` — the id of an event to scroll to once it appears in `dayGroups`, or null; armed by `scrollToEvent`, cleared by `consumeScrollTarget` or a filter change
+- `onEventLogged(eventId: String, category: Category)` — called by the UI immediately after any quick-log save; the ViewModel itself checks `category` against `activeFilter` (the same match rule `dayGroups` uses — see Save scroll behavior above) and only arms `scrollTarget` (and clears `preFilterTopDay`) when it matches, so the match rule lives in one place rather than being duplicated in the UI layer. Clearing `preFilterTopDay` prevents its own pending anchor-scroll from firing concurrently with the save-scroll on the same `dayGroups` update — logging a new event supersedes the filter's anchor scroll, the same way it already supersedes the undo window (see Undo window closes when... above).
+- `consumeScrollTarget()` — clears `scrollTarget`; called by the UI once it has scrolled to the target
 - `pendingDelete: StateFlow<Event?>` — the event swiped away but not yet committed; null when no undo is available
 - `swipeDelete(event: Event)` — calls `repository.deleteEvent()` (DB row only; files are not deleted yet); stores the full `Event` in `pendingDelete` and injects an undo placeholder into the day group at the event's original position; if a previous `pendingDelete` exists, calls `repository.deleteEventFiles()` for it first
 - `undoDelete()` — calls `repository.saveEvent(pendingDelete!!)` to restore (image files were never deleted); clears `pendingDelete`
