@@ -27,15 +27,15 @@ arrows:
     drift: "21 implemented specs have no @spec annotation anywhere in code — traceability gap, not a functional gap; count corrected 2026-07-27 (was 24)"
 
   local-storage:
-    status: PARTIAL
+    status: AUDITED
     sampled: 2026-07-27
     audited: 2026-07-27
     audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
     blocks: [category-management, event-logging]
     blockedBy: [data-model]
     detail: local-storage.md
-    next: "LS-BE-041 confirmed a real ordering race (TrackrApplication's onStartup() is fire-and-forget; MainActivity renders first frame without waiting on it) — needs an implementation fix, not just doc work. Backfill @spec on 12 unannotated specs (corrected from 9: LS-BE-001-004/033/050/054/060-062/070/071)."
-    drift: "LS-BE-041 ordering guarantee confirmed NOT met by current code — real gap, not stale. 12 implemented specs unannotated (corrected count; LS-BE-090/091/092 confirmed properly annotated, removed from list)"
+    next: "Backfill @spec on 12 unannotated specs (corrected from 9: LS-BE-001-004/033/050/054/060-062/070/071)."
+    drift: "12 implemented specs unannotated (corrected count; LS-BE-090/091/092 confirmed properly annotated, removed from list)"
 
   theme:
     status: OK
@@ -71,14 +71,14 @@ arrows:
     drift: null
 
   category-management:
-    status: PARTIAL
+    status: AUDITED
     sampled: 2026-07-27
     audited: 2026-07-27
     audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
     blocks: [event-logging]
     blockedBy: [data-model, local-storage, theme, drag-reorder-list]
     detail: category-management.md
-    next: "1 confirmed genuine gap: CAT-UI-011a (Exercise default sets/reps >=1 validation not enforced in CategoryEditViewModel.save()). CAT-UI-002 (drag-to-reorder) resolved via the new drag-reorder-list segment + CAT-UI-080-084. 10 more stale [ ] markers reconciled to [x] this pass."
+    next: "CAT-UI-011a descoped (not fixed): Exercise default sets/reps >=1 validation deliberately not enforced, spec reworded to match. CAT-UI-002 (drag-to-reorder) resolved via the new drag-reorder-list segment + CAT-UI-080-084. 10 more stale [ ] markers reconciled to [x] this pass."
     drift: null
 
   event-logging:

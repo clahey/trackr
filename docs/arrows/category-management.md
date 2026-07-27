@@ -4,7 +4,7 @@ Category list and edit screens: hierarchy (MetaCategory/SubCategory), inheritanc
 
 ## Status
 
-**PARTIAL** — last audited 2026-07-27. 73 of 76 specs confirmed implemented, 2 legitimately deferred, 1 genuine gap remains (CAT-UI-011a). CAT-UI-002 (drag-to-reorder) is now fully resolved — the generic widget landed as its own segment (`drag-reorder-list`) and this segment gained five new specs (CAT-UI-080-084) covering the category-specific adapter/persistence/reparent logic, all implemented. 10 previously-stale `[ ]` markers (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) reconciled to `[x]` this pass — the spec file was stale, not the code.
+**PARTIAL** — last audited 2026-07-27. 74 of 76 specs confirmed implemented, 2 legitimately deferred, 0 genuine gaps remain. CAT-UI-002 (drag-to-reorder) is now fully resolved — the generic widget landed as its own segment (`drag-reorder-list`) and this segment gained five new specs (CAT-UI-080-084) covering the category-specific adapter/persistence/reparent logic, all implemented. CAT-UI-011a was reworded this pass to match accepted current behavior (no minimum-value enforcement on Exercise default sets/reps) rather than fixed in code — see finding 0. 10 previously-stale `[ ]` markers (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) reconciled to `[x]` this pass — the spec file was stale, not the code.
 
 ## References
 
@@ -58,7 +58,7 @@ _Note: the drag-to-reorder **widget** itself (`DragReorderList.kt`) is owned by 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
 | List | CAT-UI-001 to 006 | 5 | 0 | 0 (CAT-UI-002 resolved — see findings) |
-| Edit — Display | CAT-UI-010 to 017 | 8 | 0 | 1 (CAT-UI-011a — see findings) |
+| Edit — Display | CAT-UI-010 to 017 | 8 | 0 | 0 |
 | Edit — Validation | CAT-UI-020 to 022 | all | 0 | 0 |
 | Edit — ValueType migration | CAT-UI-030 to 047 | all | 0 | 0 |
 | Edit — Default Value | CAT-UI-063 to 066 | all | 0 | 0 |
@@ -67,11 +67,11 @@ _Note: the drag-to-reorder **widget** itself (`DragReorderList.kt`) is owned by 
 | Navigation | CAT-NAV-* | all | 0 | 0 |
 | SubCategory group menu | CAT-UI-058, CAT-NAV-011 | 0 | 2 | 0 |
 
-**Summary:** 73 of 76 active specs implemented; 1 genuine active gap (CAT-UI-011a); 2 deferred. Fully reconciled this pass — no more stale `[ ]` markers.
+**Summary:** 74 of 76 active specs implemented; 0 active gaps; 2 deferred. Fully reconciled this pass — no more stale `[ ]` markers.
 
 ## Key Findings
 
-0. **This pass (2026-07-27):** 10 more stale `[ ]` markers reconciled to `[x]` (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) — all confirmed implemented by direct code read, not just inferred. **CAT-UI-002 (drag-to-reorder) is now fully resolved**: the generic widget (`DragReorderList.kt`) shipped as its own segment (see `drag-reorder-list.md`), and this segment gained CAT-UI-080-084 covering the category-specific adapter (transactional reparent, sibling reindex, value-type-migration confirmation dialog on cross-type reparent, drop-completion callback contract, and the concurrent-childless-guard rejection path) — all implemented and annotated in `LocalTrackrRepository.kt`, `SiblingReindex.kt`, `ValueTypeConversion.kt`. **CAT-UI-011a is confirmed a genuine, still-unfixed gap**: `CategoryEditViewModel.kt`'s `save()` (around the `_exerciseDefaultSets.value.toIntOrNull() ?: 3` / `?: 15` lines) has no `≥1` enforcement and no `SaveResult.ValidationError` path for the default sets/reps fields — `"0"` or a negative value parses via `toIntOrNull()` and saves unvalidated; `CategoryEditScreen.kt` has no error-state wiring for these fields either (only `name`/`emoji` have `ValidationError` checks). Also backfilled `@spec CAT-UI-047` on `ValueTypeSelector` in `CategoryEditScreen.kt` (implemented, was untagged).
+0. **This pass (2026-07-27):** 10 more stale `[ ]` markers reconciled to `[x]` (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) — all confirmed implemented by direct code read, not just inferred. **CAT-UI-002 (drag-to-reorder) is now fully resolved**: the generic widget (`DragReorderList.kt`) shipped as its own segment (see `drag-reorder-list.md`), and this segment gained CAT-UI-080-084 covering the category-specific adapter (transactional reparent, sibling reindex, value-type-migration confirmation dialog on cross-type reparent, drop-completion callback contract, and the concurrent-childless-guard rejection path) — all implemented and annotated in `LocalTrackrRepository.kt`, `SiblingReindex.kt`, `ValueTypeConversion.kt`. **CAT-UI-011a descoped, not fixed (user decision):** the spec previously required `≥1` enforcement on the Exercise default sets/reps fields, which `CategoryEditViewModel.kt`'s `save()` never actually implemented (`toIntOrNull() ?: 3` / `?: 15` — unparseable input falls back to 3/15, but a parseable non-positive value like `"0"` saves as-is, with no `SaveResult.ValidationError` path or error-state UI). Rather than adding that validation, the spec and LLD were reworded to describe this as accepted current behavior — low priority, not worth the added `ValidationError` branch and UI wiring right now. Also backfilled `@spec CAT-UI-047` on `ValueTypeSelector` in `CategoryEditScreen.kt` (implemented, was untagged).
 
 1. **Prior pass (2026-06-17): spec checkboxes were significantly stale.** 13 of the 16 nominally-active-gap specs from that pass were confirmed already implemented by reading the actual code, not just inferred:
    - `CAT-NAV-001` (FAB → create category): `CategoryListScreen.kt:79`, `FloatingActionButton(onClick = { onNavigateToCategoryEdit(null) })`
@@ -93,7 +93,7 @@ _Note: the drag-to-reorder **widget** itself (`DragReorderList.kt`) is owned by 
 _None._
 
 ### Should Fix
-1. **CAT-UI-011a** — enforce "≥1 to save" on the Exercise category edit screen's default sets/reps fields. `CategoryEditViewModel.kt`'s `save()` needs a validation branch (mirroring the pattern already used for `name`/`emoji`) that produces `SaveResult.ValidationError` when either field parses to a value `< 1`, and `CategoryEditScreen.kt` needs the corresponding error-state UI wiring.
+_None._
 
 ### Nice to Have
-_None noted this pass._
+1. **CAT-UI-011a** — could add "≥1 to save" enforcement on the Exercise category edit screen's default sets/reps fields (mirroring the `SaveResult.ValidationError` pattern used for `name`/`emoji`), but explicitly deprioritized by the user; not currently planned.

@@ -62,7 +62,7 @@ For a **MetaCategory**, none of the "inherit" options are shown (there is no par
 
 **Default value fields** (shown only when the effective `valueType` is `Number` or `Exercise`):
 - **Number**: a single "Unit (optional)" text field. The stored `defaultValue` is always `NumberValue(0.0, unit)` where `unit` is null when the field is blank. The number component is fixed at 0 — the user edits the unit only.
-- **Exercise**: two integer fields labeled "Default sets" and "Default reps", initialized to 3 and 15. Both must be ≥ 1 to save. The stored `defaultValue` is `ExerciseValue(sets, reps)`.
+- **Exercise**: two integer fields labeled "Default sets" and "Default reps", initialized to 3 and 15. The stored `defaultValue` is `ExerciseValue(sets, reps)`; values are parsed via `toIntOrNull() ?: <fallback>`, so unparseable input silently reverts to the 3/15 fallback, but a parseable non-positive value (e.g. `"0"`, `"-5"`) saves as-is — not currently enforced; low priority, see CAT-UI-011a.
 
 `allowEmptyText` is not exposed in the MVP editor; always written as `true` for new categories.
 

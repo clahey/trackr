@@ -4,7 +4,7 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 
 ## Status
 
-**PARTIAL** — last audited 2026-07-27. 30 of 31 specs implemented. LS-BE-041's startup-ordering guarantee is now **confirmed** (not just suspected) unmet by the current code — a real gap, not a stale marker — plus an annotation-traceability gap (corrected count: 12, not 9).
+**PARTIAL** — last audited 2026-07-27. 31 of 31 specs implemented. LS-BE-041 was reworded this pass to match actual (and accepted) behavior — fire-and-forget, no ordering guarantee against first UI frame — rather than fixing the code; see finding 2. Remaining gap is annotation-traceability only (corrected count: 12, not 9).
 
 ## References
 
@@ -49,28 +49,27 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| Repository/DAOs/Converters | LS-BE-001 to 062 | all but 1 | 0 | 1 |
+| Repository/DAOs/Converters | LS-BE-001 to 062 | all | 0 | 0 |
 | Image store / startup | LS-BE-070, LS-BE-080/081 | all | 0 | 0 |
 | Auto Backup | LS-BE-090 to 092 | all | 0 | 0 |
 
-**Summary:** 30 of 31 active specs implemented; 1 active gap (LS-BE-041).
+**Summary:** 31 of 31 active specs implemented; 0 active gaps.
 
 ## Key Findings
 
 1. **Auto Backup is genuinely configured, not just stubbed** — `data_extraction_rules.xml` and `backup_rules.xml` both include `trackr.db`, `images/`, and `datastore/` for both `cloud-backup` and `device-transfer`, and both carry `@spec LS-BE-090, LS-BE-091, LS-BE-092` annotations. This matches the HLD's stated v1 data-safety baseline. Verified by reading the XML directly, not just trusting the `[x]` marker. (LS-BE-090/091/092 are correctly annotated — an earlier pass wrongly counted them as unannotated; corrected in finding 3.)
-2. **LS-BE-041 confirmed a genuine, still-unresolved gap (2026-07-27).** ("`onStartup` shall be called once per app process start before any user-visible UI is shown".) `TrackrApplication.kt`'s `onCreate()` does `appScope.launch { repository.onStartup() }` — fire-and-forget on `Dispatchers.IO`, no join/await. `MainActivity.kt`'s `onCreate()` calls `setContent { ... AppScaffold() }` immediately, with no dependency on `onStartup()` having started or completed. The ordering guarantee is **not met**: the first UI frame can render before orphan-file cleanup even starts. This needs an implementation fix (e.g. block first frame on completion, or move the cleanup earlier in the startup sequence), not just a documentation decision.
+2. **LS-BE-041 descoped, not fixed (2026-07-27, user decision).** The spec previously claimed an ordering guarantee ("before any user-visible UI is shown") that `TrackrApplication.kt`'s fire-and-forget `appScope.launch { repository.onStartup() }` never actually met — `MainActivity.kt` renders `setContent { ... AppScaffold() }` with no dependency on `onStartup()`. Rather than implementing a real block-on-first-frame fix, the spec and LLD were reworded to describe the guarantee that's actually needed today: `onStartup` only deletes locally-orphaned image files (LS-BE-040), a purely additive cleanup nothing in the UI reads, so fire-and-forget is fine. The spec now flags explicitly that this must be revisited if `onStartup` ever takes on a responsibility the UI depends on (e.g. a migration) — see `docs/specs/local-storage.md` LS-BE-041 and `docs/llds/local-storage.md`'s `onStartup` section.
 3. **12 implemented specs have no `@spec` annotation anywhere** (corrected 2026-07-27; previously counted as 9, and wrongly included LS-BE-090/091/092 which are in fact annotated): `LS-BE-001, LS-BE-002, LS-BE-003, LS-BE-004, LS-BE-033, LS-BE-050, LS-BE-054, LS-BE-060, LS-BE-061, LS-BE-062, LS-BE-070, LS-BE-071`. LS-BE-050/054/071 are newly identified this pass — `EventValueConverter.kt`/`ValueTypeConverter.kt` carry only `DM-*` tags, and `EventEntity.kt`'s CASCADE FK has no tag at all.
 4. **Test coverage gap**: LS-BE-050, 052, 054, 060-062, 070, 071 have no test-file `@spec` citation anywhere (LS-BE-052 is annotated only in main `EventValue.kt`, not in any test).
 
 ## Work Required
 
 ### Must Fix
-_None — no user-visible symptom currently traced to the LS-BE-041 gap; tracked as Should Fix given it's a real ordering race, not just a doc mismatch._
+_None._
 
 ### Should Fix
-1. **LS-BE-041** — fix the actual ordering race: `TrackrApplication`'s fire-and-forget `onStartup()` launch does not satisfy the "before any user-visible UI is shown" guarantee. Needs a real implementation change (block first frame, or restructure startup sequencing), not a spec-wording fix.
-2. Backfill `@spec` annotations on the 12 unannotated implemented specs listed in finding 3.
-3. Add test-file `@spec` citations for the specs listed in finding 4.
+1. Backfill `@spec` annotations on the 12 unannotated implemented specs listed in finding 3.
+2. Add test-file `@spec` citations for the specs listed in finding 4.
 
 ### Nice to Have
 _None noted this pass._

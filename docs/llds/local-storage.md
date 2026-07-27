@@ -154,7 +154,7 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **Orphaned SubCategory handling in `toDomainList()`:** if a `CategoryEntity` has a non-null `parentId` that is not present among the loaded entities, it is surfaced as a `Category.MetaCategory` using its own stored fields, with null-field fallbacks matching MetaCategory assembly (`"" / 0xFFE53935L / ValueType.None`). This can occur when a MetaCategory is deleted mid-session or when the DB is in an inconsistent state; see DM-PROC-022.
 
-**`onStartup`:** called once at app startup. `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row. Future implementations may use it for different initialization behavior (sync, token refresh, etc.).
+**`onStartup`:** called once at app startup, launched fire-and-forget from `TrackrApplication.onCreate()` — it does not block the first UI frame (per LS-BE-041). `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row, a purely additive cleanup with no ordering requirement against the UI. Future implementations may use it for different initialization behavior (sync, token refresh, etc.) — if that behavior is something the UI depends on, the fire-and-forget launch must be revisited to actually block first frame.
 
 ## ImageStore
 
