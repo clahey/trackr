@@ -37,7 +37,7 @@ Individuals tracking personal health and lifestyle data who want:
 - Social or community features in v1
 - Adaptive or learned reminder timing (e.g. tuned from the user's own logging history) in v1 — reminders use a fixed, user-set availability window with simple in-window randomization only
 
-## Tenets
+## Guidelines
 
 - **Silence over spam.** When a reminder-related design choice is ambiguous, lean toward fewer notifications rather than more — a missed or dismissed reminder is not escalated or repeated within the same window.
 - **Public surfaces default to discreet.** Notification and lock-screen text defaults to generic phrasing rather than naming the specific category being tracked, since some categories (mood, symptoms, medication) are sensitive; showing more detail is an opt-in, not the default.

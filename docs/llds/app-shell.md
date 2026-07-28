@@ -57,7 +57,7 @@ setContent {
 }
 ```
 
-**Notification deep link.** A reminder notification's `PendingIntent` (see `docs/llds/reminders.md § Scheduling Engine`) targets `MainActivity` with a `categoryId` extra. On a cold start, `MainActivity` reads the launching `Intent`'s extra and passes it into the nav graph's start-destination route (`Routes.timeline(quickLogCategoryId = ...)`, see § Navigation Graph) instead of always starting bare at `"timeline"`. On a warm start (app already running), `MainActivity` overrides `onNewIntent` and forwards the extra the same way — `singleTop` launch semantics keep this from spawning a second Activity instance. This resolves the "Deep links" open question below: no platform `NavDeepLink`/intent-filter URI scheme is used, since the existing route-query-arg + `SavedStateHandle` pattern (already used for `EVENT_EDIT`/`CATEGORY_EDIT`) already covers passing a target into a composable on arrival, and adding a second, platform-native deep-link mechanism alongside it would be redundant.
+**Notification deep link.** A reminder notification's `PendingIntent` (see `docs/llds/reminders.md § Scheduling Engine`) targets `MainActivity` with a `categoryId` extra. On a cold start, `MainActivity` reads the launching `Intent`'s extra and passes it into the nav graph's start-destination route (`Routes.timeline(quickLogCategoryId = ...)`, see § Navigation Graph) instead of always starting bare at `"timeline"`. On a warm start (app already running), `MainActivity` overrides `onNewIntent` and forwards the extra the same way — `singleTop` launch semantics keep this from spawning a second Activity instance. No platform `NavDeepLink`/intent-filter URI scheme is used: the existing route-query-arg + `SavedStateHandle` pattern (already used for `EVENT_EDIT`/`CATEGORY_EDIT`) already covers passing a target into a composable on arrival, and adding a second, platform-native deep-link mechanism alongside it would be redundant.
 
 `AppScaffold` is a composable that wraps the `NavHost` in a `Scaffold` with a `BottomBar`. The bottom bar is shown only on the two top-level destinations (`timeline`, `categoryList`).
 
@@ -156,8 +156,7 @@ The repository and `ReminderScheduler` are injected into `TrackrApplication` via
 ## Open Questions & Future Decisions
 
 1. **Tab icons** — `Icons.Default.Home` / `Icons.Default.Label` are placeholders; final icons TBD.
-2. ~~**Deep links**~~ — resolved: needed as of the `reminders` segment (notification tap → timeline with `quickLogCategoryId`), handled via the existing `SavedStateHandle` route-arg pattern rather than a platform deep-link mechanism. See § MainActivity and § Navigation Graph.
-3. **Splash screen** — not implemented in v1; orphan scan is fast enough to be invisible.
+2. **Splash screen** — not implemented in v1; orphan scan is fast enough to be invisible.
 
 ## References
 
