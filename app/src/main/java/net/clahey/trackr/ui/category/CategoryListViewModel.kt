@@ -8,15 +8,18 @@ import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.domain.warningTierFor
+import net.clahey.trackr.reminders.ReminderScheduler
 import net.clahey.trackr.ui.components.DragMoveResult
 import net.clahey.trackr.ui.theme.categoryColorForIndex
 import net.clahey.trackr.ui.theme.categoryColorPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -59,15 +62,22 @@ data class PendingValueTypeConfirmation(
     val onSettled: () -> Unit = {},
 )
 
-// @spec CAT-UI-001, CAT-UI-002, CAT-UI-003, CAT-UI-004, CAT-UI-005, CAT-UI-006,
+// @spec CAT-UI-001, CAT-UI-002, CAT-UI-003, CAT-UI-004, CAT-UI-005, CAT-UI-006, CAT-UI-007,
 // CAT-UI-051, CAT-UI-052, CAT-UI-080, CAT-UI-081, CAT-UI-082, CAT-UI-084, DM-PROC-020
 @HiltViewModel
 class CategoryListViewModel @Inject constructor(
     private val repository: TrackrRepository,
+    private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
 
     val categories: StateFlow<List<Category>> = repository.getCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // @spec REM-PERM-004
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val hasEnabledReminder: StateFlow<Boolean> = categories
+        .mapLatest { repository.getAllEnabledRemindersOnce().isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _pendingDeleteConfirmation = MutableStateFlow<DeleteConfirmation?>(null)
     val pendingDeleteConfirmation: StateFlow<DeleteConfirmation?> = _pendingDeleteConfirmation.asStateFlow()
@@ -91,22 +101,27 @@ class CategoryListViewModel @Inject constructor(
         _reparentRejectedCategoryName.value = null
     }
 
-    // @spec CAT-UI-004, CAT-UI-005
+    // @spec CAT-UI-004, CAT-UI-005, CAT-UI-007
     fun deleteCategory(id: String) {
         viewModelScope.launch {
             val ownCount = repository.getEventCountForCategory(id).first()
             val subCount = repository.getSubCategoryCount(id).first()
             val confirmation = deletionConfirmationIfNeeded(id, ownCount, subCount)
-            if (confirmation == null) repository.deleteCategory(id)
-            else _pendingDeleteConfirmation.value = confirmation
+            if (confirmation == null) {
+                repository.deleteCategory(id)
+                reminderScheduler.cancel(id)
+            } else {
+                _pendingDeleteConfirmation.value = confirmation
+            }
         }
     }
 
-    // @spec CAT-UI-006
+    // @spec CAT-UI-006, CAT-UI-007
     fun confirmDelete() {
         val pending = _pendingDeleteConfirmation.value ?: return
         viewModelScope.launch {
             repository.deleteCategory(pending.categoryId)
+            reminderScheduler.cancel(pending.categoryId)
             _pendingDeleteConfirmation.value = null
         }
     }

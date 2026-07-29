@@ -3,6 +3,27 @@ package net.clahey.trackr.data.local
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+// @spec REM-DATA-001
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE reminders (
+                categoryId TEXT NOT NULL PRIMARY KEY,
+                enabled INTEGER NOT NULL,
+                mode TEXT NOT NULL,
+                times TEXT,
+                windowStart TEXT,
+                windowEnd TEXT,
+                occurrencesPerDay INTEGER,
+                daysActive TEXT NOT NULL,
+                showCategoryInNotification INTEGER NOT NULL,
+                nextFireAt INTEGER,
+                FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE
+            )
+        """)
+    }
+}
+
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("""

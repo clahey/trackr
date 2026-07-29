@@ -19,6 +19,8 @@
 - [x] **APP-NAV-002**: The start destination shall be the timeline screen.
 - [x] **APP-NAV-003**: `EventEditViewModel` shall read its required `eventId` argument from `SavedStateHandle` under the key `"eventId"`.
 - [x] **APP-NAV-004**: `CategoryEditViewModel` shall read its optional `categoryId` argument from `SavedStateHandle` under the key `"categoryId"`; a null value indicates create mode.
+- [x] **APP-NAV-005**: When `MainActivity` is cold-started by a reminder notification's `PendingIntent` (`docs/specs/reminders.md § Notifications`, `REM-NOTIF-005`) carrying a `categoryId` extra, the system shall read that extra and pass it into the nav graph's start-destination route as `Routes.timeline(quickLogCategoryId = categoryId)`, instead of always starting bare at `"timeline"`.
+- [x] **APP-NAV-006**: When `MainActivity` is already running and receives a new intent carrying a `categoryId` extra (warm start via `onNewIntent`), the system shall forward it the same way as APP-NAV-005; `singleTop` launch semantics shall prevent a second `MainActivity` instance from being created.
 
 ## Bottom Navigation
 
@@ -31,3 +33,8 @@
 ## Startup
 
 - [x] **APP-PROC-001**: On application startup, the system shall invoke `repository.onStartup()` to run the orphan image scan before any screen is shown.
+- [x] **APP-PROC-002**: On application startup, the system shall separately invoke `reminderScheduler.reconcileOnStartup()` (`docs/specs/reminders.md § Scheduling Engine`, `REM-SCHED-017`) as its own independent fire-and-forget coroutine, not composed into or dependent on `repository.onStartup()` (APP-PROC-001), so a slow or failing image scan does not block reminder re-arming or vice versa.
+
+## Reminder Integration
+
+- [x] **APP-REM-001**: `AndroidManifest.xml` shall declare `ReminderReceiver` and `ReminderRearmReceiver` (behavior specified in `docs/specs/reminders.md § Scheduling Engine`) as `BroadcastReceiver` components; this segment owns only the fact that they are declared, not what they do when triggered.

@@ -1,5 +1,6 @@
 package net.clahey.trackr.ui.home
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import net.clahey.trackr.data.TrackrRepository
@@ -13,6 +14,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -22,6 +24,12 @@ sealed class ActiveFilter {
     data object All : ActiveFilter()
     data class TopLevel(val category: Category.MetaCategory) : ActiveFilter()
     data class Sub(val parent: Category.MetaCategory, val sub: Category.SubCategory) : ActiveFilter()
+}
+
+// @spec EL-UI-081
+sealed class QuickLogTarget {
+    data class DrillDown(val meta: Category.MetaCategory) : QuickLogTarget()
+    data class DirectEntry(val category: Category) : QuickLogTarget()
 }
 
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
@@ -35,12 +43,22 @@ sealed class DayEntry {
 }
 
 // @spec EL-UI-001, EL-UI-011, EL-UI-012, EL-UI-013b, EL-UI-017, EL-UI-018,
-// EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022, EL-UI-023, EL-UI-023b
+// EL-UI-019, EL-UI-019b, EL-UI-020, EL-UI-021, EL-UI-022, EL-UI-023, EL-UI-023b,
+// EL-UI-080, EL-UI-081, EL-UI-082, EL-UI-083
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class HomeViewModel @Inject constructor(private val repository: TrackrRepository) : ViewModel() {
+class HomeViewModel @Inject constructor(
+    private val repository: TrackrRepository,
+    savedStateHandle: SavedStateHandle,
+) : ViewModel() {
     private val _activeFilter = MutableStateFlow<ActiveFilter>(ActiveFilter.All)
     val activeFilter: StateFlow<ActiveFilter> = _activeFilter.asStateFlow()
+
+    private val _pendingQuickLogTarget = MutableStateFlow<QuickLogTarget?>(null)
+    val pendingQuickLogTarget: StateFlow<QuickLogTarget?> = _pendingQuickLogTarget.asStateFlow()
+
+    private val _quickLogCategoryNotFound = MutableStateFlow(false)
+    val quickLogCategoryNotFound: StateFlow<Boolean> = _quickLogCategoryNotFound.asStateFlow()
 
     private val _dayGroups = MutableStateFlow<List<DayGroup>>(emptyList())
     val dayGroups: StateFlow<List<DayGroup>> = _dayGroups.asStateFlow()
@@ -115,6 +133,35 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
                 }
             }
         }
+
+        // @spec EL-UI-080, EL-UI-081, EL-UI-082, EL-UI-083
+        val quickLogCategoryId: String? = savedStateHandle["quickLogCategoryId"]
+        if (quickLogCategoryId != null) {
+            viewModelScope.launch {
+                val categories = repository.getCategories().first()
+                val category = categories.find { it.id == quickLogCategoryId }
+                if (category == null) {
+                    _quickLogCategoryNotFound.value = true
+                    return@launch
+                }
+                val hasSubCategories = category is Category.MetaCategory &&
+                    categories.any { it is Category.SubCategory && it.parent.id == category.id }
+                if (category is Category.MetaCategory && hasSubCategories) {
+                    setFilter(ActiveFilter.TopLevel(category))
+                    _pendingQuickLogTarget.value = QuickLogTarget.DrillDown(category)
+                } else {
+                    _pendingQuickLogTarget.value = QuickLogTarget.DirectEntry(category)
+                }
+            }
+        }
+    }
+
+    fun consumePendingQuickLogTarget() {
+        _pendingQuickLogTarget.value = null
+    }
+
+    fun consumeQuickLogCategoryNotFound() {
+        _quickLogCategoryNotFound.value = false
     }
 
     // @spec EL-UI-012, EL-UI-014, EL-UI-017, EL-UI-018, EL-UI-019b

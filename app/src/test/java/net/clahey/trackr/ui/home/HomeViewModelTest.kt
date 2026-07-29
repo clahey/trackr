@@ -1,5 +1,6 @@
 package net.clahey.trackr.ui.home
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import net.clahey.trackr.FakeTrackrRepository
 import net.clahey.trackr.domain.Category
@@ -57,7 +58,7 @@ class HomeViewModelTest {
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
         repo = FakeTrackrRepository()
-        vm = HomeViewModel(repo)
+        vm = HomeViewModel(repo, SavedStateHandle())
     }
 
     @After fun tearDown() { Dispatchers.resetMain() }
@@ -481,4 +482,59 @@ class HomeViewModelTest {
         }
     }
 
+    // ---------- quickLogCategoryId (EL-UI-080, EL-UI-081, EL-UI-082, EL-UI-083) ----------
+
+    // @spec EL-UI-081
+    @Test fun `quickLogCategoryId for a MetaCategory with no SubCategories resolves to DirectEntry`() = runTest {
+        val meta = makeMeta("meta1")
+        repo.setCategories(meta)
+        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
+        target.pendingQuickLogTarget.test {
+            val result = awaitItem() as QuickLogTarget.DirectEntry
+            assertEquals("meta1", result.category.id)
+        }
+    }
+
+    // @spec EL-UI-081
+    @Test fun `quickLogCategoryId for a SubCategory resolves to DirectEntry`() = runTest {
+        val meta = makeMeta("meta1")
+        val sub = makeSub("sub1", meta)
+        repo.setCategories(meta, sub)
+        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "sub1")))
+        target.pendingQuickLogTarget.test {
+            val result = awaitItem() as QuickLogTarget.DirectEntry
+            assertEquals("sub1", result.category.id)
+        }
+    }
+
+    // @spec EL-UI-081, EL-UI-082
+    @Test fun `quickLogCategoryId for a MetaCategory with SubCategories resolves to DrillDown and sets ActiveFilter`() = runTest {
+        val meta = makeMeta("meta1")
+        val sub = makeSub("sub1", meta)
+        repo.setCategories(meta, sub)
+        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
+        target.pendingQuickLogTarget.test {
+            val result = awaitItem() as QuickLogTarget.DrillDown
+            assertEquals("meta1", result.meta.id)
+        }
+        assertEquals(ActiveFilter.TopLevel(meta), target.activeFilter.value)
+    }
+
+    // @spec EL-UI-083
+    @Test fun `quickLogCategoryId that cannot be resolved sets the not-found signal, not a target`() = runTest {
+        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "missing")))
+        target.quickLogCategoryNotFound.test {
+            assertTrue(awaitItem())
+        }
+        assertEquals(null, target.pendingQuickLogTarget.value)
+    }
+
+    // @spec EL-UI-081
+    @Test fun `consumePendingQuickLogTarget clears the pending target`() = runTest {
+        val meta = makeMeta("meta1")
+        repo.setCategories(meta)
+        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
+        target.consumePendingQuickLogTarget()
+        assertEquals(null, target.pendingQuickLogTarget.value)
+    }
 }

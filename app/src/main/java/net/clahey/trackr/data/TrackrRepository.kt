@@ -2,6 +2,7 @@ package net.clahey.trackr.data
 
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.ValueType
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
@@ -33,4 +34,13 @@ interface TrackrRepository {
     suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int
 
     suspend fun onStartup()
+
+    // @spec REM-DATA-006
+    fun getReminderForCategory(categoryId: String): Flow<Reminder?>
+    // @spec REM-DATA-006
+    suspend fun saveReminder(reminder: Reminder)
+    // @spec REM-DATA-006, REM-DATA-008
+    suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType? = null)
+    // @spec REM-DATA-007
+    suspend fun getAllEnabledRemindersOnce(): List<Reminder>
 }

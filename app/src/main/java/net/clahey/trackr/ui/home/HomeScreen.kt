@@ -173,6 +173,27 @@ fun HomeScreen(
         }
     }
 
+    // @spec EL-UI-081, EL-UI-082
+    val pendingQuickLogTarget by homeVm.pendingQuickLogTarget.collectAsState()
+    LaunchedEffect(pendingQuickLogTarget) {
+        when (val target = pendingQuickLogTarget) {
+            is QuickLogTarget.DrillDown -> quickLogVm.expandMetaCategory(target.meta.id)
+            is QuickLogTarget.DirectEntry -> quickLogVm.selectCategory(target.category)
+            null -> return@LaunchedEffect
+        }
+        showSheet = true
+        homeVm.consumePendingQuickLogTarget()
+    }
+
+    // @spec EL-UI-083
+    val quickLogCategoryNotFound by homeVm.quickLogCategoryNotFound.collectAsState()
+    val categoryNotFoundMessage = stringResource(R.string.category_not_found)
+    LaunchedEffect(quickLogCategoryNotFound) {
+        if (!quickLogCategoryNotFound) return@LaunchedEffect
+        snackbarHostState.showSnackbar(categoryNotFoundMessage)
+        homeVm.consumeQuickLogCategoryNotFound()
+    }
+
     val eventDeletedMessage = stringResource(R.string.event_deleted_snackbar)
     val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(pendingDelete) {
