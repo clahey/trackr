@@ -24,6 +24,7 @@ class TrackrApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // @spec LS-BE-041
         appScope.launch { repository.onStartup() }
     }
 }

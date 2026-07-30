@@ -365,6 +365,84 @@ class HomeViewModelTest {
         assertNull(vm.pendingDelete.value)
     }
 
+    // @spec EL-UI-077
+    @Test fun `onEventLogged arms scrollTarget when category matches All filter`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        vm.onEventLogged("e1", cat)
+        assertEquals("e1", vm.scrollTarget.value)
+    }
+
+    // @spec EL-UI-077
+    @Test fun `onEventLogged arms scrollTarget when logged SubCategory matches TopLevel filter`() = runTest {
+        val meta = makeMeta("m1")
+        val sub = makeSub("s1", parent = meta)
+        repo.setCategories(meta, sub)
+        vm.setFilter(ActiveFilter.TopLevel(meta))
+        vm.onEventLogged("e1", sub)
+        assertEquals("e1", vm.scrollTarget.value)
+    }
+
+    // @spec EL-UI-077
+    @Test fun `onEventLogged arms scrollTarget when logged category matches Sub filter exactly`() = runTest {
+        val meta = makeMeta("m1")
+        val sub = makeSub("s1", parent = meta)
+        repo.setCategories(meta, sub)
+        vm.setFilter(ActiveFilter.Sub(meta, sub))
+        vm.onEventLogged("e1", sub)
+        assertEquals("e1", vm.scrollTarget.value)
+    }
+
+    // @spec EL-UI-077a
+    @Test fun `onEventLogged does not arm scrollTarget when category outside TopLevel filter`() = runTest {
+        val meta = makeMeta("m1")
+        val other = makeMeta("m2")
+        repo.setCategories(meta, other)
+        vm.setFilter(ActiveFilter.TopLevel(meta))
+        vm.onEventLogged("e1", other)
+        assertNull(vm.scrollTarget.value)
+    }
+
+    // @spec EL-UI-077a
+    @Test fun `onEventLogged does not arm scrollTarget when logged category is parent Meta but Sub filter active`() = runTest {
+        val meta = makeMeta("m1")
+        val sub = makeSub("s1", parent = meta)
+        repo.setCategories(meta, sub)
+        vm.setFilter(ActiveFilter.Sub(meta, sub))
+        vm.onEventLogged("e1", meta)
+        assertNull(vm.scrollTarget.value)
+    }
+
+    // @spec EL-UI-077b
+    @Test fun `changing the active filter discards a pending scrollTarget`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        vm.onEventLogged("e1", cat)
+        assertEquals("e1", vm.scrollTarget.value)
+        vm.setFilter(ActiveFilter.TopLevel(cat))
+        assertNull(vm.scrollTarget.value)
+    }
+
+    // @spec EL-UI-077c
+    @Test fun `onEventLogged clears a pending preFilterTopDay anchor`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        repo.setEvents(makeEvent("e0", "c1"))
+        vm.setFilter(ActiveFilter.TopLevel(cat))
+        assertTrue(vm.preFilterTopDay.value != null || vm.dayGroups.value.isEmpty())
+        vm.onEventLogged("e1", cat)
+        assertNull(vm.preFilterTopDay.value)
+    }
+
+    // @spec EL-UI-077
+    @Test fun `consumeScrollTarget clears scrollTarget`() = runTest {
+        val cat = makeCategory("c1")
+        repo.setCategories(cat)
+        vm.onEventLogged("e1", cat)
+        vm.consumeScrollTarget()
+        assertNull(vm.scrollTarget.value)
+    }
+
     // @spec EL-UI-002
     @Test fun `DayEntry Entry carries the matching category`() = runTest {
         val cat = makeCategory("c1", name = "Steps")

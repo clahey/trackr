@@ -504,6 +504,7 @@ private fun ColorPicker(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+// @spec CAT-UI-047
 @Composable
 private fun ValueTypeSelector(
     selected: ValueType,

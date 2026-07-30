@@ -62,6 +62,9 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
     private val _preFilterTopDay = MutableStateFlow<LocalDate?>(null)
     val preFilterTopDay: StateFlow<LocalDate?> = _preFilterTopDay.asStateFlow()
 
+    private val _scrollTarget = MutableStateFlow<String?>(null)
+    val scrollTarget: StateFlow<String?> = _scrollTarget.asStateFlow()
+
     private var deleteSnapshot: Set<String> = emptySet()
     private var currentEvents: List<Event> = emptyList()
 
@@ -135,6 +138,8 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
                 ?.timestamp?.atZone(ZoneId.systemDefault())?.toLocalDate()
         }
         if (filter is ActiveFilter.All) _preFilterTopDay.value = null
+        // @spec EL-UI-077b
+        if (filter != _activeFilter.value) _scrollTarget.value = null
         _activeFilter.value = filter
     }
 
@@ -157,6 +162,25 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
     // @spec CAT-UI-090
     fun addStarterCategories(specs: List<net.clahey.trackr.domain.StarterCategoryInput>) {
         viewModelScope.launch { repository.addStarterCategories(specs) }
+    }
+
+    // @spec EL-UI-077, EL-UI-077a, EL-UI-077c
+    fun onEventLogged(eventId: String, category: Category) {
+        if (!categoryMatchesFilter(category, _activeFilter.value)) return
+        _preFilterTopDay.value = null
+        _scrollTarget.value = eventId
+    }
+
+    fun consumeScrollTarget() {
+        _scrollTarget.value = null
+    }
+
+    private fun categoryMatchesFilter(category: Category, filter: ActiveFilter): Boolean = when (filter) {
+        is ActiveFilter.All -> true
+        is ActiveFilter.TopLevel ->
+            category.id == filter.category.id ||
+                (category is Category.SubCategory && category.parent.id == filter.category.id)
+        is ActiveFilter.Sub -> category.id == filter.sub.id
     }
 
     fun swipeDelete(event: Event) {

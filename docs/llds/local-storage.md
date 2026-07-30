@@ -157,7 +157,7 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **`addStarterCategories`:** runs inside a single Room transaction — reads existing category names, selects the specs to insert via the pure `starterCategoriesToInsert` (`domain/StarterCategories.kt`; insert-missing by case-insensitive name, top-of-list `sortOrder` preserving the given order, LS-BE-093), upserts them, and returns the count. Sharing the pure selection function with `FakeTrackrRepository` — and unit-testing it in isolation — keeps the fake behavior-consistent with the real insert, the same pattern used by `reconcileSiblingOrder`. The starter set's content and its `@StringRes`→`StarterCategoryInput` resolution live in the UI layer (`category-management.md § Starter Categories`); this repository sees only resolved inputs.
 
-**`onStartup`:** called once at app startup. `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row. Future implementations may use it for different initialization behavior (sync, token refresh, etc.).
+**`onStartup`:** called once at app startup, launched fire-and-forget from `TrackrApplication.onCreate()` — it does not block the first UI frame (per LS-BE-041). `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row, a purely additive cleanup with no ordering requirement against the UI. Future implementations may use it for different initialization behavior (sync, token refresh, etc.) — if that behavior is something the UI depends on, the fire-and-forget launch must be revisited to actually block first frame.
 
 ## ImageStore
 

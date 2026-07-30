@@ -4,7 +4,7 @@ App-level scaffolding: DI modules, application/activity entry points, and top-le
 
 ## Status
 
-**AUDITED** — last audited 2026-06-17 (git SHA `be05346`). All 17 specs implemented; only finding is a traceability gap.
+**AUDITED** — last audited 2026-07-27 (re-verified; no code or spec changes since the 2026-06-17 pass — `git diff` over this segment's paths since then is empty). All 17 specs implemented; only finding is a traceability gap.
 
 ## References
 

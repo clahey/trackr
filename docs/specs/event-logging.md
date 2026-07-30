@@ -54,7 +54,10 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-032**: The timestamp field in the quick-log sheet shall default to the time the sheet was opened, and shall be editable via the shared `TimestampField` component: tapping the date opens a date picker that updates only the date, keeping the existing time; tapping the time opens a time picker (defaulting to the current time) that updates only the time, keeping the existing date. Dismissing either picker leaves the timestamp unchanged.
 - [x] **EL-UI-033**: For a None-type category, step 2 shall omit the value input field, making the flow completable in three taps (FAB → category → save).
 - [x] **EL-UI-034**: When the category selected in the quick-log sheet is deleted externally while the sheet is open at step 2, the system shall reset to step 1.
-- [ ] **EL-UI-077**: When the user saves a new event via the quick-log sheet, the system shall dismiss the sheet and scroll the timeline to make the newly saved event visible.
+- [x] **EL-UI-077**: When the user saves a new event via the quick-log sheet and the saved event's category would be included by the timeline's active filter (the same category-match rule that determines which events populate `dayGroups`: the category itself and its SubCategories for a MetaCategory filter, or the exact SubCategory for a SubCategory filter) at the moment of save, the system shall dismiss the sheet and scroll the timeline to bring the newly saved event's row into view.
+- [x] **EL-UI-077a**: When the user saves a new event via the quick-log sheet and the saved event's category would not be included by the timeline's active filter at the moment of save, the system shall dismiss the sheet and leave the timeline's scroll position and active filter unchanged.
+- [x] **EL-UI-077b**: If the timeline's active filter changes before a pending EL-UI-077 scroll target has appeared in the timeline, then the system shall discard the pending scroll target without scrolling.
+- [x] **EL-UI-077c**: When arming an EL-UI-077 scroll target, the system shall also clear any pending pre-filter anchor scroll position (per EL-UI-017/EL-UI-018), so the two scrolls cannot both animate against the same timeline update.
 
 ## Event Edit Screen
 

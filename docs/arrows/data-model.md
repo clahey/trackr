@@ -4,7 +4,7 @@ Domain model: `ValueType`, the `EventValue` sealed class hierarchy, and core dom
 
 ## Status
 
-**AUDITED** — last audited 2026-06-17 (git SHA `be05346`). All 48 specs implemented; the only finding is a traceability gap (missing `@spec` annotations), not a functional one.
+**AUDITED** — last audited 2026-07-27 (re-verified; no functional code changes to this segment since the 2026-06-17 pass — the only diff in its territory was new `CAT-UI-*`-tagged methods in `LocalTrackrRepository.kt`/`ValueTypeConversion.kt` owned by `category-management`, not this segment). All 48 specs implemented; the only finding is a traceability gap (missing `@spec` annotations), not a functional one. Traceability list corrected this pass: 21 IDs, not 24 (DM-PROC-019 added, DM-PROC-011/017 confirmed already annotated and removed).
 
 ## References
 
@@ -60,8 +60,9 @@ Domain model: `ValueType`, the `EventValue` sealed class hierarchy, and core dom
 
 ## Key Findings
 
-1. **24 implemented specs have no `@spec` annotation anywhere in code** — DM-DATA-001, 010-016, 020-024, 030-034, and DM-PROC-010, DM-PROC-012 (full list reproducible via the audit's annotation cross-check). The behavior exists (spec status is `[x]` and was not contradicted by inspection of `Category.kt`/`ValueTypeConversion.kt`), it just isn't linked back to a `// @spec` comment. This is a code-hygiene/traceability gap, not a missing feature.
-2. No reverse orphans in this segment — every `@spec DM-*` annotation found in code points to a spec ID that exists in `docs/specs/data-model.md`.
+1. **21 implemented specs have no `@spec` annotation anywhere in code** (corrected 2026-07-27; previously counted as 24) — `DM-DATA-001, DM-DATA-010–016, DM-DATA-020–024, DM-DATA-030–034, DM-PROC-010, DM-PROC-012, DM-PROC-019`. The behavior exists (spec status is `[x]`, re-confirmed by direct code read including a spot-check of DM-DATA-013's negative-duration rejection and DM-PROC-007/008/008b's range checks in `EventValueConverter.kt`), it just isn't linked back to a `// @spec` comment. This is a code-hygiene/traceability gap, not a missing feature. (DM-PROC-011 and DM-PROC-017 were previously miscounted into this list — both are in fact already annotated, just not in a test file for DM-PROC-011's case.)
+2. **Test-file coverage gap, distinct from the annotation gap above**: DM-PROC-011 (annotated in main code, not cited by any test) and DM-DATA-025/026/027 (annotated in `Category.kt`, but no test file cites them — `CategoryTest.kt` only cites DM-PROC-018).
+3. No reverse orphans in this segment — every `@spec DM-*` annotation found in code points to a spec ID that exists in `docs/specs/data-model.md` (re-verified 2026-07-27).
 
 ## Work Required
 
@@ -69,7 +70,8 @@ Domain model: `ValueType`, the `EventValue` sealed class hierarchy, and core dom
 _None — fully implemented._
 
 ### Should Fix
-1. Add `// @spec DM-DATA-...` annotations to the unannotated implementations listed above, so future audits don't have to re-derive coverage by reading code.
+1. Add `// @spec DM-DATA-...`/`DM-PROC-...` annotations to the 21 unannotated implementations listed above, so future audits don't have to re-derive coverage by reading code.
+2. Add test-file `@spec` citations for DM-PROC-011 and DM-DATA-025/026/027.
 
 ### Nice to Have
 _None noted this pass._

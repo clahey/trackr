@@ -20,10 +20,10 @@ LLD: `docs/llds/category-management.md`
 
 ## Category Edit — Display
 
-- [ ] **CAT-UI-010**: The category edit screen shall display input fields for name, emoji, color, and value type.
+- [x] **CAT-UI-010**: The category edit screen shall display input fields for name, emoji, color, and value type.
 - [x] **CAT-UI-017**: When the category edit screen loads in edit mode and the requested category is not found in the repository, the system shall navigate back to the category list and display a snackbar on the category list screen reading "Category not found."
-- [ ] **CAT-UI-011**: While effective value type is Number, the category edit screen shall display a "Unit (optional)" text field; for all other value types this field shall be hidden. The field is seeded from the category's stored `defaultValue` (as `NumberValue.unit`) on load.
-- [ ] **CAT-UI-011a**: While effective value type is Exercise, the category edit screen shall display two integer input fields labeled "Default sets" and "Default reps"; both must be ≥ 1 to save. The fields are seeded from the category's stored `defaultValue` (as `ExerciseValue.sets`/`.reps`) on load, falling back to 3 and 15 if `defaultValue` is null.
+- [x] **CAT-UI-011**: While effective value type is Number, the category edit screen shall display a "Unit (optional)" text field; for all other value types this field shall be hidden. The field is seeded from the category's stored `defaultValue` (as `NumberValue.unit`) on load.
+- [x] **CAT-UI-011a**: While effective value type is Exercise, the category edit screen shall display two integer input fields labeled "Default sets" and "Default reps". The fields are seeded from the category's stored `defaultValue` (as `ExerciseValue.sets`/`.reps`) on load, falling back to 3 and 15 if `defaultValue` is null. Unparseable input reverts to the 3/15 fallback; a parseable non-positive value is not currently rejected and saves as-is.
 - [x] **CAT-UI-012**: While editing an existing category, the edit screen shall display a delete action in the toolbar.
 - [x] **CAT-UI-013**: While creating a new category, the edit screen shall not display a delete action.
 - [x] **CAT-UI-014**: The color field shall display the preset palette (defined in `docs/llds/theme.md § Preset Palette`) and require a selection at all times; no free-form color entry in v1.
@@ -62,10 +62,10 @@ LLD: `docs/llds/category-management.md`
 
 ## Category Edit — Default Value
 
-- [ ] **CAT-UI-063**: When saving a Number category, the system shall store `defaultValue = NumberValue(existingValue ?: 0.0, unit)` where `existingValue` is the numeric component of any previously stored `defaultValue` and `unit` is null when the unit field is blank; the numeric component is never altered by the editor.
-- [ ] **CAT-UI-064**: When saving an Exercise category, the system shall store `defaultValue = ExerciseValue(sets, reps)` using the current values of the default sets and reps fields.
-- [ ] **CAT-UI-065**: When saving a category whose effective value type is neither Number nor Exercise, the system shall leave `defaultValue` unchanged; it shall not be cleared or overwritten.
-- [ ] **CAT-UI-066**: When the category edit screen opens in SubCategory create mode, the system shall pre-populate the default value fields from the parent's `resolvedDefaultValue` only if its type matches the SubCategory's effective value type; if the types do not match or `resolvedDefaultValue` is null, the fields shall be pre-populated with the type default (3 and 15 for Exercise; blank for Number). When saving any category and `defaultValueDirty` is false, the system shall store the previously stored `defaultValue` unchanged (null for a new category, preserving any existing value in edit mode); CAT-UI-063 and CAT-UI-064 apply only when `defaultValueDirty` is true.
+- [x] **CAT-UI-063**: When saving a Number category, the system shall store `defaultValue = NumberValue(existingValue ?: 0.0, unit)` where `existingValue` is the numeric component of any previously stored `defaultValue` and `unit` is null when the unit field is blank; the numeric component is never altered by the editor.
+- [x] **CAT-UI-064**: When saving an Exercise category, the system shall store `defaultValue = ExerciseValue(sets, reps)` using the current values of the default sets and reps fields.
+- [x] **CAT-UI-065**: When saving a category whose effective value type is neither Number nor Exercise, the system shall leave `defaultValue` unchanged; it shall not be cleared or overwritten.
+- [x] **CAT-UI-066**: When the category edit screen opens in SubCategory create mode, the system shall pre-populate the default value fields from the parent's `resolvedDefaultValue` only if its type matches the SubCategory's effective value type; if the types do not match or `resolvedDefaultValue` is null, the fields shall be pre-populated with the type default (3 and 15 for Exercise; blank for Number). When saving any category and `defaultValueDirty` is false, the system shall store the previously stored `defaultValue` unchanged (null for a new category, preserving any existing value in edit mode); CAT-UI-063 and CAT-UI-064 apply only when `defaultValueDirty` is true.
 
 ## Category Hierarchy
 
@@ -103,10 +103,10 @@ LLD: `docs/llds/category-management.md`
 
 ## Navigation
 
-- [ ] **CAT-NAV-001**: When the user taps the FAB on the category list screen, the system shall navigate to the category edit screen in create mode for a new MetaCategory.
-- [ ] **CAT-NAV-002**: When the user taps a category row on the category list screen, the system shall navigate to the category edit screen in edit mode for that category.
-- [ ] **CAT-NAV-003**: When the user saves a category on the edit screen, the system shall navigate back to the category list.
-- [ ] **CAT-NAV-004**: When the user taps back or cancel on the category edit screen without saving, the system shall navigate back to the category list without persisting any changes.
+- [x] **CAT-NAV-001**: When the user taps the FAB on the category list screen, the system shall navigate to the category edit screen in create mode for a new MetaCategory.
+- [x] **CAT-NAV-002**: When the user taps a category row on the category list screen, the system shall navigate to the category edit screen in edit mode for that category.
+- [x] **CAT-NAV-003**: When the user saves a category on the edit screen, the system shall navigate back to the category list.
+- [x] **CAT-NAV-004**: When the user taps back or cancel on the category edit screen without saving, the system shall navigate back to the category list without persisting any changes.
 - [x] **CAT-NAV-005**: When the user confirms deletion of a category from the edit screen toolbar, the system shall delete the category and navigate back to the category list.
 - [x] **CAT-NAV-010**: When the user taps "Create subcategory" on a MetaCategory edit screen, the system shall navigate to the category edit screen in create mode with the parentId set to the MetaCategory's id.
 - [x] **CAT-NAV-020**: When the user saves a newly-created category (create mode), the system shall report the new category's id to the screen that initiated the create by setting `created_category_id` on that screen's back stack entry before navigating back; saving an edit to an existing category and deleting a category shall not report an id.
