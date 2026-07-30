@@ -97,6 +97,10 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-UI-075**: The category edit screen shall render the Color section (color picker) inside an `OutlinedFieldBox` labeled "Color", with the label embedded in the box's border in the visual style of `OutlinedTextField`'s floating label.
 - [x] **CAT-UI-076**: When the emoji field fails validation (CAT-UI-021, CAT-UI-022), the Emoji `OutlinedFieldBox`'s border and label shall render in the error color (`MaterialTheme.colorScheme.error`), matching `OutlinedTextField`'s `isError` styling, in addition to the existing inline error text below the field.
 
+## Starter Categories
+
+- [x] **CAT-UI-090**: The system shall define a fixed starter set — Mood (Scale), Sleep (Duration), Water (Number, unit "glasses"), Exercise (Exercise), Medication (Number, unit "mg"), Pain (Scale) — as ordinary top-level categories with preset palette colors. "Add starter categories" shall create, in a single transaction, those whose name is not already present (case-insensitive), placing them at the top of the list in the listed order; if all are already present it shall create none. It shall be reachable from the timeline empty state (EL-UI-092) and from the About screen (APP-UI-010) at any time.
+
 ## Navigation
 
 - [x] **CAT-NAV-001**: When the user taps the FAB on the category list screen, the system shall navigate to the category edit screen in create mode for a new MetaCategory.
@@ -105,6 +109,7 @@ LLD: `docs/llds/category-management.md`
 - [x] **CAT-NAV-004**: When the user taps back or cancel on the category edit screen without saving, the system shall navigate back to the category list without persisting any changes.
 - [x] **CAT-NAV-005**: When the user confirms deletion of a category from the edit screen toolbar, the system shall delete the category and navigate back to the category list.
 - [x] **CAT-NAV-010**: When the user taps "Create subcategory" on a MetaCategory edit screen, the system shall navigate to the category edit screen in create mode with the parentId set to the MetaCategory's id.
-- [x] **CAT-NAV-006**: When the user attempts to navigate back (hardware back button or navigation icon) while the category edit form has unsaved changes, the system shall present a Save / Discard / Cancel prompt; Save shall persist the changes and navigate back; Discard shall navigate back without persisting changes; Cancel shall dismiss the prompt and return to the edit screen.
+- [x] **CAT-NAV-020**: When the user saves a newly-created category (create mode), the system shall report the new category's id to the screen that initiated the create by setting `created_category_id` on that screen's back stack entry before navigating back; saving an edit to an existing category and deleting a category shall not report an id.
+- [x] **CAT-NAV-006**: When the user attempts to navigate back (hardware back button or navigation icon) while the category edit form has unsaved changes, the system shall present a Save / Discard / Cancel prompt; Save shall persist the changes and navigate back; Discard shall navigate back without persisting changes; Cancel shall dismiss the prompt and return to the edit screen. The prompt shall be armed only once the user has actually edited a field; a freshly-opened create screen — where the Save button already shows because create mode is dirty from the start (CAT-UI-067) — does not by itself count as unsaved changes, so an immediate back does not warn.
 - [x] **CAT-UI-067**: The Save button on the category edit screen shall be visible only when the form has unsaved changes; in create mode the form is considered dirty from the start, so the Save button is visible immediately; it shall be hidden when the form is in its initial saved state in edit mode.
 - [D] **CAT-NAV-011**: When the user confirms "Remove from group" on a SubCategory edit screen, the system shall promote the SubCategory to a MetaCategory (per DM-PROC-019) and navigate back to the category list.

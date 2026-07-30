@@ -18,6 +18,7 @@ Individuals tracking personal health and lifestyle data who want:
 ## Goals
 
 - Log any event in under three taps
+- Frictionless first run: a fresh install offers seeded starter categories and guided empty states rather than a blank screen
 - Support at least seven value types: none (occurrence), scale 1–10, boolean, numeric with unit, free text, duration, exercise (sets × reps)
 - User-defined categories with emoji, color, and value type
 - Two-level category hierarchy (parent → subcategory); subcategories inherit color, emoji, and value type from their parent but can override any field individually
@@ -48,7 +49,7 @@ graph TD
 
 **Major components:**
 
-- **UI Layer** — Jetpack Compose screens: Home (timeline), Add Event (bottom sheet), Categories (management), Event detail/edit. A bottom navigation bar with two tabs (Timeline, Categories) provides top-level navigation; hidden on detail screens.
+- **UI Layer** — Jetpack Compose screens: Home (timeline), Add Event (bottom sheet), Categories (management), Event detail/edit, About. A bottom navigation bar with two tabs (Timeline, Categories) provides top-level navigation; hidden on detail screens.
 - **ViewModels** — state holders per screen; expose `StateFlow`; consume repository
 - **Repository interface** — `TrackrRepository` — sole seam for future backend swap
 - **LocalTrackrRepository** — Room-backed implementation

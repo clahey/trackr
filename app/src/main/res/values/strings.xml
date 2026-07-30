@@ -114,6 +114,8 @@
     <string name="timeline_day_yesterday">Yesterday</string>
     <string name="quick_log_choose_category">Choose a category</string>
     <string name="quick_log_log_directly">Log to %s directly</string>
+    <string name="quick_log_new_category">New category</string>
+    <string name="quick_log_new_subcategory">New subcategory</string>
     <string name="add_image_dialog_title">Add image</string>
 
     <!-- Delete category dialog -->
@@ -127,5 +129,46 @@
     <plurals name="delete_category_subcategories_message">
         <item quantity="one">%d subcategory will be promoted to a top-level category.</item>
         <item quantity="other">%d subcategories will be promoted to top-level categories.</item>
+    </plurals>
+
+    <!-- Timeline empty states -->
+    <string name="empty_no_categories_title">Welcome to Trackr</string>
+    <string name="empty_no_categories_body">Add a few things you want to track to get started.</string>
+    <string name="empty_no_events_title">No events yet</string>
+    <string name="empty_no_events_body">Tap + to log your first one.</string>
+    <string name="empty_no_match_title">No events for %s</string>
+    <string name="empty_no_match_body">Tap + to log one, or clear the filter.</string>
+    <string name="empty_create_category">Create a category</string>
+    <string name="action_add_starter_categories">Add starter categories</string>
+    <string name="action_clear_filter">Clear filter</string>
+
+    <!-- Starter categories -->
+    <string name="starter_mood">Mood</string>
+    <string name="starter_sleep">Sleep</string>
+    <string name="starter_water">Water</string>
+    <string name="starter_exercise">Exercise</string>
+    <string name="starter_medication">Medication</string>
+    <string name="starter_pain">Pain</string>
+    <string name="starter_unit_glasses">glasses</string>
+    <string name="starter_unit_mg">mg</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="cd_about">About Trackr</string>
+    <string name="about_hero_slogan_lead">Log anything.</string>
+    <string name="about_hero_slogan_accent">Fast.</string>
+    <string name="about_point_fast_title">Log fast</string>
+    <string name="about_point_fast_body">Define the things you care about, then capture each one in as few as three taps.</string>
+    <string name="about_point_local_title">On-device first</string>
+    <string name="about_point_local_body">Works fully offline; your phone holds the source of truth. Backup and sync, when they arrive, are optional.</string>
+    <string name="about_point_account_title">No account required</string>
+    <string name="about_point_account_body">Ever — not to use it, not even to back it up.</string>
+    <string name="about_source_code">View source code</string>
+    <string name="about_feedback">Feedback &amp; feature requests</string>
+    <string name="about_version">Version %s</string>
+    <string name="about_starters_all_present">Starter categories already added.</string>
+    <plurals name="starters_added">
+        <item quantity="one">Added %d category.</item>
+        <item quantity="other">Added %d categories.</item>
     </plurals>
 </resources>

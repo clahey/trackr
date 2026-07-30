@@ -49,26 +49,36 @@ class CategoryEditViewModel @Inject constructor(
 
     val isEditMode: Boolean get() = categoryId != null
 
-    // @spec CAT-UI-067
+    // @spec CAT-UI-067 — create mode is "dirty" from the start so the Save button shows immediately
     private val _isDirty = MutableStateFlow(categoryId == null)
     val isDirty: StateFlow<Boolean> = _isDirty.asStateFlow()
 
+    // @spec CAT-NAV-006 — tracks whether the user has actually edited a field; drives the
+    // unsaved-changes back-guard, so an untouched new-category screen doesn't warn on immediate back.
+    private val _hasUserEdits = MutableStateFlow(false)
+    val hasUserEdits: StateFlow<Boolean> = _hasUserEdits.asStateFlow()
+
+    private fun markEdited() {
+        _isDirty.value = true
+        _hasUserEdits.value = true
+    }
+
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name.asStateFlow()
-    fun setName(value: String) { _name.value = value; _isDirty.value = true }
+    fun setName(value: String) { _name.value = value; markEdited() }
 
     // @spec CAT-UI-054
     private val _emojiUIState = MutableStateFlow(EmojiUIState(EmojiMode.INHERIT, ""))
     val emojiUIState: StateFlow<EmojiUIState> = _emojiUIState.asStateFlow()
-    fun setEmojiUIState(value: EmojiUIState) { _emojiUIState.value = value; _isDirty.value = true }
+    fun setEmojiUIState(value: EmojiUIState) { _emojiUIState.value = value; markEdited() }
 
     private val _colorState = MutableStateFlow<Long?>(null)
     val colorState: StateFlow<Long?> = _colorState.asStateFlow()
-    fun setColorState(value: Long?) { _colorState.value = value; _isDirty.value = true }
+    fun setColorState(value: Long?) { _colorState.value = value; markEdited() }
 
     private val _valueTypeState = MutableStateFlow<ValueType?>(null)
     val valueTypeState: StateFlow<ValueType?> = _valueTypeState.asStateFlow()
-    fun setValueTypeState(value: ValueType?) { _valueTypeState.value = value; _isDirty.value = true }
+    fun setValueTypeState(value: ValueType?) { _valueTypeState.value = value; markEdited() }
 
     private val _numberDefaultUnit = MutableStateFlow("")
     val numberDefaultUnit: StateFlow<String> = _numberDefaultUnit.asStateFlow()
@@ -81,9 +91,9 @@ class CategoryEditViewModel @Inject constructor(
 
     private var defaultValueDirty = false
 
-    fun updateNumberDefaultUnit(value: String) { _numberDefaultUnit.value = value; defaultValueDirty = true; _isDirty.value = true }
-    fun updateExerciseDefaultSets(value: String) { _exerciseDefaultSets.value = value; defaultValueDirty = true; _isDirty.value = true }
-    fun updateExerciseDefaultReps(value: String) { _exerciseDefaultReps.value = value; defaultValueDirty = true; _isDirty.value = true }
+    fun updateNumberDefaultUnit(value: String) { _numberDefaultUnit.value = value; defaultValueDirty = true; markEdited() }
+    fun updateExerciseDefaultSets(value: String) { _exerciseDefaultSets.value = value; defaultValueDirty = true; markEdited() }
+    fun updateExerciseDefaultReps(value: String) { _exerciseDefaultReps.value = value; defaultValueDirty = true; markEdited() }
     private var storedDefaultValue: EventValue? = null
 
     private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
@@ -159,6 +169,10 @@ class CategoryEditViewModel @Inject constructor(
 
     private val _saveResult = MutableStateFlow<SaveResult>(SaveResult.Idle)
     val saveResult: StateFlow<SaveResult> = _saveResult.asStateFlow()
+
+    // @spec CAT-NAV-020
+    private val _savedCategoryId = MutableStateFlow<String?>(null)
+    val savedCategoryId: StateFlow<String?> = _savedCategoryId.asStateFlow()
 
     private val _originalValueType = MutableStateFlow<ValueType?>(null)
 
@@ -314,6 +328,8 @@ class CategoryEditViewModel @Inject constructor(
             repository.saveCategory(category)
         }
         _isDirty.value = false
+        // @spec CAT-NAV-020
+        _savedCategoryId.value = category.id
         _saveResult.value = SaveResult.Success
     }
 

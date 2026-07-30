@@ -11,9 +11,11 @@ import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.SiblingSlot
+import net.clahey.trackr.domain.StarterCategoryInput
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.convertEventValue
 import net.clahey.trackr.domain.reconcileSiblingOrder
+import net.clahey.trackr.domain.starterCategoriesToInsert
 import net.clahey.trackr.ui.theme.DEFAULT_CATEGORY_COLOR
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -200,6 +202,15 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         }
         return current
     }
+
+    // @spec CAT-UI-090, LS-BE-093
+    override suspend fun addStarterCategories(specs: List<StarterCategoryInput>): Int =
+        db.withTransaction {
+            val existingNames = categoryDao.getAllOnce().map { it.name }
+            val toInsert = starterCategoriesToInsert(existingNames, categoryDao.getMinSortOrder(), specs)
+            toInsert.forEach { categoryDao.upsert(it.toEntity()) }
+            toInsert.size
+        }
 
     // @spec LS-BE-040, EL-PROC-003
     override suspend fun onStartup() {

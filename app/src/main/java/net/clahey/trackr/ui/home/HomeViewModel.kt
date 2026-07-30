@@ -26,6 +26,13 @@ sealed class ActiveFilter {
 
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
 
+// @spec EL-UI-092, EL-UI-093, EL-UI-094
+sealed class TimelineEmptyState {
+    data object NoCategories : TimelineEmptyState()
+    data object NoEvents : TimelineEmptyState()
+    data class NoFilterMatch(val filter: ActiveFilter) : TimelineEmptyState()
+}
+
 sealed class DayEntry {
     // @spec EL-UI-061
     data class Entry(val event: Event, val category: Category) : DayEntry() {
@@ -44,6 +51,10 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
 
     private val _dayGroups = MutableStateFlow<List<DayGroup>>(emptyList())
     val dayGroups: StateFlow<List<DayGroup>> = _dayGroups.asStateFlow()
+
+    // @spec EL-UI-092, EL-UI-093, EL-UI-094 — null while the timeline has content
+    private val _emptyState = MutableStateFlow<TimelineEmptyState?>(null)
+    val emptyState: StateFlow<TimelineEmptyState?> = _emptyState.asStateFlow()
 
     private val _pendingDelete = MutableStateFlow<Event?>(null)
     val pendingDelete: StateFlow<Event?> = _pendingDelete.asStateFlow()
@@ -81,7 +92,9 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
                         return@collect
                     }
                 }
-                _dayGroups.value = buildDayGroups(events, pending, categories)
+                val groups = buildDayGroups(events, pending, categories)
+                _dayGroups.value = groups
+                _emptyState.value = computeEmptyState(groups, categories, _activeFilter.value)
             }
         }
 
@@ -132,6 +145,23 @@ class HomeViewModel @Inject constructor(private val repository: TrackrRepository
 
     fun onUserScrolled() {
         _preFilterTopDay.value = null
+    }
+
+    // @spec EL-UI-092, EL-UI-093, EL-UI-094
+    private fun computeEmptyState(
+        groups: List<DayGroup>,
+        categories: List<Category>,
+        filter: ActiveFilter,
+    ): TimelineEmptyState? = when {
+        groups.isNotEmpty() -> null
+        categories.isEmpty() -> TimelineEmptyState.NoCategories
+        filter !is ActiveFilter.All -> TimelineEmptyState.NoFilterMatch(filter)
+        else -> TimelineEmptyState.NoEvents
+    }
+
+    // @spec CAT-UI-090
+    fun addStarterCategories(specs: List<net.clahey.trackr.domain.StarterCategoryInput>) {
+        viewModelScope.launch { repository.addStarterCategories(specs) }
     }
 
     // @spec EL-UI-077, EL-UI-077a, EL-UI-077c

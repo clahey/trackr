@@ -89,6 +89,7 @@ import kotlinx.coroutines.launch
 fun CategoryEditScreen(
     onNavigateBack: (errorMessage: String?) -> Unit,
     onNavigateToCreateSubCategory: (parentId: String) -> Unit = {},
+    onCategoryCreated: (categoryId: String) -> Unit = {},
     viewModel: CategoryEditViewModel = hiltViewModel(),
 ) {
     val name by viewModel.name.collectAsState()
@@ -103,6 +104,7 @@ fun CategoryEditScreen(
     val saveResult by viewModel.saveResult.collectAsState()
     val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
     val navigateBack by viewModel.navigateBack.collectAsState()
+    val savedCategoryId by viewModel.savedCategoryId.collectAsState()
     val isColorInherited = colorState == null
     val isValueTypeInherited = valueTypeState == null
     val parentCategory by viewModel.parentCategory.collectAsState()
@@ -110,20 +112,25 @@ fun CategoryEditScreen(
     val previewEvent by viewModel.previewEvent.collectAsState()
     val isEditMode = viewModel.isEditMode
     val isDirty by viewModel.isDirty.collectAsState()
+    val hasUserEdits by viewModel.hasUserEdits.collectAsState()
 
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
     var showBackDiscardDialog by remember { mutableStateOf(false) }
 
-    // @spec CAT-NAV-006
-    BackHandler(enabled = isDirty) { showBackDiscardDialog = true }
+    // @spec CAT-NAV-006 — only warn once the user has actually edited a field
+    BackHandler(enabled = hasUserEdits) { showBackDiscardDialog = true }
 
     val categoryNotFound = stringResource(R.string.category_not_found)
     LaunchedEffect(navigateBack) {
         if (navigateBack) onNavigateBack(categoryNotFound)
     }
     LaunchedEffect(saveResult) {
-        if (saveResult is SaveResult.Success) onNavigateBack(null)
+        if (saveResult is SaveResult.Success) {
+            // @spec CAT-NAV-020 — report the id of a genuinely new category before popping
+            if (!isEditMode) savedCategoryId?.let { onCategoryCreated(it) }
+            onNavigateBack(null)
+        }
     }
 
     // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
@@ -151,7 +158,7 @@ fun CategoryEditScreen(
                 navigationIcon = {
                     // @spec CAT-NAV-006
                     IconButton(onClick = {
-                        if (isDirty) showBackDiscardDialog = true
+                        if (hasUserEdits) showBackDiscardDialog = true
                         else onNavigateBack(null)
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))

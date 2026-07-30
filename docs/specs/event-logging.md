@@ -13,6 +13,12 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-005**: Each event row shall display the category color as a filled circle avatar on the left; the category emoji shall be centered inside the circle using the WCAG foreground color computed by `foregroundColorForBackground(categoryColor)`.
 - [x] **EL-UI-003**: Day group headers shall display "Today" for the current date, "Yesterday" for the prior date, and the full date for all older days.
 
+## Timeline Empty States
+
+- [x] **EL-UI-092**: When the timeline has no events and no categories exist, the screen shall show a welcome empty state offering "Add starter categories" — which creates the starter set (CAT-UI-090), after which the timeline shows the no-events state (EL-UI-093) rather than opening the sheet — and "Create a category," which navigates to category creation and returns to the timeline afterward, without reopening the sheet or pre-filling an event (distinct from the in-sheet "+ New category" tile of EL-NAV-020).
+- [x] **EL-UI-093**: When the timeline has no events but at least one category exists and no filter is active, the screen shall show a "No events yet — tap + to log your first one" empty state, without prompting to create a category.
+- [x] **EL-UI-094**: When a category filter is active and no events match it, the screen shall show a distinct empty state that names the filtered category and offers to clear the filter, rather than the whole-app "no events yet" state.
+
 ## Category Filter
 
 - [x] **EL-UI-010**: The timeline screen shall display a horizontally scrollable row of category filter chips; an "All" chip shall appear first, followed by one chip per MetaCategory.
@@ -96,6 +102,9 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-UI-074**: The first tile in the drill-down view shall allow the user to log an event directly to the MetaCategory (not to a SubCategory); tapping it shall advance to step 2 with the MetaCategory as the selected category.
 - [x] **EL-UI-075**: While ActiveFilter.TopLevel is active for a MetaCategory that has SubCategories, opening the quick-log sheet shall present step 1 in the drill-down view for that MetaCategory.
 - [x] **EL-UI-076**: When a MetaCategory is deleted while the quick-log sheet step 1 is showing that MetaCategory's drill-down view, the system shall return to the top-level grid.
+- [x] **EL-UI-090**: The quick-log step-1 top-level grid shall always end with a full-width "+ New category" tile spanning the grid width; when no categories exist, the grid shall show only that tile beneath the "Choose a category" heading, so opening the quick-log sheet on a fresh install is never a dead end.
+- [x] **EL-UI-091**: The quick-log step-1 drill-down view for a MetaCategory shall always end with a full-width "+ New subcategory" tile that, when tapped, creates a new SubCategory of that MetaCategory.
+- [x] **EL-UI-095**: A category tile's name label in the quick-log step-1 grid shall shrink to fit on a single line down to a minimum size, then ellipsize if it still overflows, so longer names (e.g. "Medication") stay readable in the narrow multi-column grid without clipping.
 
 ## Value Type Mismatch UI
 
@@ -125,6 +134,8 @@ LLD: `docs/llds/event-logging.md`
 - [x] **EL-NAV-003**: When the user dismisses the quick-log sheet without saving, the system shall delete any unsaved captured image and return to the timeline.
 - [x] **EL-NAV-003b**: When the user presses the system back button or performs a back edge swipe while the quick-log sheet is at step 2, the system shall return to step 1 without dismissing the sheet.
 - [x] **EL-NAV-003c**: When the user presses the system back button or performs a back edge swipe while the quick-log sheet is at step 1 in the drill-down view, the system shall return to the top-level category grid without dismissing the sheet.
+- [x] **EL-NAV-020**: When the user taps "+ New category" in the quick-log sheet, the system shall record a pending-reopen intent and navigate to the category edit screen in create mode for a new top-level category; when the user taps "+ New subcategory" in a MetaCategory's drill-down view, it shall record the same intent and navigate in create mode with parentId set to that MetaCategory. Navigating away dismisses the sheet without discarding the quick-log form state or drill-down context.
+- [x] **EL-NAV-021**: The pending-reopen intent is set only by the quick-log sheet's "+ New" tiles (EL-NAV-020), so on return to the timeline it distinguishes a sheet-initiated create from any other create. When it is set, the system shall reopen the sheet: if a newly-created category id was reported on the timeline's back stack entry (`created_category_id`), the sheet shall open at step 2 with that category pre-selected, waiting for it to appear in the category list before selecting it; otherwise (cancelled) it shall reopen at step 1 with any prior drill-down context restored. The reported id shall be cleared on every return regardless, so a create started outside the sheet (e.g. the welcome empty state's "Create a category," EL-UI-092) never leaves a stale pre-selection for a later sheet create to pick up. The intent shall fire only on return, not on the tap that started the excursion.
 - [x] **EL-NAV-004**: When the user taps an event row on the timeline, the system shall navigate to the event edit screen for that event.
 - [x] **EL-NAV-005**: When the user saves changes on the event edit screen, the system shall navigate back to the timeline.
 - [x] **EL-NAV-006**: When the user confirms deletion on the event edit screen, the system shall delete the event and navigate back to the timeline.
