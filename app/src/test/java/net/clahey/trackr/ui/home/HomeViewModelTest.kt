@@ -133,9 +133,7 @@ class HomeViewModelTest {
         repo.setCategories(a, b)
         repo.setEvents(makeEvent("e1", "a"))
         vm.setFilter(ActiveFilter.TopLevel(b))
-        val state = vm.emptyState.value
-        assertTrue(state is TimelineEmptyState.NoFilterMatch)
-        assertEquals(ActiveFilter.TopLevel(b), (state as TimelineEmptyState.NoFilterMatch).filter)
+        assertEquals(TimelineEmptyState.NoFilterMatch(ActiveFilter.TopLevel(b)), vm.emptyState.value)
     }
 
     // @spec EL-UI-092, EL-UI-093, EL-UI-094
