@@ -1,6 +1,22 @@
 # Trackr
 
-A local-first Android app for tracking recurring health and lifestyle events. Define your own categories, log entries in under three taps, and keep all your data on-device with no account required.
+<p align="center">
+  <img src="docs/store-listing/feature-graphic.svg" width="100%" alt="Trackr — Log anything. Fast." />
+</p>
+
+Trackr is a local-first Android app for logging whatever you want to keep track of — habits, mood, water, workouts, medications, practice sessions, the plants you watered. Define your own categories, each with its own emoji, color, and value type, then capture an entry in as few as three taps. No account required, and your data stays on your device.
+
+<p align="center">
+  <img src="docs/store-listing/screenshots/shot-01-timeline.png" width="30%" alt="Timeline — your entries grouped by day" />
+  <img src="docs/store-listing/screenshots/shot-03-quicklog.png" width="30%" alt="Quick-log — pick a category and save" />
+  <img src="docs/store-listing/screenshots/shot-02-categories.png" width="30%" alt="Categories — each with its own value type" />
+</p>
+
+<p align="center"><em>Your timeline · the three-tap quick-log picker · fully customizable categories</em></p>
+
+## Alpha testers wanted
+
+Trackr is in **[closed testing on Google Play](https://play.google.com/store/apps/details?id=net.clahey.trackr)**, working toward a 1.0 release. Want early access and a say in where it goes? **Get in touch** — email `youraveragechris@gmail.com` with the Google account you'd test with, and I'll add you to the closed test.
 
 ## Features
 

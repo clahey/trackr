@@ -114,6 +114,46 @@ class HomeViewModelTest {
         }
     }
 
+    // ---------- Timeline empty states (EL-UI-092/093/094) ----------
+
+    // @spec EL-UI-092
+    @Test fun `empty state is NoCategories when no categories exist`() = runTest {
+        assertEquals(TimelineEmptyState.NoCategories, vm.emptyState.value)
+    }
+
+    // @spec EL-UI-093
+    @Test fun `empty state is NoEvents when categories exist but no events`() = runTest {
+        repo.setCategories(makeMeta("c1"))
+        assertEquals(TimelineEmptyState.NoEvents, vm.emptyState.value)
+    }
+
+    // @spec EL-UI-094
+    @Test fun `empty state is NoFilterMatch when a filter matches no events`() = runTest {
+        val a = makeMeta("a")
+        val b = makeMeta("b")
+        repo.setCategories(a, b)
+        repo.setEvents(makeEvent("e1", "a"))
+        vm.setFilter(ActiveFilter.TopLevel(b))
+        assertEquals(TimelineEmptyState.NoFilterMatch(ActiveFilter.TopLevel(b)), vm.emptyState.value)
+    }
+
+    // @spec EL-UI-092, EL-UI-093, EL-UI-094
+    @Test fun `empty state is null when the timeline has content`() = runTest {
+        repo.setCategories(makeMeta("c1"))
+        repo.setEvents(makeEvent("e1", "c1"))
+        assertNull(vm.emptyState.value)
+    }
+
+    // @spec CAT-UI-090
+    @Test fun `addStarterCategories creates categories via the repository`() = runTest {
+        val specs = listOf(
+            net.clahey.trackr.domain.StarterCategoryInput("Mood", "🙂", 1L, ValueType.Scale, null),
+        )
+        vm.addStarterCategories(specs)
+        // categories now exist with no events -> empty state flips from NoCategories to NoEvents
+        assertEquals(TimelineEmptyState.NoEvents, vm.emptyState.value)
+    }
+
     // @spec EL-UI-011
     @Test fun `active TopLevel filter shows only events from that MetaCategory and its children`() = runTest {
         val cat1 = makeCategory("c1")

@@ -14,7 +14,7 @@
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
 
-    <!-- Yellow dot at R-peak -->
+    <!-- Yellow dot at R-peak — brand yellow. Canonical palette: docs/brand.md -->
     <path
         android:pathData="M54,36 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0"
         android:fillColor="#fcd214" />

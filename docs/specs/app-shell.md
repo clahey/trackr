@@ -21,6 +21,7 @@
 - [x] **APP-NAV-004**: `CategoryEditViewModel` shall read its optional `categoryId` argument from `SavedStateHandle` under the key `"categoryId"`; a null value indicates create mode.
 - [x] **APP-NAV-005**: When `MainActivity` is cold-started by a reminder notification's `PendingIntent` (`docs/specs/reminders.md § Notifications`, `REM-NOTIF-005`) carrying a `categoryId` extra, the system shall read that extra and pass it into the nav graph's start-destination route as `Routes.timeline(quickLogCategoryId = categoryId)`, instead of always starting bare at `"timeline"`.
 - [x] **APP-NAV-006**: When `MainActivity` is already running and receives a new intent carrying a `categoryId` extra (warm start via `onNewIntent`), the system shall forward it the same way as APP-NAV-005; `singleTop` launch semantics shall prevent a second `MainActivity` instance from being created.
+- [x] **APP-NAV-010**: The timeline and category-list top app bars shall each provide an About action that navigates to the About screen; the About screen shall provide back navigation and, like other detail destinations, shall not show the bottom navigation bar.
 
 ## Bottom Navigation
 
@@ -29,6 +30,10 @@
 - [x] **APP-UI-003**: Tapping the Timeline bottom nav item shall navigate to the timeline screen.
 - [x] **APP-UI-004**: Tapping the Categories bottom nav item shall navigate to the category list screen.
 - [x] **APP-UI-005**: Tapping the currently active bottom nav item shall be a no-op — the screen shall not re-navigate or reset its state.
+
+## About Screen
+
+- [x] **APP-UI-010**: The About screen shall display a branded hero (app icon, wordmark, and slogan with an accent word) over the brand gradient, the app's positioning as labelled points (log fast; on-device first; no account required — ever), a link to the source code, a link to report a bug or request a feature, the app version, and an "Add starter categories" action that reports how many categories it created.
 
 ## Startup
 

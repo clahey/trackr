@@ -6,7 +6,8 @@
      (135deg gradient) and ic_launcher_foreground.xml (EKG heartbeat). -->
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
   <defs>
-    <!-- top-left #47AADC -> bottom-right #04325C, matching the feature graphic -->
+    <!-- Brand palette — canonical: docs/brand.md. Gradient brand light blue (top-left) ->
+         brand dark navy (bottom-right), matching the feature graphic; R-peak dot is brand yellow. -->
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#47AADC"/>
       <stop offset="1" stop-color="#04325C"/>

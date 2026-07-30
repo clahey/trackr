@@ -15,7 +15,8 @@
     }
   </style>
   <defs>
-    <!-- 135deg: top-left #47AADC -> bottom-right #04325C, same as the launcher icon -->
+    <!-- Brand palette — canonical: docs/brand.md. 135deg gradient brand light blue ->
+         brand dark navy, same as the launcher icon; the "Fast." word and R-peak dot are brand yellow. -->
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#47AADC"/>
       <stop offset="1" stop-color="#04325C"/>
