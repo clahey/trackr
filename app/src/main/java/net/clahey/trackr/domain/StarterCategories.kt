@@ -32,8 +32,9 @@ fun starterCategoriesToInsert(
 ): List<Category.MetaCategory> {
     val present = existingNames.map { it.trim().lowercase() }.toSet()
     val missing = specs.filter { it.name.trim().lowercase() !in present }
-    if (missing.isEmpty()) return emptyList()
     // Place the block just above the current top, preserving the listed order (first spec on top).
+    // sortOrder sorts ascending, so lower values are the top of the list; these are intentionally
+    // below `base` (the current minimum) to land above every existing category.
     val base = minSortOrder ?: 0
     return missing.mapIndexed { i, spec ->
         Category.MetaCategory(

@@ -1,9 +1,7 @@
 package net.clahey.trackr.ui
 
+import android.content.Context
 import androidx.annotation.StringRes
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import net.clahey.trackr.R
 import net.clahey.trackr.domain.EventValue
 import net.clahey.trackr.domain.StarterCategoryInput
@@ -31,19 +29,18 @@ val STARTER_CATEGORIES: List<StarterCategorySpec> = listOf(
     StarterCategorySpec(R.string.starter_pain, "🤕", 0xFF8E24AAL, ValueType.Scale),
 )
 
-/** Resolves [STARTER_CATEGORIES] into repository inputs with names/units pulled from resources. */
-@Composable
-fun rememberStarterCategoryInputs(): List<StarterCategoryInput> {
-    val context = LocalContext.current
-    return remember(context) {
-        STARTER_CATEGORIES.map { spec ->
-            StarterCategoryInput(
-                name = context.getString(spec.nameRes),
-                emoji = spec.emoji,
-                color = spec.color,
-                valueType = spec.valueType,
-                defaultValue = spec.unitRes?.let { EventValue.NumberValue(0.0, context.getString(it)) },
-            )
-        }
+/**
+ * Resolves [STARTER_CATEGORIES] into repository inputs with names/units pulled from resources.
+ * Plain (non-`@Composable`) function — call it where it's actually needed (e.g. on the "Add
+ * starter categories" click) rather than resolving on every composition of a screen that offers it.
+ */
+fun resolveStarterCategoryInputs(context: Context): List<StarterCategoryInput> =
+    STARTER_CATEGORIES.map { spec ->
+        StarterCategoryInput(
+            name = context.getString(spec.nameRes),
+            emoji = spec.emoji,
+            color = spec.color,
+            valueType = spec.valueType,
+            defaultValue = spec.unitRes?.let { EventValue.NumberValue(0.0, context.getString(it)) },
+        )
     }
-}

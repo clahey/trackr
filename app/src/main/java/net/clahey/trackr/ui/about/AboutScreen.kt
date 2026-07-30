@@ -54,20 +54,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.R
-import net.clahey.trackr.ui.rememberStarterCategoryInputs
+import net.clahey.trackr.ui.resolveStarterCategoryInputs
 
 // Brand palette — canonical definition in docs/brand.md (update there; `rg docs/brand.md` finds every hardcoded copy).
-private val BrandTop = Color(0xFF47AADC)      // light blue
-private val BrandBottom = Color(0xFF04325C)   // dark blue
-private val BrandAccent = Color(0xFFFCD214)   // yellow
-private val BrandDarkYellow = Color(0xFFEBC413) // brand yellow at V=0.92 (same hue/sat), for light surfaces
+private val BrandLightBlue = Color(0xFF47AADC)   // light blue
+private val BrandDarkBlue = Color(0xFF04325C)    // dark blue
+private val BrandYellow = Color(0xFFFCD214)      // yellow
+private val BrandDarkYellow = Color(0xFFEBC413)  // brand yellow at V=0.92 (same hue/sat), for light surfaces
+private val BrandGreen = Color(0xFF148244)       // green
+
+// Hero banner gradient endpoints.
+private val GradientTop = BrandLightBlue
+private val GradientBottom = BrandDarkBlue
 
 // About point-icon colors — from the brand palette (docs/brand.md). "Log fast"
 // flips per mode (see AboutScreen): bright brand yellow on dark, the darker same-hue yellow on light
 // (bright yellow vanishes on white). On-device stays light blue (dark blue read as black on white);
 // no-account stays green — both legible in both modes.
-private val PointLocal = BrandTop            // brand light blue — device
-private val PointAccount = Color(0xFF148244) // brand green — privacy/positive
+private val PointLocal = BrandLightBlue   // device
+private val PointAccount = BrandGreen     // privacy/positive
+private val PointFastDark = BrandYellow
+private val PointFastLight = BrandDarkYellow
 
 // @spec APP-UI-010, CAT-UI-090
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,7 +85,6 @@ fun AboutScreen(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val starterInputs = rememberStarterCategoryInputs()
     val addedCount by viewModel.addedCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -88,7 +94,7 @@ fun AboutScreen(
     }
 
     // Bright brand yellow reads on dark; the darker same-hue yellow is needed against a light surface.
-    val pointFast = if (isSystemInDarkTheme()) BrandAccent else BrandDarkYellow
+    val pointFast = if (isSystemInDarkTheme()) PointFastDark else PointFastLight
 
 
     // @spec CAT-UI-090
@@ -145,7 +151,7 @@ fun AboutScreen(
                 )
 
                 Spacer(Modifier.height(4.dp))
-                Button(onClick = { viewModel.addStarterCategories(starterInputs) }) {
+                Button(onClick = { viewModel.addStarterCategories(resolveStarterCategoryInputs(context)) }) {
                     Text(stringResource(R.string.action_add_starter_categories))
                 }
                 // Grouped so the parent's 16dp spacing doesn't sit between the two links.
@@ -181,7 +187,7 @@ private fun BrandHero() {
             .fillMaxWidth()
             .background(
                 Brush.linearGradient(
-                    colors = listOf(BrandTop, BrandBottom),
+                    colors = listOf(GradientTop, GradientBottom),
                     start = Offset(0f, 0f),
                     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
                 )
@@ -226,7 +232,7 @@ private fun BrandHero() {
                     stringResource(R.string.about_hero_slogan_accent),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = BrandAccent,
+                    color = BrandYellow,
                 )
             }
         }
