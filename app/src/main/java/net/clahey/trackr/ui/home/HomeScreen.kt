@@ -59,7 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import net.clahey.trackr.ui.resolveStarterCategoryInputs
+import net.clahey.trackr.ui.getStarterCategoryInputs
 import androidx.compose.ui.unit.dp
 import net.clahey.trackr.R
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -279,7 +279,7 @@ fun HomeScreen(
                     state = currentEmptyState,
                     // Seed the categories only; the timeline then lands on the "No events" state,
                     // which points the user at the FAB (rather than a picker appearing on its own).
-                    onAddStarters = { homeVm.addStarterCategories(resolveStarterCategoryInputs(context)) },
+                    onAddStarters = { homeVm.addStarterCategories(getStarterCategoryInputs(context)) },
                     // Plain trip to category creation — no sheet reopen and no auto-log on return.
                     onCreateCategory = onNavigateToCreateCategory,
                     onClearFilter = { homeVm.setFilter(ActiveFilter.All) },

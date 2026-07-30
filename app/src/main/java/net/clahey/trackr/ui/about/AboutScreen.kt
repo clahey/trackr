@@ -54,7 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.R
-import net.clahey.trackr.ui.resolveStarterCategoryInputs
+import net.clahey.trackr.ui.getStarterCategoryInputs
 
 // Brand palette — canonical definition in docs/brand.md (update there; `rg docs/brand.md` finds every hardcoded copy).
 private val BrandLightBlue = Color(0xFF47AADC)   // light blue
@@ -151,7 +151,7 @@ fun AboutScreen(
                 )
 
                 Spacer(Modifier.height(4.dp))
-                Button(onClick = { viewModel.addStarterCategories(resolveStarterCategoryInputs(context)) }) {
+                Button(onClick = { viewModel.addStarterCategories(getStarterCategoryInputs(context)) }) {
                     Text(stringResource(R.string.action_add_starter_categories))
                 }
                 // Grouped so the parent's 16dp spacing doesn't sit between the two links.
