@@ -386,10 +386,6 @@ System back and edge swipe are intercepted by `BackHandler` within the sheet: st
 1. ~~**Unit in `ValueType.Number`**~~ — resolved by the `Category.defaultValue` redesign. `Category.unit` replaced with `Category.defaultValue: EventValue?`; the unit for Number categories is stored as `NumberValue(0.0, unit)` in `defaultValue`. Seeding at log time uses `resolvedDefaultValue.toValueUIState()` when non-null, falling back to `defaultValueUIStateForType` otherwise (see `docs/llds/category-management.md`).
 2. **`toEventValue()` null ambiguity** — the method returns `null` for two distinct reasons: (a) `ValueUIState.None` (category type is None, no value is appropriate); (b) invalid/partial input (e.g., `Bool(null)`, unparseable Number text). Current callers always have the category type in scope and disambiguate correctly, so this is harmless now. Worthwhile medium-size refactor: introduce `EventValue.None` (making `Event.value: EventValue` non-nullable) so callers get a typed signal instead of relying on ambient context — expected to clarify the code broadly throughout the stack.
 
-### Open questions
-
-1. **Empty timeline state** — what the home screen shows when there are no events yet. Copy/illustration TBD. Distinct from the empty *category picker* (the quick-log step-1 grid with no categories), whose dead-end is resolved by the always-present "+ New category" tile (EL-UI-090).
-
 ### Resolved edges — inline category creation (EL-UI-090/091, EL-NAV-020/021)
 
 - **Room-`Flow` lag on reopen:** the `created_category_id` result is present immediately on return (written before the pop), but the new category row may trail it by a frame or two in `categories`. The step-2 reopen awaits the row's appearance before `selectCategory`, so it never selects a not-yet-loaded category.
