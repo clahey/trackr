@@ -8,9 +8,10 @@ import net.clahey.trackr.data.local.converters.InstantConverter
 import net.clahey.trackr.data.local.converters.StringListConverter
 import net.clahey.trackr.data.local.converters.ValueTypeConverter
 
-@Database(entities = [CategoryEntity::class, EventEntity::class], version = 3, exportSchema = true)
+@Database(entities = [CategoryEntity::class, EventEntity::class, ReminderEntity::class], version = 4, exportSchema = true)
 @TypeConverters(EventValueConverter::class, InstantConverter::class, StringListConverter::class, ValueTypeConverter::class)
 abstract class TrackrDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun eventDao(): EventDao
+    abstract fun reminderDao(): ReminderDao
 }

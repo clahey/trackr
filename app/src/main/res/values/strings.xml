@@ -131,6 +131,36 @@
         <item quantity="other">%d subcategories will be promoted to top-level categories.</item>
     </plurals>
 
+    <!-- Reminders -->
+    <string name="reminder_channel_name">Reminders</string>
+    <string name="reminder_notification_title">Time to log</string>
+    <string name="reminder_notification_body_generic">You have a category waiting to be logged</string>
+    <string name="reminder_section_title">Reminder</string>
+    <string name="reminder_mode_fixed">Fixed time</string>
+    <string name="reminder_mode_random">Random</string>
+    <string name="reminder_add_time">+ Add time</string>
+    <string name="reminder_window_start">Start</string>
+    <string name="reminder_window_end">End</string>
+    <string name="reminder_occurrences_per_day">Times per day</string>
+    <string name="reminder_active_days">Active days</string>
+    <string name="reminder_show_category_in_notification">Show category name in notification</string>
+    <string name="reminder_day_mon">Mon</string>
+    <string name="reminder_day_tue">Tue</string>
+    <string name="reminder_day_wed">Wed</string>
+    <string name="reminder_day_thu">Thu</string>
+    <string name="reminder_day_fri">Fri</string>
+    <string name="reminder_day_sat">Sat</string>
+    <string name="reminder_day_sun">Sun</string>
+    <string name="reminder_validation_no_active_day">Choose at least one active day.</string>
+    <string name="reminder_validation_no_time">Add at least one time.</string>
+    <string name="reminder_validation_window_invalid">End time must be after start time.</string>
+    <string name="reminder_permission_dialog_title">Notifications aren\'t fully enabled</string>
+    <string name="reminder_permission_dialog_message">This reminder may not fire or may not be visible. Save anyway?</string>
+    <string name="reminder_permission_save_anyway">Save anyway</string>
+    <string name="reminder_exact_alarm_prompt">For reliable timing, allow Trackr to schedule exact alarms.</string>
+    <string name="reminder_exact_alarm_open_settings">Open settings</string>
+    <string name="reminder_banner_message">Some reminders may not fire reliably — tap to review</string>
+
     <!-- Timeline empty states -->
     <string name="empty_no_categories_title">Welcome to Trackr</string>
     <string name="empty_no_categories_body">Add a few things you want to track to get started.</string>

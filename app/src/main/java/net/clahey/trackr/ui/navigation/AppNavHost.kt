@@ -38,12 +38,15 @@ import net.clahey.trackr.ui.home.EventEditScreen
 import net.clahey.trackr.ui.home.HomeScreen
 
 object Routes {
-    const val TIMELINE = "timeline"
+    const val TIMELINE = "timeline?quickLogCategoryId={quickLogCategoryId}"
     const val CATEGORY_LIST = "categoryList"
     const val EVENT_EDIT = "eventEdit/{eventId}?filterCategoryId={filterCategoryId}"
     const val CATEGORY_EDIT = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
     const val ABOUT = "about"
 
+    // @spec APP-NAV-005, APP-NAV-006
+    fun timeline(quickLogCategoryId: String? = null) =
+        if (quickLogCategoryId != null) "timeline?quickLogCategoryId=$quickLogCategoryId" else "timeline"
     fun eventEdit(eventId: String, filterCategoryId: String? = null) =
         if (filterCategoryId != null) "eventEdit/$eventId?filterCategoryId=$filterCategoryId"
         else "eventEdit/$eventId"
@@ -52,10 +55,13 @@ object Routes {
     fun categoryEditNewSubCategory(parentId: String) = "categoryEdit?parentId=$parentId"
 }
 
-// @spec APP-NAV-001, APP-NAV-002, APP-UI-001, APP-UI-002, APP-UI-003, APP-UI-004, APP-UI-005
+// @spec APP-NAV-001, APP-NAV-002, APP-UI-001, APP-UI-002, APP-UI-003, APP-UI-004, APP-UI-005, APP-NAV-005
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun AppScaffold(navController: NavHostController = rememberNavController()) {
+fun AppScaffold(
+    navController: NavHostController = rememberNavController(),
+    initialQuickLogCategoryId: String? = null,
+) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -80,7 +86,7 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
                         selected = currentRoute == Routes.TIMELINE,
                         onClick = {
                             if (currentRoute != Routes.TIMELINE) {
-                                navController.navigate(Routes.TIMELINE) {
+                                navController.navigate(Routes.timeline()) {
                                     popUpTo(Routes.TIMELINE) { inclusive = true }
                                 }
                             }
@@ -105,7 +111,11 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
             }
         }
     ) { innerPadding ->
-        AppNavHost(navController = navController, modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()))
+        AppNavHost(
+            navController = navController,
+            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
+            initialQuickLogCategoryId = initialQuickLogCategoryId,
+        )
     }
 }
 
@@ -113,13 +123,23 @@ fun AppScaffold(navController: NavHostController = rememberNavController()) {
 fun AppNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    initialQuickLogCategoryId: String? = null,
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.TIMELINE,
+        startDestination = Routes.timeline(initialQuickLogCategoryId),
         modifier = modifier,
     ) {
-        composable(Routes.TIMELINE) { entry ->
+        composable(
+            route = Routes.TIMELINE,
+            arguments = listOf(
+                navArgument("quickLogCategoryId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { entry ->
             HomeScreen(
                 onNavigateToEventEdit = { eventId, filterCategoryId ->
                     navController.navigate(Routes.eventEdit(eventId, filterCategoryId))

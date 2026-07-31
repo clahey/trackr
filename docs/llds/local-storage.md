@@ -36,6 +36,12 @@ interface TrackrRepository {
     // Preferences
     suspend fun getAndIncrementNextCategoryColorIndex(paletteSize: Int): Int  // atomically returns current index then increments
 
+    // Reminders (persistence only — no AlarmManager access; see docs/llds/reminders.md)
+    fun getReminderForCategory(categoryId: String): Flow<Reminder?>
+    suspend fun saveReminder(reminder: Reminder)                                  // upsert, standalone
+    suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?) // atomic: category upsert + reminder upsert/clear in one transaction
+    suspend fun getAllEnabledRemindersOnce(): List<Reminder>                      // boot / time-change re-arm
+
     // Lifecycle
     suspend fun onStartup()
 }
@@ -71,6 +77,23 @@ Entities mirror domain models with Room annotations. They are package-private to
 | `notes` | `String?` | |
 | `imagePaths` | `String` | `List<String>` as JSON array; `"[]"` when empty |
 | `createdAt` | `Long` | epoch millis via `InstantConverter`; wall-clock creation time; indexed |
+
+### ReminderEntity
+
+| Column | Type | Notes |
+|---|---|---|
+| `categoryId` | `String` PK, FK → categories(id) CASCADE DELETE | one row per category |
+| `enabled` | `Boolean` | |
+| `mode` | `String` | `"fixed"` / `"random"` |
+| `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only |
+| `windowStart` | `String?` | `"HH:mm"`; RANDOM only |
+| `windowEnd` | `String?` | `"HH:mm"`; RANDOM only |
+| `occurrencesPerDay` | `Int?` | RANDOM only |
+| `daysActive` | `String` | JSON list of `DayOfWeek` names |
+| `showCategoryInNotification` | `Boolean` | default `false` |
+| `nextFireAt` | `Long?` | epoch millis; null when disabled |
+
+Field-level rationale (mode/window/frequency shape, why one row per category, why `nextFireAt` is stored rather than derived on demand) lives in `docs/llds/reminders.md § Data Model` — this segment owns the mechanical storage, not the design intent behind it.
 
 ## TypeConverters
 
@@ -133,9 +156,19 @@ This mirrors the `ErrorValue` forward-compatibility contract: an old app version
 
 Sort order (`timestamp DESC, createdAt DESC, id ASC`) matches the canonical ordering in `data-model.md § Same-timestamp ordering`.
 
+### ReminderDao
+
+| Method | Return | Notes |
+|---|---|---|
+| `getByCategoryId(categoryId)` | `Flow<ReminderEntity?>` | |
+| `getAllEnabledOnce()` | `List<ReminderEntity>` | suspend; boot / time-change re-arm and startup reconciliation |
+| `upsert(entity)` | `Unit` | suspend |
+
+No explicit `deleteByCategoryId` — removal happens via the `categories` row's CASCADE DELETE, not a direct call.
+
 ## Entity ↔ Domain Mappers
 
-Extension functions in the `local` package. `CategoryEntity.toDomain()`, `Category.toEntity()`, `EventEntity.toDomain()`, `Event.toEntity()`. Each maps field-for-field, delegating type conversion to the converters above.
+Extension functions in the `local` package. `CategoryEntity.toDomain()`, `Category.toEntity()`, `EventEntity.toDomain()`, `Event.toEntity()`, `ReminderEntity.toDomain()`, `Reminder.toEntity()`. Each maps field-for-field, delegating type conversion to the converters above.
 
 **`CategoryWithParent`**: a Room result POJO with `@Embedded val category: CategoryEntity` and `@Relation(parentColumn = "parentId", entityColumn = "id") val parent: CategoryEntity?`. Room fetches the parent in a second `SELECT * FROM categories WHERE id IN (...)` query within the same transaction. Used only by `getCategoryById` in the repository.
 
@@ -157,7 +190,11 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **`addStarterCategories`:** runs inside a single Room transaction — reads existing category names, selects the specs to insert via the pure `starterCategoriesToInsert` (`domain/StarterCategories.kt`; insert-missing by case-insensitive name, top-of-list `sortOrder` preserving the given order, LS-BE-093), upserts them, and returns the count. Sharing the pure selection function with `FakeTrackrRepository` — and unit-testing it in isolation — keeps the fake behavior-consistent with the real insert, the same pattern used by `reconcileSiblingOrder`. The starter set's content and its `@StringRes`→`StarterCategoryInput` resolution live in the UI layer (`category-management.md § Starter Categories`); this repository sees only resolved inputs.
 
-**`onStartup`:** called once at app startup, launched fire-and-forget from `TrackrApplication.onCreate()` — it does not block the first UI frame (per LS-BE-041). `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row, a purely additive cleanup with no ordering requirement against the UI. Future implementations may use it for different initialization behavior (sync, token refresh, etc.) — if that behavior is something the UI depends on, the fire-and-forget launch must be revisited to actually block first frame.
+**`onStartup`:** called once at app startup, launched fire-and-forget from `TrackrApplication.onCreate()` — it does not block the first UI frame (per LS-BE-041). `LocalTrackrRepository` uses it to scan `filesDir/images` and delete any file not referenced by a DB event row, a purely additive cleanup with no ordering requirement against the UI. Future implementations may use it for different initialization behavior (sync, token refresh, etc.) — if that behavior is something the UI depends on, the fire-and-forget launch must be revisited to actually block first frame. (Reminder scheduling reconciliation, added by the `reminders` segment, is a **separate** fire-and-forget call from `TrackrApplication.onCreate()` — not folded into this method. Re-arming alarms needs `AlarmManager` access, which sits outside this segment's persistence-only seam; it isn't this method's concern regardless of what else `onStartup` happens to do today.)
+
+**`saveReminder` / `getReminderForCategory` / `getAllEnabledRemindersOnce`:** thin pass-throughs to `ReminderDao`, mapping via `ReminderEntity.toDomain()`/`Reminder.toEntity()`. No transaction needed — each is a single-row read or upsert.
+
+**`saveCategoryWithReminder`:** runs inside a single Room transaction: upserts the `CategoryEntity` (via the same path `saveCategory` uses, including its childlessness guard) and upserts (or, when `reminder == null`, no-ops — there's nothing to delete explicitly; a category can only reach this method while it still exists) the `ReminderEntity`. This is a persistence-only transaction — it does not touch `AlarmManager`; arming or cancelling the alarm is a separate post-commit step the caller (`ReminderScheduler`, per `docs/llds/reminders.md § Scheduling Engine`) performs after this method returns successfully.
 
 ## ImageStore
 
@@ -181,7 +218,7 @@ Jetpack DataStore Preferences stores simple app-wide state that doesn't belong i
 
 ## Room Database
 
-Two entities (`CategoryEntity`, `EventEntity`), version 3, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
+Three entities (`CategoryEntity`, `EventEntity`, `ReminderEntity`), version 4, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
 
 ## Migration Strategy
 
@@ -196,6 +233,9 @@ Removes `unit` column and adds `default_value` column on `categories`. SQLite do
 3. Drop `categories`.
 4. Rename `categories_new` to `categories`.
 5. Recreate any indexes dropped by the table recreation.
+
+### Version 3 → 4
+Adds the `reminders` table (`ReminderEntity`, § Room Entities), a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`.
 
 ## Android Auto Backup
 

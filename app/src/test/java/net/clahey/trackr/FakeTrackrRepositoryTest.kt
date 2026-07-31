@@ -3,7 +3,10 @@ package net.clahey.trackr
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.Reminder
+import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.ValueType
+import java.time.DayOfWeek
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -227,6 +230,58 @@ class FakeTrackrRepositoryTest {
         assertEquals("orphaned SubCategory color fallback", parent.color, meta.color)
         assertEquals("orphaned SubCategory valueType fallback", parent.valueType, meta.valueType)
     }
+
+    // @spec REM-DATA-008
+    @Test fun `saveCategoryWithReminder ignores the passed nextFireAt and preserves the store's current value`() = runTest {
+        val repo = FakeTrackrRepository()
+        val category = makeCategory("cat1")
+        repo.setCategories(category)
+        val armedAt = Instant.parse("2024-01-15T08:00:00Z")
+        repo.setReminders(makeReminder("cat1", nextFireAt = armedAt))
+        // Simulate onAlarmFired having already advanced nextFireAt while the edit screen was open.
+        val staleFromScreen = Instant.parse("2024-01-15T20:00:00Z")
+        repo.saveCategoryWithReminder(category, makeReminder("cat1", nextFireAt = staleFromScreen))
+        val result = repo.getReminderForCategory("cat1").first()
+        assertEquals(armedAt, result!!.nextFireAt)
+    }
+
+    // @spec REM-DATA-006
+    @Test fun `saveCategoryWithReminder with a null reminder clears any existing row`() = runTest {
+        val repo = FakeTrackrRepository()
+        val category = makeCategory("cat1")
+        repo.setCategories(category)
+        repo.setReminders(makeReminder("cat1"))
+        repo.saveCategoryWithReminder(category, null)
+        assertNull(repo.getReminderForCategory("cat1").first())
+    }
+
+    // @spec REM-DATA-007
+    @Test fun `getAllEnabledRemindersOnce returns only enabled reminders`() = runTest {
+        val repo = FakeTrackrRepository()
+        repo.setReminders(
+            makeReminder("enabled1", enabled = true),
+            makeReminder("disabled1", enabled = false),
+        )
+        val result = repo.getAllEnabledRemindersOnce()
+        assertEquals(listOf("enabled1"), result.map { it.categoryId })
+    }
+
+    private fun makeReminder(
+        categoryId: String,
+        enabled: Boolean = true,
+        nextFireAt: Instant? = null,
+    ) = Reminder(
+        categoryId = categoryId,
+        enabled = enabled,
+        mode = ReminderMode.FIXED,
+        times = listOf(java.time.LocalTime.of(8, 0)),
+        windowStart = null,
+        windowEnd = null,
+        occurrencesPerDay = null,
+        daysActive = DayOfWeek.entries.toSet(),
+        showCategoryInNotification = false,
+        nextFireAt = nextFireAt,
+    )
 
     private fun makeCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,

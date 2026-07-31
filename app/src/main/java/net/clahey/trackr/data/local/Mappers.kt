@@ -6,8 +6,13 @@ import net.clahey.trackr.data.local.converters.StringListConverter
 import net.clahey.trackr.data.local.converters.ValueTypeConverter
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.Reminder
+import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.ui.theme.DEFAULT_CATEGORY_COLOR
+import java.time.DayOfWeek
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 private fun CategoryEntity.toMetaCategory() = Category.MetaCategory(
     id = id, name = name,
@@ -88,4 +93,35 @@ fun Event.toEntity(): EventEntity = EventEntity(
     notes = notes,
     imagePaths = StringListConverter.encode(imagePaths),
     createdAt = InstantConverter.encode(createdAt),
+)
+
+private val hhMm = DateTimeFormatter.ofPattern("HH:mm")
+private fun LocalTime.toHHmm(): String = format(hhMm)
+private fun String.toLocalTimeHHmm(): LocalTime = LocalTime.parse(this, hhMm)
+
+// @spec REM-DATA-002
+fun ReminderEntity.toDomain(): Reminder = Reminder(
+    categoryId = categoryId,
+    enabled = enabled,
+    mode = if (mode == "random") ReminderMode.RANDOM else ReminderMode.FIXED,
+    times = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList(),
+    windowStart = windowStart?.toLocalTimeHHmm(),
+    windowEnd = windowEnd?.toLocalTimeHHmm(),
+    occurrencesPerDay = occurrencesPerDay,
+    daysActive = StringListConverter.decode(daysActive).map { DayOfWeek.valueOf(it) }.toSet(),
+    showCategoryInNotification = showCategoryInNotification,
+    nextFireAt = nextFireAt?.let { InstantConverter.decode(it) },
+)
+
+fun Reminder.toEntity(): ReminderEntity = ReminderEntity(
+    categoryId = categoryId,
+    enabled = enabled,
+    mode = if (mode == ReminderMode.RANDOM) "random" else "fixed",
+    times = if (times.isNotEmpty()) StringListConverter.encode(times.map { it.toHHmm() }) else null,
+    windowStart = windowStart?.toHHmm(),
+    windowEnd = windowEnd?.toHHmm(),
+    occurrencesPerDay = occurrencesPerDay,
+    daysActive = StringListConverter.encode(daysActive.map { it.name }),
+    showCategoryInNotification = showCategoryInNotification,
+    nextFireAt = nextFireAt?.let { InstantConverter.encode(it) },
 )

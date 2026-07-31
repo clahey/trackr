@@ -15,7 +15,9 @@ This segment is the connective tissue of the app. It owns no domain logic — it
 
 ## Application Class
 
-`TrackrApplication` is annotated `@HiltAndroidApp` and declared in `AndroidManifest.xml` via `android:name=".TrackrApplication"`. Its `onCreate` calls `LocalTrackrRepository.onStartup()` for the orphan image scan (see LS-BE-040).
+`TrackrApplication` is annotated `@HiltAndroidApp` and declared in `AndroidManifest.xml` via `android:name=".TrackrApplication"`. Its `onCreate` launches two independent fire-and-forget coroutines: `LocalTrackrRepository.onStartup()` for the orphan image scan (see LS-BE-040), and `ReminderScheduler.reconcileOnStartup()` (see `docs/llds/reminders.md § Scheduling Engine`) to re-arm any enabled reminder whose alarm is missing or stale. The two are launched separately, not composed into one call — re-arming alarms needs `AlarmManager` access, which sits outside `local-storage`'s persistence-only seam (see `docs/llds/local-storage.md § LocalTrackrRepository`), so it can't live inside `LocalTrackrRepository.onStartup()` regardless of what that method currently does (LS-BE-041).
+
+`AndroidManifest.xml` also registers two `reminders`-owned `BroadcastReceiver`s (`ReminderReceiver`, `ReminderRearmReceiver`) — their triggers and behavior are specced in `docs/llds/reminders.md § Scheduling Engine`; this segment only owns the fact that they're declared, not what they do.
 
 ## Hilt Modules
 
@@ -55,6 +57,8 @@ setContent {
 }
 ```
 
+**Notification deep link.** A reminder notification's `PendingIntent` (see `docs/llds/reminders.md § Scheduling Engine`) targets `MainActivity` with a `categoryId` extra. On a cold start, `MainActivity` reads the launching `Intent`'s extra and passes it into the nav graph's start-destination route (`Routes.timeline(quickLogCategoryId = ...)`, see § Navigation Graph) instead of always starting bare at `"timeline"`. On a warm start (app already running), `MainActivity` overrides `onNewIntent` and forwards the extra the same way — `singleTop` launch semantics keep this from spawning a second Activity instance. No platform `NavDeepLink`/intent-filter URI scheme is used: the existing route-query-arg + `SavedStateHandle` pattern (already used for `EVENT_EDIT`/`CATEGORY_EDIT`) already covers passing a target into a composable on arrival, and adding a second, platform-native deep-link mechanism alongside it would be redundant.
+
 `AppScaffold` is a composable that wraps the `NavHost` in a `Scaffold` with a `BottomBar`. The bottom bar is shown only on the two top-level destinations (`timeline`, `categoryList`).
 
 ## Navigation Graph
@@ -63,12 +67,16 @@ Routes are `String` constants in a `Routes` object:
 
 ```kotlin
 object Routes {
-    const val TIMELINE       = "timeline"
+    const val TIMELINE       = "timeline?quickLogCategoryId={quickLogCategoryId}"
     const val CATEGORY_LIST  = "categoryList"
     const val EVENT_EDIT     = "eventEdit/{eventId}?filterCategoryId={filterCategoryId}"
     const val CATEGORY_EDIT  = "categoryEdit?categoryId={categoryId}&parentId={parentId}"
     const val ABOUT          = "about"
 
+    fun timeline(quickLogCategoryId: String? = null) = buildString {
+        append("timeline")
+        if (quickLogCategoryId != null) append("?quickLogCategoryId=$quickLogCategoryId")
+    }
     fun eventEdit(eventId: String, filterCategoryId: String? = null) = ...
     fun categoryEdit(categoryId: String?, parentId: String? = null) = buildString {
         append("categoryEdit")
@@ -77,6 +85,8 @@ object Routes {
     }
 }
 ```
+
+`quickLogCategoryId` is null on every ordinary in-app navigation to `timeline` (bottom-nav tab switch, back-navigation) — it's populated only by `MainActivity`'s notification deep-link handling above.
 
 Full graph:
 
@@ -127,14 +137,15 @@ ViewModels that need navigation arguments inject `SavedStateHandle`:
 | `EventEditViewModel` | `"eventId"` | `String` | (required) |
 | `EventEditViewModel` | `"filterCategoryId"` | `String?` | null (= no filter, show all events) |
 | `CategoryEditViewModel` | `"categoryId"` | `String?` | null (= create mode) |
+| `HomeViewModel` | `"quickLogCategoryId"` | `String?` | null (= no notification deep link); behavior on non-null documented in `docs/llds/event-logging.md § Quick-Log Sheet` |
 
 All five ViewModels are annotated `@HiltViewModel`.
 
 ## Startup Sequence
 
-`TrackrApplication.onCreate()` → `repository.onStartup()` (orphan image scan).
+`TrackrApplication.onCreate()` → `repository.onStartup()` (orphan image scan) and, separately, `reminderScheduler.reconcileOnStartup()` (re-arm missing/stale reminder alarms; see `docs/llds/reminders.md § Scheduling Engine`).
 
-The repository is injected into `TrackrApplication` via field injection (`@Inject lateinit var repository: TrackrRepository`).
+The repository and `ReminderScheduler` are injected into `TrackrApplication` via field injection (`@Inject lateinit var repository: TrackrRepository`, `@Inject lateinit var reminderScheduler: ReminderScheduler`).
 
 ## Decisions & Alternatives
 
@@ -147,18 +158,19 @@ The repository is injected into `TrackrApplication` via field injection (`@Injec
 | ViewModel arguments | `SavedStateHandle` | `@AssistedInject` | Idiomatic Hilt + Navigation pattern; survives process death and back-stack restoration automatically |
 | Hilt module split | Three modules (Database, DataStore, Repository) | One monolithic module | Each module is independently testable; standard Android practice |
 | DataStore placement | Top-level `preferencesDataStore` delegate on Application | Manual `DataStore` construction | Delegate is the recommended API; guarantees singleton; no manual scope management |
+| Notification deep-link mechanism | Extend the existing route-query-arg + `SavedStateHandle` pattern (`quickLogCategoryId` on `Routes.TIMELINE`) | Platform `NavDeepLink` / manifest intent-filter URI scheme | The app already has a working, simple mechanism for "arrive at a composable with an argument set" (`EVENT_EDIT`/`CATEGORY_EDIT`); a second, platform-native deep-link mechanism alongside it for exactly one more argument would be redundant complexity, not added capability |
 
 ## Open Questions & Future Decisions
 
 1. **Tab icons** — `Icons.Default.Home` / `Icons.Default.Label` are placeholders; final icons TBD.
-2. **Deep links** — not needed in v1; `SavedStateHandle` approach is compatible if added later.
-3. **Splash screen** — not implemented in v1; orphan scan is fast enough to be invisible.
+2. **Splash screen** — not implemented in v1; orphan scan is fast enough to be invisible.
 
 ## References
 
 - `docs/llds/local-storage.md` — `TrackrRepository`, `ImageStore`, `onStartup`
-- `docs/llds/event-logging.md` — event screen navigation
+- `docs/llds/event-logging.md` — event screen navigation, `HomeViewModel`'s `quickLogCategoryId` handling
 - `docs/llds/category-management.md` — category screen navigation
 - `docs/llds/theme.md` — `TrackrTheme`
+- `docs/llds/reminders.md` — `ReminderScheduler.reconcileOnStartup()`, the two `BroadcastReceiver`s, the notification `PendingIntent` this segment's deep-link handling responds to
 - `docs/llds/publishing.md` — the Play Store listing copy the About positioning (slogan + "log fast / on-device first / no account required" points) must stay in sync with
 - `docs/brand.md` — the brand palette the About hero and point icons draw from (they carry literal hex per `docs/brand.md`)

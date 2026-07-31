@@ -1,7 +1,13 @@
 package net.clahey.trackr.ui.category
 
+import android.app.AlarmManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +25,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,6 +41,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,12 +51,17 @@ import androidx.compose.runtime.setValue
 import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import net.clahey.trackr.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
@@ -75,6 +88,26 @@ fun CategoryListScreen(
     val pendingValueTypeConfirmation by viewModel.pendingValueTypeConfirmation.collectAsState()
     var menuCategoryId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // @spec REM-PERM-004
+    val hasEnabledReminder by viewModel.hasEnabledReminder.collectAsState()
+    val context = LocalContext.current
+    var permissionRecheckTrigger by remember { mutableStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionRecheckTrigger++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val showReminderPermissionBanner = remember(hasEnabledReminder, permissionRecheckTrigger) {
+        hasEnabledReminder && (
+            !NotificationManagerCompat.from(context).areNotificationsEnabled() ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    !context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms())
+            )
+    }
 
     val snackbarMessage by pendingSnackbarMessage.collectAsState()
     LaunchedEffect(snackbarMessage) {
@@ -127,12 +160,46 @@ fun CategoryListScreen(
                 },
             )
         }
+        Column(modifier = Modifier.padding(innerPadding)) {
+            // @spec REM-PERM-004
+            if (showReminderPermissionBanner) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .clickable {
+                            val settingsIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                !context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+                            ) {
+                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                                    .setData(Uri.parse("package:${context.packageName}"))
+                            } else {
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            context.startActivity(settingsIntent)
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        stringResource(R.string.reminder_banner_message),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
         DragReorderList(
             items = dragItems,
             onMove = { result, onSettled -> viewModel.onDragMove(result, onSettled) },
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+                .fillMaxSize(),
         ) { item ->
             val category = categories.first { it.id == item.id }
             val hasSubCategories = category is Category.MetaCategory &&
@@ -161,6 +228,7 @@ fun CategoryListScreen(
                     viewModel.removeFromGroup(category.id)
                 },
             )
+        }
         }
     }
 

@@ -5,6 +5,7 @@ import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
+import net.clahey.trackr.reminders.testReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -33,7 +34,7 @@ class CategoryListViewModelGroupTest {
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
         repo = FakeTrackrRepository()
-        vm = CategoryListViewModel(repo)
+        vm = CategoryListViewModel(repo, testReminderScheduler(repo))
     }
 
     @After fun tearDown() { Dispatchers.resetMain() }

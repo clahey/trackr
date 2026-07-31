@@ -2,6 +2,7 @@ package net.clahey.trackr.ui.category
 
 import androidx.lifecycle.SavedStateHandle
 import net.clahey.trackr.FakeTrackrRepository
+import net.clahey.trackr.reminders.testReminderScheduler
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.EventValue
@@ -93,7 +94,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent")
         repo.saveCategory(parent)
         val counterBefore = repo.peekColorCounter()
-        CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         assertEquals(counterBefore, repo.peekColorCounter())
     }
 
@@ -101,7 +102,7 @@ class CategoryEditViewModelHierarchyTest {
     @Test fun `SubCategory create mode opens with inherit mode for all inheritable fields`() = runTest {
         val parent = makeMetaCategory("parent")
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         assertEquals(EmojiMode.INHERIT, vm.emojiUIState.value.mode)
         assertNull(vm.colorState.value)
         assertNull(vm.valueTypeState.value)
@@ -111,7 +112,7 @@ class CategoryEditViewModelHierarchyTest {
     @Test fun `new SubCategory gets global minimum sortOrder minus 1`() = runTest {
         val parent = makeMetaCategory("parent", sortOrder = 5)
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         vm.setName("child")
         vm.save()
         assertEquals(SaveResult.Success, vm.saveResult.value)
@@ -154,7 +155,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Number,
             defaultValue = EventValue.NumberValue(0.0, "kg"))
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         assertEquals("kg", vm.numberDefaultUnit.value)
     }
 
@@ -162,7 +163,7 @@ class CategoryEditViewModelHierarchyTest {
     @Test fun `SubCategory create mode uses blank unit when parent defaultValue is null`() = runTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Number, defaultValue = null)
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         assertEquals("", vm.numberDefaultUnit.value)
     }
 
@@ -171,7 +172,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Number,
             defaultValue = EventValue.NumberValue(0.0, "kg"))
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         vm.setName("child")
         vm.save()
         val saved = repo.getCategories().first().first { it.id != "parent" } as Category.SubCategory
@@ -182,7 +183,7 @@ class CategoryEditViewModelHierarchyTest {
     @Test fun `SubCategory create mode saves NumberValue when unit field edited`() = runTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Number, defaultValue = null)
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         vm.updateNumberDefaultUnit("lbs")
         vm.setName("child")
         vm.save()
@@ -195,7 +196,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Number,
             defaultValue = EventValue.NumberValue(0.0, "kg"))
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         vm.setValueTypeState(ValueType.Exercise)
         assertEquals("3", vm.exerciseDefaultSets.value)
         assertEquals("15", vm.exerciseDefaultReps.value)
@@ -206,7 +207,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Exercise,
             defaultValue = EventValue.ExerciseValue(5, 10))
         repo.saveCategory(parent)
-        val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
+        val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to "parent")))
         assertEquals("5", vm.exerciseDefaultSets.value)
         assertEquals("10", vm.exerciseDefaultReps.value)
     }
@@ -214,7 +215,7 @@ class CategoryEditViewModelHierarchyTest {
     // ---------- Helpers ----------
 
     private fun editVm(categoryId: String) =
-        CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to categoryId)))
+        CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("categoryId" to categoryId)))
 
     private fun makeMetaCategory(
         id: String,

@@ -4,6 +4,7 @@ import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.SiblingSlot
 import net.clahey.trackr.domain.StarterCategoryInput
 import net.clahey.trackr.domain.ValueType
@@ -20,6 +21,7 @@ import java.time.Instant
 class FakeTrackrRepository : TrackrRepository {
     private val categories = MutableStateFlow<List<Category>>(emptyList())
     private val events = MutableStateFlow<List<Event>>(emptyList())
+    private val reminders = MutableStateFlow<Map<String, Reminder>>(emptyMap())
     private var nextColorIndex = 0
 
     // @spec CAT-UI-001, DM-PROC-022
@@ -237,4 +239,33 @@ class FakeTrackrRepository : TrackrRepository {
     // Test helpers for CategoryEditViewModelHierarchyTest (Phase 6 Step 3)
     fun resetColorCounter(value: Int) { nextColorIndex = value }
     fun peekColorCounter(): Int = nextColorIndex
+
+    // @spec REM-DATA-006
+    override fun getReminderForCategory(categoryId: String): Flow<Reminder?> =
+        reminders.map { it[categoryId] }
+
+    // @spec REM-DATA-006
+    override suspend fun saveReminder(reminder: Reminder) {
+        reminders.update { it + (reminder.categoryId to reminder) }
+    }
+
+    // @spec REM-DATA-006, REM-DATA-008
+    override suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType?) {
+        if (migrateFromType != null) saveCategoryAndMigrateEvents(category, migrateFromType) else saveCategory(category)
+        reminders.update { map ->
+            if (reminder == null) {
+                map - category.id
+            } else {
+                // nextFireAt on `reminder` is ignored; the store's current value survives (REM-DATA-008).
+                val currentNextFireAt = map[category.id]?.nextFireAt
+                map + (category.id to reminder.copy(nextFireAt = currentNextFireAt))
+            }
+        }
+    }
+
+    // @spec REM-DATA-007
+    override suspend fun getAllEnabledRemindersOnce(): List<Reminder> =
+        reminders.value.values.filter { it.enabled }
+
+    fun setReminders(vararg r: Reminder) { reminders.value = r.associateBy { it.categoryId } }
 }

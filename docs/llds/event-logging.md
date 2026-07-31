@@ -76,6 +76,17 @@ When `ActiveFilter.TopLevel(meta)` is active and the filtered MetaCategory has S
 
 **Reopen after inline create.** The reopen intent (`pendingCategoryCreate`) is set **only** by the sheet's "+ New" tiles, so on return it reliably means "you came from the sheet" — no proxy like "do categories exist" is needed (the FAB can open the sheet even with zero categories, so that proxy would be wrong). `HomeScreen` reads it once per composition (a `LaunchedEffect(Unit)`, so it fires on return, not on the initiating tap). If Category Edit reported a new id (`created_category_id`, written synchronously before it popped — see `docs/llds/category-management.md § CategoryEditViewModel`), the sheet awaits that category appearing in `categories`, `selectCategory`s it, and opens at **step 2**; otherwise (cancel) it reopens at **step 1** with the preserved `expandedMetaCategoryId` restoring any drill-down context. The reported id is cleared on *every* return regardless of the flag: the welcome empty state's "Create a category" deliberately does **not** set the flag (it's a plain trip to category creation), so it returns straight to the timeline and its `created_category_id` is consumed here rather than lingering to mis-fire a later sheet create (EL-NAV-021).
 
+**Opening directly at an explicit target (`QuickLogTarget`).** The FAB/`ActiveFilter` path above is one way to reach step 1/2 directly; a second, independent way exists for callers outside a chip tap — specifically, `reminders` (`docs/llds/reminders.md § Notifications`) opening the sheet from a notification tap:
+
+```kotlin
+sealed class QuickLogTarget {
+    data class DrillDown(val meta: Category.MetaCategory) : QuickLogTarget()  // opens straight into the drill-down view
+    data class DirectEntry(val category: Category) : QuickLogTarget()        // opens straight to step 2
+}
+```
+
+`HomeViewModel` accepts an optional `quickLogCategoryId: String?` navigation argument (`SavedStateHandle`-sourced, default null; the notification `PendingIntent` → `MainActivity` → nav-graph wiring that populates it is `app-shell.md`'s concern, not this ViewModel's — by the time `HomeViewModel` sees it, it's just a normal nav argument, indistinguishable from any other route arg). Consumed once on init: resolves the category, builds the corresponding `QuickLogTarget` (`DrillDown` for a MetaCategory with SubCategories, `DirectEntry` otherwise), and opens the sheet against it directly. If the category can't be resolved (deleted between the notification being posted and tapped), the argument is discarded, a snackbar reads "Category not found.", and the timeline loads normally with `ActiveFilter` untouched — the same treatment as an unresolvable id elsewhere in the app (`category-management.md`'s CAT-UI-017, this segment's EL-UI-045) — **not** by first setting `ActiveFilter` and relying on the table above to derive the page, the reverse of the FAB path. For the `DrillDown` case only, this same init-time handling *also* calls `HomeViewModel`'s existing chip-tap filter-set function to set `ActiveFilter.TopLevel(meta)` — a real, permanent filter change exactly like a chip tap, made *in addition to*, not in order to produce, the direct `DrillDown` open. For `DirectEntry`, `ActiveFilter` is never read or written at all. See `docs/llds/reminders.md § Notifications` for why the two mechanisms (`ActiveFilter`-derived vs. direct `QuickLogTarget`) are kept decoupled rather than just setting a filter and relying on the table above.
+
 **Step 2 — Value + details**
 - Value input (see Value Input section below); for Number, Text, and Duration types the input field is automatically focused on entry so the keyboard rises without an extra tap
 - Optional: single photo (camera or gallery picker)
@@ -409,4 +420,5 @@ System back and edge swipe are intercepted by `BackHandler` within the sheet: st
 - `docs/llds/data-model.md` — `Event`, `Category`, `EventValue`, `ValueType`
 - `docs/llds/local-storage.md` — `TrackrRepository` interface, `ImageStore`
 - `docs/llds/category-management.md` — category list and edit flows (parallel segment)
+- `docs/llds/reminders.md` — `QuickLogTarget`'s caller (notification tap), the `ActiveFilter.TopLevel(meta)` side-effect call
 - `docs/high-level-design.md` — three-tap goal, image capture sources

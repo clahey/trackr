@@ -10,6 +10,7 @@ import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
+import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.SiblingSlot
 import net.clahey.trackr.domain.StarterCategoryInput
 import net.clahey.trackr.domain.ValueType
@@ -29,6 +30,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     private val db: TrackrDatabase,
     private val categoryDao: CategoryDao,
     private val eventDao: EventDao,
+    private val reminderDao: ReminderDao,
     private val imageStore: ImageStore,
     private val dataStore: DataStore<Preferences>,
 ) : TrackrRepository {
@@ -222,4 +224,37 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     private fun EventEntity.imagePaths(): List<String> =
         net.clahey.trackr.data.local.converters.StringListConverter.decode(imagePaths)
+
+    // @spec REM-DATA-006
+    override fun getReminderForCategory(categoryId: String): Flow<Reminder?> =
+        reminderDao.getByCategoryId(categoryId).map { it?.toDomain() }
+
+    // @spec REM-DATA-006
+    override suspend fun saveReminder(reminder: Reminder) {
+        reminderDao.upsert(reminder.toEntity())
+    }
+
+    // @spec REM-DATA-006, REM-DATA-008
+    override suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType?) {
+        db.withTransaction {
+            requireNoChildren(category)
+            categoryDao.upsert(category.toEntity())
+            if (migrateFromType != null) {
+                migrateEventsForCategory(category.id, category.resolvedValueType)
+            }
+            if (reminder == null) {
+                reminderDao.deleteByCategoryId(category.id)
+            } else {
+                // nextFireAt is ignored on `reminder` — the DB's current value survives this
+                // write untouched, so a save can never clobber a value ReminderScheduler set
+                // concurrently while the edit screen was open (REM-DATA-008).
+                val currentNextFireAt = reminderDao.getByCategoryIdOnce(category.id)?.nextFireAt
+                reminderDao.upsert(reminder.toEntity().copy(nextFireAt = currentNextFireAt))
+            }
+        }
+    }
+
+    // @spec REM-DATA-007
+    override suspend fun getAllEnabledRemindersOnce(): List<Reminder> =
+        reminderDao.getAllEnabledOnce().map { it.toDomain() }
 }

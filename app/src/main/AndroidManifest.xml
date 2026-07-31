@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- @spec REM-PERM-001 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- @spec REM-SCHED-010 -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- @spec REM-SCHED-016 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name=".TrackrApplication"
         android:label="@string/app_name"
@@ -11,12 +18,28 @@
         android:fullBackupContent="@xml/backup_rules">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- @spec APP-REM-001 -->
+        <receiver
+            android:name="net.clahey.trackr.reminders.ReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="net.clahey.trackr.reminders.ReminderRearmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

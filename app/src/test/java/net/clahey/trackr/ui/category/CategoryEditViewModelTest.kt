@@ -2,6 +2,7 @@ package net.clahey.trackr.ui.category
 
 import androidx.lifecycle.SavedStateHandle
 import net.clahey.trackr.FakeTrackrRepository
+import net.clahey.trackr.reminders.testReminderScheduler
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.EventValue
@@ -41,7 +42,7 @@ class CategoryEditViewModelTest {
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
         repo = FakeTrackrRepository()
-        vm = CategoryEditViewModel(repo, SavedStateHandle())
+        vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle())
     }
 
     @After fun tearDown() { Dispatchers.resetMain() }
@@ -131,7 +132,7 @@ class CategoryEditViewModelTest {
     // @spec CAT-UI-043
     @Test fun `second new category gets next palette color`() = runTest {
         vm.setName("Running"); vm.setEmojiUIState(EmojiUIState(EmojiMode.CUSTOM, "🏃")); vm.save()
-        vm = CategoryEditViewModel(repo, SavedStateHandle())
+        vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle())
         vm.setName("Sleep"); vm.setEmojiUIState(EmojiUIState(EmojiMode.CUSTOM, "💤")); vm.save()
         assertEquals(0xFFE53935L, getSavedCategoryByName("Running").color)
         assertEquals(0xFFFB8C00L, getSavedCategoryByName("Sleep").color)
@@ -816,20 +817,20 @@ class CategoryEditViewModelTest {
 
     // @spec CAT-UI-017
     @Test fun `navigateBack emits true when category not found in edit mode`() = runTest {
-        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "nonexistent")))
+        vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("categoryId" to "nonexistent")))
         assertTrue(vm.navigateBack.value)
     }
 
     // @spec CAT-UI-017
     @Test fun `navigateBack stays false when category is found`() = runTest {
         repo.saveCategory(makeCategory("c1"))
-        vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to "c1")))
+        vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("categoryId" to "c1")))
         assertFalse(vm.navigateBack.value)
     }
 
     // @spec CAT-UI-017
     @Test fun `navigateBack stays false in create mode`() = runTest {
-        vm = CategoryEditViewModel(repo, SavedStateHandle())
+        vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle())
         assertFalse(vm.navigateBack.value)
     }
 
@@ -1051,7 +1052,7 @@ class CategoryEditViewModelTest {
 
     // @spec CAT-UI-067
     @Test fun `isDirty is true initially in MetaCategory create mode`() = runTest {
-        vm = CategoryEditViewModel(repo, SavedStateHandle())
+        vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle())
         assertTrue(vm.isDirty.value)
     }
 
@@ -1137,10 +1138,10 @@ class CategoryEditViewModelTest {
     // ---------- Helpers ----------
 
     private fun editVm(categoryId: String) =
-        CategoryEditViewModel(repo, SavedStateHandle(mapOf("categoryId" to categoryId)))
+        CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("categoryId" to categoryId)))
 
     private fun createSubVm(parentId: String) =
-        CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to parentId)))
+        CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle(mapOf("parentId" to parentId)))
 
     private suspend fun eventValue(categoryId: String): EventValue? =
         repo.getEventsByCategory(categoryId).first().first().value

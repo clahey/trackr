@@ -1,7 +1,14 @@
 package net.clahey.trackr.ui.category
 
 import android.annotation.SuppressLint
+import android.app.AlarmManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,24 +34,36 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,14 +78,17 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.NotificationManagerCompat
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
 import net.clahey.trackr.R
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.ui.SaveResult
@@ -76,6 +98,9 @@ import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.theme.categoryColorPalette
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 // @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013, CAT-UI-017,
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
@@ -118,6 +143,32 @@ fun CategoryEditScreen(
     val scope = rememberCoroutineScope()
     var showBackDiscardDialog by remember { mutableStateOf(false) }
 
+    // @spec REM-UI-001..011, REM-PERM-001..004
+    val reminderEnabled by viewModel.reminderEnabled.collectAsState()
+    val reminderMode by viewModel.reminderMode.collectAsState()
+    val reminderTimes by viewModel.reminderTimes.collectAsState()
+    val reminderWindowStart by viewModel.reminderWindowStart.collectAsState()
+    val reminderWindowEnd by viewModel.reminderWindowEnd.collectAsState()
+    val reminderOccurrencesPerDay by viewModel.reminderOccurrencesPerDay.collectAsState()
+    val reminderDaysActive by viewModel.reminderDaysActive.collectAsState()
+    val reminderShowCategoryInNotification by viewModel.reminderShowCategoryInNotification.collectAsState()
+    val pendingPermissionConfirmation by viewModel.pendingPermissionConfirmation.collectAsState()
+
+    val context = LocalContext.current
+    fun notificationsGranted() = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    fun exactAlarmAvailable() = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+        context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+
+    fun doSave(force: Boolean = false) {
+        scope.launch {
+            viewModel.save(
+                notificationPermissionGranted = notificationsGranted(),
+                exactAlarmAvailable = exactAlarmAvailable(),
+                forceSaveDespitePermission = force,
+            )
+        }
+    }
+
     // @spec CAT-NAV-006 — only warn once the user has actually edited a field
     BackHandler(enabled = hasUserEdits) { showBackDiscardDialog = true }
 
@@ -133,6 +184,25 @@ fun CategoryEditScreen(
         }
     }
 
+    // @spec REM-PERM-003
+    if (pendingPermissionConfirmation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissPermissionConfirmation() },
+            title = { Text(stringResource(R.string.reminder_permission_dialog_title)) },
+            text = { Text(stringResource(R.string.reminder_permission_dialog_message)) },
+            confirmButton = {
+                TextButton(onClick = { doSave(force = true) }) {
+                    Text(stringResource(R.string.reminder_permission_save_anyway))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissPermissionConfirmation() }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
     // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
     pendingDelete?.let { confirmation ->
         DeleteCategoryDialog(
@@ -145,7 +215,7 @@ fun CategoryEditScreen(
     // @spec CAT-NAV-006
     if (showBackDiscardDialog) {
         UnsavedChangesDialog(
-            onSave = { scope.launch { viewModel.save() } },
+            onSave = { doSave() },
             onDiscard = { onNavigateBack(null) },
             onCancel = { showBackDiscardDialog = false },
         )
@@ -275,11 +345,32 @@ fun CategoryEditScreen(
                 }
             }
 
+            // @spec REM-UI-001..011, REM-PERM-001, REM-PERM-002
+            ReminderSection(
+                enabled = reminderEnabled,
+                mode = reminderMode,
+                times = reminderTimes,
+                windowStart = reminderWindowStart,
+                windowEnd = reminderWindowEnd,
+                occurrencesPerDay = reminderOccurrencesPerDay,
+                daysActive = reminderDaysActive,
+                showCategoryInNotification = reminderShowCategoryInNotification,
+                validationField = (saveResult as? SaveResult.ValidationError)?.field,
+                onEnabledChange = { viewModel.setReminderEnabled(it) },
+                onModeChange = { viewModel.setReminderMode(it) },
+                onTimesChange = { viewModel.setReminderTimes(it) },
+                onWindowStartChange = { viewModel.setReminderWindowStart(it) },
+                onWindowEndChange = { viewModel.setReminderWindowEnd(it) },
+                onOccurrencesPerDayChange = { viewModel.setReminderOccurrencesPerDay(it) },
+                onDaysActiveChange = { viewModel.setReminderDaysActive(it) },
+                onShowCategoryInNotificationChange = { viewModel.setReminderShowCategoryInNotification(it) },
+            )
+
             // @spec CAT-UI-067
             if (isDirty) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = { scope.launch { viewModel.save() } },
+                    onClick = { doSave() },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.action_save))
@@ -553,6 +644,284 @@ private fun ValueTypeSelector(
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )
             }
+        }
+    }
+}
+
+private fun formatTime(time: LocalTime): String = time.format(DateTimeFormatter.ofPattern("h:mm a"))
+
+// @spec REM-UI-001, REM-UI-002, REM-UI-003, REM-UI-007, REM-UI-008, REM-UI-009, REM-UI-010,
+// REM-UI-011, REM-PERM-001, REM-PERM-002
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderSection(
+    enabled: Boolean,
+    mode: ReminderMode,
+    times: List<LocalTime>,
+    windowStart: LocalTime,
+    windowEnd: LocalTime,
+    occurrencesPerDay: Int,
+    daysActive: Set<DayOfWeek>,
+    showCategoryInNotification: Boolean,
+    validationField: String?,
+    onEnabledChange: (Boolean) -> Unit,
+    onModeChange: (ReminderMode) -> Unit,
+    onTimesChange: (List<LocalTime>) -> Unit,
+    onWindowStartChange: (LocalTime) -> Unit,
+    onWindowEndChange: (LocalTime) -> Unit,
+    onOccurrencesPerDayChange: (Int) -> Unit,
+    onDaysActiveChange: (Set<DayOfWeek>) -> Unit,
+    onShowCategoryInNotificationChange: (Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* live-checked elsewhere via NotificationManagerCompat; nothing to store */ }
+
+    fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !NotificationManagerCompat.from(context).areNotificationsEnabled()
+        ) {
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // @spec REM-UI-002
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Notifications, contentDescription = null)
+                Text(stringResource(R.string.reminder_section_title))
+            }
+            // @spec REM-PERM-001
+            Switch(
+                checked = enabled,
+                onCheckedChange = { checked ->
+                    onEnabledChange(checked)
+                    if (checked) requestNotificationPermissionIfNeeded()
+                },
+            )
+        }
+
+        // @spec REM-UI-003
+        if (enabled) {
+            // Fires once each time this content is entered — turning the section on, or
+            // reopening an already-on one — matching "entering/expanding the Reminder section".
+            LaunchedEffect(Unit) { requestNotificationPermissionIfNeeded() }
+
+            // @spec REM-PERM-002
+            val exactAlarmAvailable = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+            if (!exactAlarmAvailable) {
+                Card {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.reminder_exact_alarm_prompt), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = {
+                            context.startActivity(
+                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                                    .setData(Uri.parse("package:${context.packageName}")),
+                            )
+                        }) { Text(stringResource(R.string.reminder_exact_alarm_open_settings)) }
+                    }
+                }
+            }
+
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = mode == ReminderMode.FIXED,
+                    onClick = { onModeChange(ReminderMode.FIXED) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                ) { Text(stringResource(R.string.reminder_mode_fixed)) }
+                SegmentedButton(
+                    selected = mode == ReminderMode.RANDOM,
+                    onClick = { onModeChange(ReminderMode.RANDOM) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                ) { Text(stringResource(R.string.reminder_mode_random)) }
+            }
+
+            if (mode == ReminderMode.FIXED) {
+                // @spec REM-UI-004
+                ReminderTimesEditor(times = times, onTimesChange = onTimesChange)
+                if (validationField == "reminder_times") {
+                    Text(
+                        stringResource(R.string.reminder_validation_no_time),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            } else {
+                // @spec REM-UI-005
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    TimePickerFieldButton(
+                        label = stringResource(R.string.reminder_window_start),
+                        time = windowStart,
+                        onTimeChange = onWindowStartChange,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TimePickerFieldButton(
+                        label = stringResource(R.string.reminder_window_end),
+                        time = windowEnd,
+                        onTimeChange = onWindowEndChange,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // @spec REM-UI-006
+                OutlinedTextField(
+                    value = occurrencesPerDay.toString(),
+                    onValueChange = { v -> v.toIntOrNull()?.let { if (it in 1..12) onOccurrencesPerDayChange(it) } },
+                    label = { Text(stringResource(R.string.reminder_occurrences_per_day)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (validationField == "reminder_window") {
+                    Text(
+                        stringResource(R.string.reminder_validation_window_invalid),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+
+            // @spec REM-UI-007
+            Text(stringResource(R.string.reminder_active_days), style = MaterialTheme.typography.labelMedium)
+            DaysOfWeekRow(daysActive = daysActive, onDaysActiveChange = onDaysActiveChange)
+            if (validationField == "reminder_days") {
+                Text(
+                    stringResource(R.string.reminder_validation_no_active_day),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            // @spec REM-UI-008
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(stringResource(R.string.reminder_show_category_in_notification))
+                Switch(checked = showCategoryInNotification, onCheckedChange = onShowCategoryInNotificationChange)
+            }
+        }
+    }
+}
+
+// @spec REM-UI-004
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderTimesEditor(times: List<LocalTime>, onTimesChange: (List<LocalTime>) -> Unit) {
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
+    var showAddPicker by remember { mutableStateOf(false) }
+
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(times.size) { index ->
+            InputChip(
+                selected = false,
+                onClick = { editingIndex = index },
+                label = { Text(formatTime(times[index])) },
+                trailingIcon = if (times.size > 1) {
+                    {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_remove),
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { onTimesChange(times.filterIndexed { i, _ -> i != index }) },
+                        )
+                    }
+                } else null,
+            )
+        }
+        item {
+            TextButton(onClick = { showAddPicker = true }) { Text(stringResource(R.string.reminder_add_time)) }
+        }
+    }
+
+    editingIndex?.let { index ->
+        val state = rememberTimePickerState(initialHour = times[index].hour, initialMinute = times[index].minute)
+        AlertDialog(
+            onDismissRequest = { editingIndex = null },
+            confirmButton = {
+                TextButton(onClick = {
+                    onTimesChange(times.mapIndexed { i, t -> if (i == index) LocalTime.of(state.hour, state.minute) else t })
+                    editingIndex = null
+                }) { Text(stringResource(R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { editingIndex = null }) { Text(stringResource(R.string.action_cancel)) } },
+            text = { TimePicker(state = state) },
+        )
+    }
+
+    if (showAddPicker) {
+        val state = rememberTimePickerState(initialHour = 9, initialMinute = 0)
+        AlertDialog(
+            onDismissRequest = { showAddPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    onTimesChange(times + LocalTime.of(state.hour, state.minute))
+                    showAddPicker = false
+                }) { Text(stringResource(R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { showAddPicker = false }) { Text(stringResource(R.string.action_cancel)) } },
+            text = { TimePicker(state = state) },
+        )
+    }
+}
+
+// @spec REM-UI-005
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickerFieldButton(
+    label: String,
+    time: LocalTime,
+    onTimeChange: (LocalTime) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = { showPicker = true }, modifier = modifier) {
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall)
+            Text(formatTime(time))
+        }
+    }
+    if (showPicker) {
+        val state = rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute)
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    onTimeChange(LocalTime.of(state.hour, state.minute))
+                    showPicker = false
+                }) { Text(stringResource(R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) } },
+            text = { TimePicker(state = state) },
+        )
+    }
+}
+
+// @spec REM-UI-007
+@Composable
+private fun DaysOfWeekRow(daysActive: Set<DayOfWeek>, onDaysActiveChange: (Set<DayOfWeek>) -> Unit) {
+    val days = listOf(
+        DayOfWeek.MONDAY to R.string.reminder_day_mon,
+        DayOfWeek.TUESDAY to R.string.reminder_day_tue,
+        DayOfWeek.WEDNESDAY to R.string.reminder_day_wed,
+        DayOfWeek.THURSDAY to R.string.reminder_day_thu,
+        DayOfWeek.FRIDAY to R.string.reminder_day_fri,
+        DayOfWeek.SATURDAY to R.string.reminder_day_sat,
+        DayOfWeek.SUNDAY to R.string.reminder_day_sun,
+    )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        items(days) { (day, labelRes) ->
+            FilterChip(
+                selected = day in daysActive,
+                onClick = { onDaysActiveChange(if (day in daysActive) daysActive - day else daysActive + day) },
+                label = { Text(stringResource(labelRes)) },
+            )
         }
     }
 }

@@ -7,6 +7,7 @@ package net.clahey.trackr.ui.category
 import net.clahey.trackr.FakeTrackrRepository
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
+import net.clahey.trackr.reminders.testReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -36,7 +37,7 @@ class CategoryListViewModelHierarchyTest {
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
         repo = FakeTrackrRepository()
-        vm = CategoryListViewModel(repo)
+        vm = CategoryListViewModel(repo, testReminderScheduler(repo))
     }
 
     @After fun tearDown() { Dispatchers.resetMain() }

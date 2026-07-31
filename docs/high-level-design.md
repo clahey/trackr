@@ -27,6 +27,7 @@ Individuals tracking personal health and lifestyle data who want:
 - Attach photos to an event (camera or gallery); quick-log captures one image, full edit allows multiple
 - Timeline view of events grouped by day
 - Data stays fully on-device; no network required
+- Optional per-category reminders that prompt the user to log, either at a fixed time or at a time randomized inside a user-configured availability window — randomized reminders never land during declared unavailable hours (e.g. sleep)
 
 ## Non-Goals
 
@@ -35,6 +36,12 @@ Individuals tracking personal health and lifestyle data who want:
 - Cross-user sharing in v1 (intended post-v1 feature; shapes the backend direction below)
 - iOS support (Android-only)
 - Social or community features in v1
+- Adaptive or learned reminder timing (e.g. tuned from the user's own logging history) in v1 — reminders use a fixed, user-set availability window with simple in-window randomization only
+
+## Guidelines
+
+- **Silence over spam.** When a reminder-related design choice is ambiguous, lean toward fewer notifications rather than more — a missed or dismissed reminder is not escalated or repeated within the same window.
+- **Public surfaces default to discreet.** Notification and lock-screen text defaults to generic phrasing rather than naming the specific category being tracked, since some categories (mood, symptoms, medication) are sensitive; showing more detail is an opt-in, not the default.
 
 ## System Design
 
@@ -45,6 +52,11 @@ graph TD
     Repo --> Local[LocalTrackrRepository]
     Local --> Room[Room Database]
     Room --> DB[(SQLite)]
+    VM --> Sched[ReminderScheduler]
+    Sched --> Alarm[(AlarmManager)]
+    Alarm --> Rcv[ReminderReceiver]
+    Rcv --> Repo
+    Rcv --> Notif[(NotificationManager)]
 ```
 
 **Major components:**
@@ -56,6 +68,7 @@ graph TD
 - **Room Database** — two tables: `categories`, `events`. `Category` supports a two-level hierarchy via `parentId: String?` (null = top-level). Subcategories store null for any field they inherit from their parent (color, emoji, valueType); top-level categories always carry explicit values. The UI layer resolves effective values by falling back to the parent when a field is null.
 - **Image storage** — image files written to app-private storage (`context.filesDir`); paths stored as a JSON list in the `events` table; never stored as blobs
 - **App Shell** — `TrackrApplication` (`@HiltAndroidApp`), `MainActivity` (`@AndroidEntryPoint`), Hilt modules, and the Compose `NavHost`. ViewModel arguments pass via `SavedStateHandle` (compatible with process-death restoration). The app's permanent Play Store identity is `applicationId = "net.clahey.trackr"`; this value is immutable once published.
+- **Reminder Scheduler** — computes and arms per-category reminder alarms via `AlarmManager`, one per category with reminders enabled. A `BroadcastReceiver` handles the fired alarm: it posts the notification (tapping it deep-links into quick-log for that category) and immediately re-arms the next occurrence, since alarms are one-shot. A separate `BOOT_COMPLETED` receiver re-arms every pending reminder after device restart, since alarms do not survive reboot. Reminder configuration (enabled state, availability window) is edited from the category edit screen, owned by category management; the scheduler itself is a standalone component the rest of the app does not otherwise depend on.
 
 ## Key Design Decisions
 
@@ -92,6 +105,10 @@ graph TD
 **Orphan recovery at startup.** Because DB row deletion and image file deletion are separate operations, a process kill between them can leave orphaned files. `onStartup()` scans `filesDir/images` and deletes any file not referenced by a current event row in the database, recovering storage without data loss. Stale category references (events whose category was deleted mid-session) surface gracefully as orphaned events with a missing header rather than crashing.
 
 *Alternatives considered:* strict transactional cleanup across DB + filesystem (impossible without two-phase commit); ignore orphans (accumulates wasted device storage).
+
+**Reminder scheduling via `AlarmManager.setExactAndAllowWhileIdle()`, not `WorkManager` or `setAlarmClock()`.** Both fixed-time and randomized-within-window reminders resolve to a single concrete timestamp before scheduling, and neither needs second-level precision — only reliable delivery close to that computed moment. `setExactAndAllowWhileIdle()` survives Doze (worst case ~9 minutes' slip under sustained deep Doze, per Android's per-app exact-alarm rate limit) without requiring the persistent alarm-clock status-bar icon that `setAlarmClock()` shows. Alarms are one-shot by design (repeating exact alarms are deprecated), so the receiver recomputes and re-arms the next occurrence every time one fires; a `BOOT_COMPLETED` receiver re-arms all pending reminders after reboot, since alarms don't survive it.
+
+*Alternatives considered:* `WorkManager` periodic/delayed work — simpler API, but the OS may batch or defer execution well past the requested time under Doze/App Standby, unsuitable for landing near a specific randomized moment; `AlarmManager.setAlarmClock()` — fully exempt from Doze throttling, but shows a persistent alarm-clock icon implying a literal wake-up alarm is set, misrepresenting a logging nudge and intended for genuine alarm-clock use cases.
 
 ## Future Backend Strategy
 

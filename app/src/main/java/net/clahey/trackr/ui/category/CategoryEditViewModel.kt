@@ -7,10 +7,15 @@ import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.EventValue
+import net.clahey.trackr.domain.Reminder
+import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.matchesValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.domain.warningTierFor
+import net.clahey.trackr.reminders.ReminderScheduler
+import java.time.DayOfWeek
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.seconds
@@ -37,10 +42,12 @@ data class EmojiUIState(val mode: EmojiMode, val customValue: String)
 // @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013,
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
-// CAT-UI-054, CAT-UI-062, CAT-NAV-005, CAT-NAV-006, CAT-UI-067, DM-PROC-021, APP-NAV-004
+// CAT-UI-054, CAT-UI-062, CAT-NAV-005, CAT-NAV-006, CAT-UI-067, DM-PROC-021, APP-NAV-004,
+// REM-UI-001..011, REM-PERM-003, REM-DATA-006
 @HiltViewModel
 class CategoryEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
+    private val reminderScheduler: ReminderScheduler,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -199,6 +206,44 @@ class CategoryEditViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
     } else MutableStateFlow(0)
 
+    // @spec REM-UI-001..011
+    private val _reminderEnabled = MutableStateFlow(false)
+    val reminderEnabled: StateFlow<Boolean> = _reminderEnabled.asStateFlow()
+    fun setReminderEnabled(value: Boolean) { _reminderEnabled.value = value; markEdited() }
+
+    private val _reminderMode = MutableStateFlow(ReminderMode.FIXED)
+    val reminderMode: StateFlow<ReminderMode> = _reminderMode.asStateFlow()
+    fun setReminderMode(value: ReminderMode) { _reminderMode.value = value; markEdited() }
+
+    private val _reminderTimes = MutableStateFlow(listOf(LocalTime.of(9, 0)))
+    val reminderTimes: StateFlow<List<LocalTime>> = _reminderTimes.asStateFlow()
+    fun setReminderTimes(value: List<LocalTime>) { _reminderTimes.value = value; markEdited() }
+
+    private val _reminderWindowStart = MutableStateFlow(LocalTime.MIDNIGHT)
+    val reminderWindowStart: StateFlow<LocalTime> = _reminderWindowStart.asStateFlow()
+    fun setReminderWindowStart(value: LocalTime) { _reminderWindowStart.value = value; markEdited() }
+
+    private val _reminderWindowEnd = MutableStateFlow(LocalTime.MIDNIGHT)
+    val reminderWindowEnd: StateFlow<LocalTime> = _reminderWindowEnd.asStateFlow()
+    fun setReminderWindowEnd(value: LocalTime) { _reminderWindowEnd.value = value; markEdited() }
+
+    private val _reminderOccurrencesPerDay = MutableStateFlow(1)
+    val reminderOccurrencesPerDay: StateFlow<Int> = _reminderOccurrencesPerDay.asStateFlow()
+    fun setReminderOccurrencesPerDay(value: Int) { _reminderOccurrencesPerDay.value = value; markEdited() }
+
+    private val _reminderDaysActive = MutableStateFlow(DayOfWeek.entries.toSet())
+    val reminderDaysActive: StateFlow<Set<DayOfWeek>> = _reminderDaysActive.asStateFlow()
+    fun setReminderDaysActive(value: Set<DayOfWeek>) { _reminderDaysActive.value = value; markEdited() }
+
+    private val _reminderShowCategoryInNotification = MutableStateFlow(false)
+    val reminderShowCategoryInNotification: StateFlow<Boolean> = _reminderShowCategoryInNotification.asStateFlow()
+    fun setReminderShowCategoryInNotification(value: Boolean) { _reminderShowCategoryInNotification.value = value; markEdited() }
+
+    // @spec REM-PERM-003
+    private val _pendingPermissionConfirmation = MutableStateFlow(false)
+    val pendingPermissionConfirmation: StateFlow<Boolean> = _pendingPermissionConfirmation.asStateFlow()
+    fun dismissPermissionConfirmation() { _pendingPermissionConfirmation.value = false }
+
     init {
         when {
             categoryId != null -> {
@@ -227,6 +272,18 @@ class CategoryEditViewModel @Inject constructor(
                         }
                     }
                     _originalValueType.value = cat.resolvedValueType
+                }
+                // @spec REM-UI-001
+                viewModelScope.launch {
+                    val reminder = repository.getReminderForCategory(categoryId).first() ?: return@launch
+                    _reminderEnabled.value = reminder.enabled
+                    _reminderMode.value = reminder.mode
+                    if (reminder.times.isNotEmpty()) _reminderTimes.value = reminder.times
+                    reminder.windowStart?.let { _reminderWindowStart.value = it }
+                    reminder.windowEnd?.let { _reminderWindowEnd.value = it }
+                    reminder.occurrencesPerDay?.let { _reminderOccurrencesPerDay.value = it }
+                    if (reminder.daysActive.isNotEmpty()) _reminderDaysActive.value = reminder.daysActive
+                    _reminderShowCategoryInNotification.value = reminder.showCategoryInNotification
                 }
             }
 
@@ -260,7 +317,12 @@ class CategoryEditViewModel @Inject constructor(
         }
     }
 
-    suspend fun save() {
+    // @spec REM-UI-009, REM-UI-010, REM-PERM-003
+    suspend fun save(
+        notificationPermissionGranted: Boolean = true,
+        exactAlarmAvailable: Boolean = true,
+        forceSaveDespitePermission: Boolean = false,
+    ) {
         val nameVal = _name.value.trim()
         if (nameVal.isEmpty()) { _saveResult.value = SaveResult.ValidationError("name"); return }
 
@@ -275,6 +337,23 @@ class CategoryEditViewModel @Inject constructor(
         } else if (parent == null) {
             _saveResult.value = SaveResult.ValidationError("emoji"); return
         }
+
+        // @spec REM-UI-009
+        val reminderValidationField = reminderValidationField()
+        if (reminderValidationField != null) {
+            _saveResult.value = SaveResult.ValidationError(reminderValidationField)
+            return
+        }
+
+        // @spec REM-PERM-003
+        if (_reminderEnabled.value && !forceSaveDespitePermission &&
+            (!notificationPermissionGranted || !exactAlarmAvailable)
+        ) {
+            _pendingPermissionConfirmation.value = true
+            return
+        }
+        _pendingPermissionConfirmation.value = false
+
         val sortOrder = categoryId?.let { repository.getCategoryById(it).first()?.sortOrder }
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)
 
@@ -320,26 +399,58 @@ class CategoryEditViewModel @Inject constructor(
             )
         }
 
+        // @spec REM-DATA-002, REM-DATA-006, REM-DATA-008
+        val reminder = Reminder(
+            categoryId = category.id,
+            enabled = _reminderEnabled.value,
+            mode = _reminderMode.value,
+            times = _reminderTimes.value,
+            windowStart = _reminderWindowStart.value,
+            windowEnd = _reminderWindowEnd.value,
+            occurrencesPerDay = _reminderOccurrencesPerDay.value,
+            daysActive = _reminderDaysActive.value,
+            showCategoryInNotification = _reminderShowCategoryInNotification.value,
+            nextFireAt = null, // ignored by saveCategoryWithReminder; the DB's current value survives (REM-DATA-008)
+        )
+
         val originalType = _originalValueType.value
         // @spec DM-PROC-021
         if (categoryId != null && originalType != null && category.resolvedValueType != originalType) {
-            repository.saveCategoryAndMigrateEvents(category, originalType)
+            repository.saveCategoryWithReminder(category, reminder, migrateFromType = originalType)
         } else {
-            repository.saveCategory(category)
+            repository.saveCategoryWithReminder(category, reminder)
         }
+        // @spec REM-SCHED-013, REM-SCHED-014
+        if (reminder.enabled) reminderScheduler.enableReminder(reminder) else reminderScheduler.disableReminder(category.id)
+
         _isDirty.value = false
         // @spec CAT-NAV-020
         _savedCategoryId.value = category.id
         _saveResult.value = SaveResult.Success
     }
 
-    // @spec CAT-UI-004, CAT-UI-005, CAT-NAV-005
+    // @spec REM-UI-009, REM-UI-010
+    private fun reminderValidationField(): String? {
+        if (!_reminderEnabled.value) return null
+        if (_reminderDaysActive.value.isEmpty()) return "reminder_days"
+        return when (_reminderMode.value) {
+            ReminderMode.FIXED -> if (_reminderTimes.value.isEmpty()) "reminder_times" else null
+            ReminderMode.RANDOM -> {
+                val validWindow = _reminderWindowEnd.value == LocalTime.MIDNIGHT ||
+                    _reminderWindowEnd.value.isAfter(_reminderWindowStart.value)
+                if (_reminderOccurrencesPerDay.value < 1 || !validWindow) "reminder_window" else null
+            }
+        }
+    }
+
+    // @spec CAT-UI-004, CAT-UI-005, CAT-UI-007, CAT-NAV-005
     fun requestDelete() {
         val id = categoryId ?: return
         val confirmation = deletionConfirmationIfNeeded(id, ownEventCount.value, subCategoryCount.value)
         if (confirmation == null) {
             viewModelScope.launch {
                 repository.deleteCategory(id)
+                reminderScheduler.cancel(id)
                 _saveResult.value = SaveResult.Success
             }
         } else {
@@ -347,10 +458,12 @@ class CategoryEditViewModel @Inject constructor(
         }
     }
 
+    // @spec CAT-UI-007
     fun confirmDelete() {
         val pending = _pendingDeleteConfirmation.value ?: return
         viewModelScope.launch {
             repository.deleteCategory(pending.categoryId)
+            reminderScheduler.cancel(pending.categoryId)
             _pendingDeleteConfirmation.value = null
             _saveResult.value = SaveResult.Success
         }
