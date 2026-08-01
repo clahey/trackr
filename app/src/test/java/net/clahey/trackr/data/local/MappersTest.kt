@@ -34,7 +34,7 @@ class MappersTest {
     }
 
     // @spec DM-PROC-022
-    @Test fun `toDomainList uses entity emoji when orphaned SubCategory has explicit emoji`() {
+    @Test fun `toDomainList uses entity's own field values when orphaned SubCategory has them set`() {
         val orphan = CategoryEntity(
             id = "child", name = "Child", emoji = "🎯", color = 0xFF123456L, valueType = "boolean",
             defaultValue = null, allowEmptyText = true, sortOrder = 1, parentId = "missing-parent",

@@ -38,7 +38,7 @@ LLD: `docs/llds/data-model.md`
 
 - [x] **DM-DATA-020**: The system shall identify each Category by a UUID string that remains stable across local storage and future cloud sync.
 - [x] **DM-DATA-021**: Category color shall be stored as an ARGB-packed Long.
-- [x] **DM-DATA-022**: Category.unit shall be meaningful only when valueType is Number; the domain model shall not reject a non-null unit value for other value types.
+- [x] **DM-DATA-022**: A Number category's unit — carried as the `unit` field of the `NumberValue` in `Category.defaultValue` — shall be meaningful only when `valueType` is Number; the domain model shall not reject a non-null `defaultValue` for other value types.
 - [x] **DM-DATA-023**: Category.allowEmptyText shall be meaningful only when valueType is Text; the domain model shall not reject the field for other value types.
 - [x] **DM-DATA-024**: Category.sortOrder shall be an integer where a lower value indicates a higher position in the displayed list.
 ## Event
@@ -72,5 +72,5 @@ LLD: `docs/llds/data-model.md`
 ## Ordering and Invariants
 
 - [x] **DM-PROC-010**: When two events share the same timestamp, the system shall order them by createdAt ascending, then by id string ascending as a tiebreaker.
-- [x] **DM-PROC-011**: When logging a new event for a Number-type category, the system shall copy Category.unit into NumberValue.unit at the time of logging, so historical events retain the unit that was in effect when they were created.
+- [x] **DM-PROC-011**: When logging a new event for a Number-type category, the system shall seed the event's `NumberValue.unit` from `Category.resolvedDefaultValue`'s `NumberValue.unit` at the time of logging, so historical events retain the unit that was in effect when they were created.
 - [x] **DM-PROC-012**: The domain model shall not reject TextValue("") regardless of Category.allowEmptyText; enforcement of the empty-text policy is the responsibility of the event logging UI.
