@@ -32,7 +32,101 @@ import java.util.UUID
 import javax.inject.Inject
 
 enum class EmojiMode { INHERIT, CUSTOM }
-data class EmojiUIState(val mode: EmojiMode, val customValue: String)
+
+class InvalidEmojiException(message: String) : Exception(message)
+
+data class EmojiUIState(val mode: EmojiMode, val customValue: String) {
+    // @spec CAT-UI-054, CAT-UI-062
+    fun getPreviewEmoji(parent: Category.MetaCategory?): String =
+        if (mode == EmojiMode.INHERIT) parent?.emoji ?: "" else customValue
+
+    // @spec CAT-UI-054, CAT-UI-062
+    fun getEmojiToSave(parent: Category.MetaCategory?): Result<String?> {
+        if (parent != null && mode == EmojiMode.INHERIT) return Result.success(null)
+        if (customValue.isEmpty()) return Result.failure(InvalidEmojiException("Emoji is required."))
+        if (customValue.graphemeClusterCount() != 1) {
+            return Result.failure(InvalidEmojiException("Emoji must be a single character."))
+        }
+        return Result.success(customValue)
+    }
+}
+
+private fun String.graphemeClusterCount(): Int {
+    val bi = java.text.BreakIterator.getCharacterInstance()
+    bi.setText(this)
+    var count = 0
+    while (bi.next() != java.text.BreakIterator.DONE) count++
+    return count
+}
+
+data class DefaultValueUIState(
+    val numberDefaultUnit: String = "",
+    val exerciseDefaultSets: String = "3",
+    val exerciseDefaultReps: String = "15",
+    val stored: EventValue? = null,
+    val dirty: Boolean = false,
+) {
+    // The value implied by the current live form state, regardless of dirty. Shared building
+    // block for both getPreviewValue (CAT-UI-059) and getValueToSave (CAT-UI-063..066).
+    fun getLiveDefault(effectiveType: ValueType): EventValue? = when (effectiveType) {
+        ValueType.Number -> EventValue.NumberValue(
+            (stored as? EventValue.NumberValue)?.value ?: 0.0,
+            numberDefaultUnit.takeIf { it.isNotBlank() },
+        )
+        ValueType.Exercise -> EventValue.ExerciseValue(
+            exerciseDefaultSets.toIntOrNull() ?: 3,
+            exerciseDefaultReps.toIntOrNull() ?: 15,
+        )
+        else -> stored?.takeIf { matchesValueType(it, effectiveType) }
+    }
+
+    // What the live preview card shows: the live default when there is one, else a plausible
+    // sample for types with no default-value editing UI at all. Never used for save —
+    // getValueToSave calls getLiveDefault directly so a sample is never persisted.
+    fun getPreviewValue(effectiveType: ValueType): EventValue? = getLiveDefault(effectiveType) ?: when (effectiveType) {
+        ValueType.None -> null
+        ValueType.Scale -> EventValue.Scale(7)
+        ValueType.Boolean -> EventValue.BooleanValue(true)
+        ValueType.Text -> EventValue.TextValue("Sample")
+        ValueType.Duration -> EventValue.DurationValue(90.seconds)
+        else -> null
+    }
+
+    // @spec CAT-UI-063, CAT-UI-064, CAT-UI-065, CAT-UI-066
+    fun getValueToSave(effectiveType: ValueType): EventValue? = when {
+        !dirty -> stored  // CAT-UI-066: preserve unchanged when user hasn't edited fields
+        effectiveType == ValueType.Number || effectiveType == ValueType.Exercise -> getLiveDefault(effectiveType)
+        else -> stored  // CAT-UI-065: leave unchanged
+    }
+
+    fun withUpdatedUnit(value: String) = copy(numberDefaultUnit = value, dirty = true)
+    fun withUpdatedSets(value: String) = copy(exerciseDefaultSets = value, dirty = true)
+    fun withUpdatedReps(value: String) = copy(exerciseDefaultReps = value, dirty = true)
+
+    companion object {
+        // @spec CAT-UI-011, CAT-UI-011a — loads an existing stored default: display fields seeded
+        // from it, and it becomes the save-preservation baseline (CAT-UI-066).
+        fun fromStored(dv: EventValue?, effectiveType: ValueType): DefaultValueUIState =
+            seedDisplay(dv, effectiveType).copy(stored = dv)
+
+        // @spec CAT-UI-066 — pre-populates display only from the parent's resolved default
+        // (SubCategory create); no baseline to preserve, so an untouched save stays null (inherit).
+        fun seedFromParentPreview(dv: EventValue?, effectiveType: ValueType): DefaultValueUIState =
+            seedDisplay(dv, effectiveType)
+
+        private fun seedDisplay(dv: EventValue?, effectiveType: ValueType): DefaultValueUIState = when (effectiveType) {
+            ValueType.Number -> DefaultValueUIState(numberDefaultUnit = (dv as? EventValue.NumberValue)?.unit ?: "")
+            ValueType.Exercise -> {
+                val ev = dv as? EventValue.ExerciseValue
+                DefaultValueUIState(
+                    exerciseDefaultSets = ev?.sets?.toString() ?: "3",
+                    exerciseDefaultReps = ev?.reps?.toString() ?: "15",
+                )
+            }
+            else -> DefaultValueUIState()
+        }
+    }
+}
 
 // @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013,
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
@@ -80,27 +174,27 @@ class CategoryEditViewModel @Inject constructor(
     val valueTypeState: StateFlow<ValueType?> = _valueTypeState.asStateFlow()
     fun setValueTypeState(value: ValueType?) { _valueTypeState.value = value; markEdited() }
 
-    private val _numberDefaultUnit = MutableStateFlow("")
-    val numberDefaultUnit: StateFlow<String> = _numberDefaultUnit.asStateFlow()
+    private val _defaultValueUIState = MutableStateFlow(DefaultValueUIState())
+    val defaultValueUIState: StateFlow<DefaultValueUIState> = _defaultValueUIState.asStateFlow()
 
-    private val _exerciseDefaultSets = MutableStateFlow("3")
-    val exerciseDefaultSets: StateFlow<String> = _exerciseDefaultSets.asStateFlow()
-
-    private val _exerciseDefaultReps = MutableStateFlow("15")
-    val exerciseDefaultReps: StateFlow<String> = _exerciseDefaultReps.asStateFlow()
-
-    private var defaultValueDirty = false
-
-    fun updateNumberDefaultUnit(value: String) { _numberDefaultUnit.value = value; defaultValueDirty = true; markEdited() }
-    fun updateExerciseDefaultSets(value: String) { _exerciseDefaultSets.value = value; defaultValueDirty = true; markEdited() }
-    fun updateExerciseDefaultReps(value: String) { _exerciseDefaultReps.value = value; defaultValueDirty = true; markEdited() }
-    private var storedDefaultValue: EventValue? = null
+    fun updateNumberDefaultUnit(value: String) {
+        _defaultValueUIState.value = _defaultValueUIState.value.withUpdatedUnit(value)
+        markEdited()
+    }
+    fun updateExerciseDefaultSets(value: String) {
+        _defaultValueUIState.value = _defaultValueUIState.value.withUpdatedSets(value)
+        markEdited()
+    }
+    fun updateExerciseDefaultReps(value: String) {
+        _defaultValueUIState.value = _defaultValueUIState.value.withUpdatedReps(value)
+        markEdited()
+    }
 
     private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
     val parentCategory: StateFlow<Category.MetaCategory?> = _parentCategory.asStateFlow()
 
     val effectiveEmoji: StateFlow<String> = combine(_emojiUIState, _parentCategory) { state, parent ->
-        if (state.mode == EmojiMode.INHERIT) parent?.emoji ?: "" else state.customValue
+        state.getPreviewEmoji(parent)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val effectiveColor: StateFlow<Long> = combine(_colorState, _parentCategory) { c, parent ->
@@ -113,26 +207,9 @@ class CategoryEditViewModel @Inject constructor(
 
     // @spec CAT-UI-059
     val previewEventValue: StateFlow<EventValue?> = combine(
-        effectiveValueType, _numberDefaultUnit, _exerciseDefaultSets, _exerciseDefaultReps,
-    ) { vt, unit, sets, reps ->
-        val liveDefault = when (vt) {
-            ValueType.Number -> EventValue.NumberValue(
-                storedDefaultValue?.let { (it as? EventValue.NumberValue)?.value } ?: 0.0,
-                unit.takeIf { it.isNotBlank() },
-            )
-            ValueType.Exercise -> EventValue.ExerciseValue(
-                sets.toIntOrNull() ?: 3, reps.toIntOrNull() ?: 15,
-            )
-            else -> storedDefaultValue?.takeIf { matchesValueType(it, vt) }
-        }
-        liveDefault ?: when (vt) {
-            ValueType.None -> null
-            ValueType.Scale -> EventValue.Scale(7)
-            ValueType.Boolean -> EventValue.BooleanValue(true)
-            ValueType.Text -> EventValue.TextValue("Sample")
-            ValueType.Duration -> EventValue.DurationValue(90.seconds)
-            else -> null
-        }
+        effectiveValueType, _defaultValueUIState,
+    ) { vt, dvState ->
+        dvState.getPreviewValue(vt)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val previewTimestamp = ZonedDateTime.now(ZoneId.systemDefault())
@@ -206,8 +283,7 @@ class CategoryEditViewModel @Inject constructor(
                     val cat = repository.getCategoryById(categoryId).first()
                     if (cat == null) { _navigateBack.value = true; return@launch }
                     _name.value = cat.name
-                    storedDefaultValue = cat.defaultValue
-                    seedDefaultValueFields(cat.defaultValue, cat.resolvedValueType)
+                    _defaultValueUIState.value = DefaultValueUIState.fromStored(cat.defaultValue, cat.resolvedValueType)
                     when (cat) {
                         is Category.MetaCategory -> {
                             _emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, cat.emoji)
@@ -238,8 +314,10 @@ class CategoryEditViewModel @Inject constructor(
                         _parentCategory.value = parent
                         // @spec CAT-UI-062
                         _emojiUIState.value = EmojiUIState(EmojiMode.INHERIT, parent.emoji)
-                        // @spec CAT-UI-066 — pre-populate from parent's resolved default; don't mark dirty
-                        seedDefaultValueFields(parent.resolvedDefaultValue, parent.resolvedValueType)
+                        // pre-populate from parent's resolved default; don't mark dirty (CAT-UI-066,
+                        // see DefaultValueUIState.seedFromParentPreview)
+                        _defaultValueUIState.value =
+                            DefaultValueUIState.seedFromParentPreview(parent.resolvedDefaultValue, parent.resolvedValueType)
                     } else {
                         _navigateBack.value = true
                     }
@@ -265,34 +343,13 @@ class CategoryEditViewModel @Inject constructor(
         if (nameVal.isEmpty()) { _saveResult.value = SaveResult.ValidationError("name"); return }
 
         val parent = _parentCategory.value
-        val emojiStateVal = _emojiUIState.value
-        val emojiToSave: String? = if (parent != null && emojiStateVal.mode == EmojiMode.INHERIT) null else emojiStateVal.customValue
-        if (emojiToSave != null) {
-            if (emojiToSave.isEmpty()) { _saveResult.value = SaveResult.ValidationError("emoji"); return }
-            if (emojiToSave.graphemeClusterCount() != 1) {
-                _saveResult.value = SaveResult.ValidationError("emoji"); return
-            }
-        } else if (parent == null) {
+        val emojiToSave = _emojiUIState.value.getEmojiToSave(parent).getOrElse {
             _saveResult.value = SaveResult.ValidationError("emoji"); return
         }
         val sortOrder = categoryId?.let { repository.getCategoryById(it).first()?.sortOrder }
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)
 
-        // @spec CAT-UI-063, CAT-UI-064, CAT-UI-065, CAT-UI-066
-        val effectiveVt = effectiveValueType.value
-        val defaultValueToSave: EventValue? = when {
-            !defaultValueDirty -> storedDefaultValue  // CAT-UI-066: preserve unchanged when user hasn't edited fields
-            effectiveVt == ValueType.Number -> EventValue.NumberValue(
-                (storedDefaultValue as? EventValue.NumberValue)?.value ?: 0.0,
-                _numberDefaultUnit.value.takeIf { it.isNotBlank() },
-            )
-            effectiveVt == ValueType.Exercise -> {
-                val sets = _exerciseDefaultSets.value.toIntOrNull() ?: 3
-                val reps = _exerciseDefaultReps.value.toIntOrNull() ?: 15
-                EventValue.ExerciseValue(sets, reps)
-            }
-            else -> storedDefaultValue  // CAT-UI-065: leave unchanged
-        }
+        val defaultValueToSave = _defaultValueUIState.value.getValueToSave(effectiveValueType.value)
 
         val category: Category = if (parent != null) {
             // @spec CAT-UI-041
@@ -358,27 +415,5 @@ class CategoryEditViewModel @Inject constructor(
 
     fun cancelDelete() {
         _pendingDeleteConfirmation.value = null
-    }
-
-    // @spec CAT-UI-011, CAT-UI-011a, CAT-UI-066
-    private fun seedDefaultValueFields(dv: EventValue?, effectiveType: ValueType) {
-        when {
-            effectiveType == ValueType.Number -> {
-                _numberDefaultUnit.value = (dv as? EventValue.NumberValue)?.unit ?: ""
-            }
-            effectiveType == ValueType.Exercise -> {
-                val ev = dv as? EventValue.ExerciseValue
-                _exerciseDefaultSets.value = ev?.sets?.toString() ?: "3"
-                _exerciseDefaultReps.value = ev?.reps?.toString() ?: "15"
-            }
-        }
-    }
-
-    private fun String.graphemeClusterCount(): Int {
-        val bi = java.text.BreakIterator.getCharacterInstance()
-        bi.setText(this)
-        var count = 0
-        while (bi.next() != java.text.BreakIterator.DONE) count++
-        return count
     }
 }

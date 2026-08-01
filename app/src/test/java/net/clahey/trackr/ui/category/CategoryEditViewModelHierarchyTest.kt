@@ -155,7 +155,7 @@ class CategoryEditViewModelHierarchyTest {
             defaultValue = EventValue.NumberValue(0.0, "kg"))
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        assertEquals("kg", vm.numberDefaultUnit.value)
+        assertEquals("kg", vm.defaultValueUIState.value.numberDefaultUnit)
     }
 
     // @spec CAT-UI-066
@@ -163,7 +163,7 @@ class CategoryEditViewModelHierarchyTest {
         val parent = makeMetaCategory("parent", valueType = ValueType.Number, defaultValue = null)
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        assertEquals("", vm.numberDefaultUnit.value)
+        assertEquals("", vm.defaultValueUIState.value.numberDefaultUnit)
     }
 
     // @spec CAT-UI-066
@@ -197,8 +197,8 @@ class CategoryEditViewModelHierarchyTest {
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
         vm.setValueTypeState(ValueType.Exercise)
-        assertEquals("3", vm.exerciseDefaultSets.value)
-        assertEquals("15", vm.exerciseDefaultReps.value)
+        assertEquals("3", vm.defaultValueUIState.value.exerciseDefaultSets)
+        assertEquals("15", vm.defaultValueUIState.value.exerciseDefaultReps)
     }
 
     // @spec CAT-UI-066
@@ -207,8 +207,8 @@ class CategoryEditViewModelHierarchyTest {
             defaultValue = EventValue.ExerciseValue(5, 10))
         repo.saveCategory(parent)
         val vm = CategoryEditViewModel(repo, SavedStateHandle(mapOf("parentId" to "parent")))
-        assertEquals("5", vm.exerciseDefaultSets.value)
-        assertEquals("10", vm.exerciseDefaultReps.value)
+        assertEquals("5", vm.defaultValueUIState.value.exerciseDefaultSets)
+        assertEquals("10", vm.defaultValueUIState.value.exerciseDefaultReps)
     }
 
     // ---------- Helpers ----------
