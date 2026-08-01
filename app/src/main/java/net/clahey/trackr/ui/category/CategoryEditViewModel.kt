@@ -66,7 +66,8 @@ data class DefaultValueUIState(
     val stored: EventValue? = null,
     val dirty: Boolean = false,
 ) {
-    // @spec CAT-UI-059 — the value implied by the current live form state, regardless of dirty
+    // The value implied by the current live form state, regardless of dirty. Shared building
+    // block for both getPreviewValue (CAT-UI-059) and getValueToSave (CAT-UI-063..066).
     fun getLiveDefault(effectiveType: ValueType): EventValue? = when (effectiveType) {
         ValueType.Number -> EventValue.NumberValue(
             (stored as? EventValue.NumberValue)?.value ?: 0.0,
@@ -79,9 +80,9 @@ data class DefaultValueUIState(
         else -> stored?.takeIf { matchesValueType(it, effectiveType) }
     }
 
-    // @spec CAT-UI-059 — what the live preview card shows: the live default when there is one,
-    // else a plausible sample for types with no default-value editing UI at all. Never used for
-    // save — getValueToSave calls getLiveDefault directly so a sample is never persisted.
+    // What the live preview card shows: the live default when there is one, else a plausible
+    // sample for types with no default-value editing UI at all. Never used for save —
+    // getValueToSave calls getLiveDefault directly so a sample is never persisted.
     fun getPreviewValue(effectiveType: ValueType): EventValue? = getLiveDefault(effectiveType) ?: when (effectiveType) {
         ValueType.None -> null
         ValueType.Scale -> EventValue.Scale(7)
@@ -318,7 +319,8 @@ class CategoryEditViewModel @Inject constructor(
                         _parentCategory.value = parent
                         // @spec CAT-UI-062
                         _emojiUIState.value = EmojiUIState(EmojiMode.INHERIT, parent.emoji)
-                        // @spec CAT-UI-066 — pre-populate from parent's resolved default; don't mark dirty
+                        // pre-populate from parent's resolved default; don't mark dirty (CAT-UI-066,
+                        // see DefaultValueUIState.seedFromParentPreview)
                         _defaultValueUIState.value =
                             DefaultValueUIState.seedFromParentPreview(parent.resolvedDefaultValue, parent.resolvedValueType)
                     } else {
