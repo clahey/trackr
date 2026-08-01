@@ -98,6 +98,10 @@ data class DefaultValueUIState(
         else -> stored  // CAT-UI-065: leave unchanged
     }
 
+    fun withUpdatedUnit(value: String) = copy(numberDefaultUnit = value, dirty = true)
+    fun withUpdatedSets(value: String) = copy(exerciseDefaultSets = value, dirty = true)
+    fun withUpdatedReps(value: String) = copy(exerciseDefaultReps = value, dirty = true)
+
     companion object {
         // @spec CAT-UI-011, CAT-UI-011a — loads an existing stored default: display fields seeded
         // from it, and it becomes the save-preservation baseline (CAT-UI-066).
@@ -178,15 +182,15 @@ class CategoryEditViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, DefaultValueUIState().exerciseDefaultReps)
 
     fun updateNumberDefaultUnit(value: String) {
-        _defaultValueUIState.value = _defaultValueUIState.value.copy(numberDefaultUnit = value, dirty = true)
+        _defaultValueUIState.value = _defaultValueUIState.value.withUpdatedUnit(value)
         markEdited()
     }
     fun updateExerciseDefaultSets(value: String) {
-        _defaultValueUIState.value = _defaultValueUIState.value.copy(exerciseDefaultSets = value, dirty = true)
+        _defaultValueUIState.value = _defaultValueUIState.value.withUpdatedSets(value)
         markEdited()
     }
     fun updateExerciseDefaultReps(value: String) {
-        _defaultValueUIState.value = _defaultValueUIState.value.copy(exerciseDefaultReps = value, dirty = true)
+        _defaultValueUIState.value = _defaultValueUIState.value.withUpdatedReps(value)
         markEdited()
     }
 
