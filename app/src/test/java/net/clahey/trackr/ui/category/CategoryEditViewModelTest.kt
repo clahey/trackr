@@ -940,14 +940,14 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number,
             defaultValue = EventValue.NumberValue(0.0, "kg")))
         vm = editVm("c1")
-        assertEquals("kg", vm.numberDefaultUnit.value)
+        assertEquals("kg", vm.defaultValueUIState.value.numberDefaultUnit)
     }
 
     // @spec CAT-UI-011
     @Test fun `loading Number category with null defaultValue seeds blank unit`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Number, defaultValue = null))
         vm = editVm("c1")
-        assertEquals("", vm.numberDefaultUnit.value)
+        assertEquals("", vm.defaultValueUIState.value.numberDefaultUnit)
     }
 
     // @spec CAT-UI-063
@@ -989,16 +989,16 @@ class CategoryEditViewModelTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise,
             defaultValue = EventValue.ExerciseValue(5, 10)))
         vm = editVm("c1")
-        assertEquals("5", vm.exerciseDefaultSets.value)
-        assertEquals("10", vm.exerciseDefaultReps.value)
+        assertEquals("5", vm.defaultValueUIState.value.exerciseDefaultSets)
+        assertEquals("10", vm.defaultValueUIState.value.exerciseDefaultReps)
     }
 
     // @spec CAT-UI-011a
     @Test fun `loading Exercise category with null defaultValue seeds 3 and 15`() = runTest {
         repo.saveCategory(makeCategory("c1", valueType = ValueType.Exercise, defaultValue = null))
         vm = editVm("c1")
-        assertEquals("3", vm.exerciseDefaultSets.value)
-        assertEquals("15", vm.exerciseDefaultReps.value)
+        assertEquals("3", vm.defaultValueUIState.value.exerciseDefaultSets)
+        assertEquals("15", vm.defaultValueUIState.value.exerciseDefaultReps)
     }
 
     // @spec CAT-UI-064

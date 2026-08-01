@@ -175,12 +175,7 @@ class CategoryEditViewModel @Inject constructor(
     fun setValueTypeState(value: ValueType?) { _valueTypeState.value = value; markEdited() }
 
     private val _defaultValueUIState = MutableStateFlow(DefaultValueUIState())
-    val numberDefaultUnit: StateFlow<String> = _defaultValueUIState.map { it.numberDefaultUnit }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, DefaultValueUIState().numberDefaultUnit)
-    val exerciseDefaultSets: StateFlow<String> = _defaultValueUIState.map { it.exerciseDefaultSets }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, DefaultValueUIState().exerciseDefaultSets)
-    val exerciseDefaultReps: StateFlow<String> = _defaultValueUIState.map { it.exerciseDefaultReps }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, DefaultValueUIState().exerciseDefaultReps)
+    val defaultValueUIState: StateFlow<DefaultValueUIState> = _defaultValueUIState.asStateFlow()
 
     fun updateNumberDefaultUnit(value: String) {
         _defaultValueUIState.value = _defaultValueUIState.value.withUpdatedUnit(value)

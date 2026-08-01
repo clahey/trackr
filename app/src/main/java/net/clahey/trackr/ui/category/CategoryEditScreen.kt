@@ -98,9 +98,7 @@ fun CategoryEditScreen(
     val effectiveColor by viewModel.effectiveColor.collectAsState()
     val effectiveValueType by viewModel.effectiveValueType.collectAsState()
     val valueTypeState by viewModel.valueTypeState.collectAsState()
-    val numberDefaultUnit by viewModel.numberDefaultUnit.collectAsState()
-    val exerciseDefaultSets by viewModel.exerciseDefaultSets.collectAsState()
-    val exerciseDefaultReps by viewModel.exerciseDefaultReps.collectAsState()
+    val defaultValueUIState by viewModel.defaultValueUIState.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val valueTypeWarning by viewModel.valueTypeWarning.collectAsState()
     val navigateBack by viewModel.navigateBack.collectAsState()
@@ -248,7 +246,7 @@ fun CategoryEditScreen(
             // @spec CAT-UI-011
             if (effectiveValueType == ValueType.Number) {
                 OutlinedTextField(
-                    value = numberDefaultUnit,
+                    value = defaultValueUIState.numberDefaultUnit,
                     onValueChange = { viewModel.updateNumberDefaultUnit(it) },
                     label = { Text(stringResource(R.string.category_field_unit_optional)) },
                     modifier = Modifier.fillMaxWidth(),
@@ -261,13 +259,13 @@ fun CategoryEditScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedTextField(
-                        value = exerciseDefaultSets,
+                        value = defaultValueUIState.exerciseDefaultSets,
                         onValueChange = { viewModel.updateExerciseDefaultSets(it) },
                         label = { Text(stringResource(R.string.category_field_default_sets)) },
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
-                        value = exerciseDefaultReps,
+                        value = defaultValueUIState.exerciseDefaultReps,
                         onValueChange = { viewModel.updateExerciseDefaultReps(it) },
                         label = { Text(stringResource(R.string.category_field_default_reps)) },
                         modifier = Modifier.weight(1f),
