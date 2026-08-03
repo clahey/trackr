@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Trackr Play Store high-res icon — source of truth (editable master).
+     Canvas: 512x512, viewBox 0 0 108 108 to match the adaptive launcher icon.
+     Export to icon-512.png as 32-bit RGB, fully opaque, exactly 512x512.
+     Layers lifted from app/src/main/res/drawable/ic_launcher_background.xml
+     (135deg gradient) and ic_launcher_foreground.xml (EKG heartbeat). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
+  <defs>
+    <!-- Brand palette — canonical: docs/brand.md. Gradient brand light blue (top-left) ->
+         brand dark navy (bottom-right), matching the feature graphic; R-peak dot is brand yellow. -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#47AADC"/>
+      <stop offset="1" stop-color="#04325C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed background: keep this covering the whole canvas (no transparency) -->
+  <rect width="108" height="108" fill="url(#bg)"/>
+
+  <!-- EKG wave: baseline -> P bump -> QRS spike -> ST -> T wave -> baseline -->
+  <path d="M10,66 L30,66 C31,62 33,56 36,56 C39,56 41,62 42,66 L46,66 L49,72 L54,36 L59,72 L61,66 L68,66 C70,66 73,48 78,48 C83,48 86,66 90,66 L98,66"
+        fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Yellow dot at the R-peak -->
+  <circle cx="54" cy="36" r="5.5" fill="#fcd214"/>
+</svg>

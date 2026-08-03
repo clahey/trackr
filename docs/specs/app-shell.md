@@ -1,5 +1,11 @@
 # App Shell Specs
 
+## App Identity
+
+- [x] **APP-ID-001**: The application shall use `applicationId = "net.clahey.trackr"` as its permanent Play Store identity; this value shall not be changed after first publish.
+- [x] **APP-ID-002**: The Kotlin `namespace` shall match the `applicationId` (`net.clahey.trackr`).
+- [x] **APP-ID-003**: The FileProvider authority shall be declared as `${applicationId}.fileprovider`, resolved to `net.clahey.trackr.fileprovider` at build time.
+
 ## Dependency Injection
 
 - [x] **APP-DI-001**: The application class shall be annotated `@HiltAndroidApp`; `MainActivity` shall be annotated `@AndroidEntryPoint`; all ViewModels shall be annotated `@HiltViewModel`.
@@ -13,6 +19,7 @@
 - [x] **APP-NAV-002**: The start destination shall be the timeline screen.
 - [x] **APP-NAV-003**: `EventEditViewModel` shall read its required `eventId` argument from `SavedStateHandle` under the key `"eventId"`.
 - [x] **APP-NAV-004**: `CategoryEditViewModel` shall read its optional `categoryId` argument from `SavedStateHandle` under the key `"categoryId"`; a null value indicates create mode.
+- [x] **APP-NAV-010**: The timeline and category-list top app bars shall each provide an About action that navigates to the About screen; the About screen shall provide back navigation and, like other detail destinations, shall not show the bottom navigation bar.
 
 ## Bottom Navigation
 
@@ -21,6 +28,10 @@
 - [x] **APP-UI-003**: Tapping the Timeline bottom nav item shall navigate to the timeline screen.
 - [x] **APP-UI-004**: Tapping the Categories bottom nav item shall navigate to the category list screen.
 - [x] **APP-UI-005**: Tapping the currently active bottom nav item shall be a no-op — the screen shall not re-navigate or reset its state.
+
+## About Screen
+
+- [x] **APP-UI-010**: The About screen shall display a branded hero (app icon, wordmark, and slogan with an accent word) over the brand gradient, the app's positioning as labelled points (log fast; on-device first; no account required — ever), a link to the source code, a link to report a bug or request a feature, the app version, and an "Add starter categories" action that reports how many categories it created.
 
 ## Startup
 

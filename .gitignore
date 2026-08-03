@@ -13,10 +13,25 @@ local.properties
 # Keystore files (never commit)
 *.jks
 *.keystore
+keystore.properties
+
+# Signed release output (Generate Signed Bundle / APK wizard)
+app/release/
 
 # Google Services (contains API keys)
 google-services.json
 
+# Scratch (local working files, never commit)
+scratch/
+
+# Python (demo-data screenshot tooling)
+__pycache__/
+*.pyc
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json

@@ -8,19 +8,24 @@ plugins {
 }
 
 android {
-    namespace = "com.trackr.app"
-    compileSdk = 35
+    namespace = "net.clahey.trackr"
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.trackr.app"
+        applicationId = "net.clahey.trackr"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 36
+        versionCode = 3
+        versionName = "0.2"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
+            // Release signing is done interactively via Android Studio's Generate Signed
+            // Bundle / APK wizard (keystore password kept in the developer's head, never
+            // stored on disk or in env). No signingConfig here on purpose: CLI `bundleRelease`
+            // produces an unsigned bundle. See docs/llds/publishing.md § Decisions.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -38,6 +43,10 @@ android {
     buildFeatures {
         compose = true
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -67,6 +76,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.datastore.preferences)
+    implementation(libs.coil.compose)
+    implementation(libs.emoji2.emojipicker)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

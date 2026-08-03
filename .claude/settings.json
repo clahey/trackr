@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew testDebugUnitTest)",
+      "Bash(./gradlew :app:testDebugUnitTest)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(./gradlew test)",
+      "Bash(./gradlew :app:testDebugUnitTest *)",
+      "Bash(./gradlew :app:compileDebugKotlin *)",
+      "Bash(./gradlew compileDebugKotlin *)",
+      "Bash(./gradlew testDebugUnitTest *)",
+      "Bash(adb devices)",
+      "Bash(./gradlew :app:compileDebugAndroidTestKotlin *)",
+      "Bash(./gradlew :app:compileDebugUnitTestKotlin *)",
+      "Bash(./gradlew :app:assembleDebug *)",
+      "Bash(./gradlew assembleDebug *)"
+    ]
+  },
+  "enabledPlugins": {
+    "linked-intent-dev@jszmajda-lid": true,
+    "frontend-design@claude-plugins-official": false,
+    "arrow-maintenance@jszmajda-lid": true
+  }
+}

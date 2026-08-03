@@ -6,19 +6,19 @@ LLD: `docs/llds/data-model.md`
 
 ## ValueType
 
-- [ ] **DM-DATA-001**: The system shall represent category value types as a sealed class with variants: None, Scale, Boolean, Number, Text, Duration, Exercise, and Unknown(raw).
+- [x] **DM-DATA-001**: The system shall represent category value types as a sealed class with variants: None, Scale, Boolean, Number, Text, Duration, Exercise, and Unknown(raw).
 - [x] **DM-DATA-002**: When decoding a ValueType string that does not match any known variant name, the system shall produce Unknown(raw), preserving the original string verbatim.
 - [x] **DM-DATA-003**: When encoding an Unknown(raw) ValueType, the system shall write the raw string verbatim without modification.
 - [x] **DM-DATA-004**: When encoding a known ValueType (None, Scale, Boolean, Number, Text, Duration), the system shall serialize it to a fixed lowercase name string.
 
 ## EventValue
 
-- [ ] **DM-DATA-010**: The system shall represent event values as a sealed class with variants: Scale, BooleanValue, NumberValue, TextValue, DurationValue, ExerciseValue, and ErrorValue.
-- [ ] **DM-DATA-011**: The system shall represent the absence of a value (for None-type categories) as null rather than as an EventValue variant.
-- [ ] **DM-DATA-012**: Scale values shall carry an integer in the inclusive range 1–10.
-- [ ] **DM-DATA-013**: DurationValue values shall carry a non-negative `kotlin.time.Duration`; the domain model shall reject (via ErrorValue at read time) any stored value representing a negative duration.
-- [ ] **DM-DATA-014**: NumberValue values shall carry a finite Double and an optional unit string (null means unitless).
-- [ ] **DM-DATA-015**: ErrorValue shall carry an ErrorKind (UNPARSABLE, UNRECOGNIZED_TYPE, or OUT_OF_RANGE) and the original raw string for diagnostics and future recovery.
+- [x] **DM-DATA-010**: The system shall represent event values as a sealed class with variants: Scale, BooleanValue, NumberValue, TextValue, DurationValue, ExerciseValue, and ErrorValue.
+- [x] **DM-DATA-011**: The system shall represent the absence of a value (for None-type categories) as null rather than as an EventValue variant.
+- [x] **DM-DATA-012**: Scale values shall carry an integer in the inclusive range 1–10.
+- [x] **DM-DATA-013**: DurationValue values shall carry a non-negative `kotlin.time.Duration`; the domain model shall reject (via ErrorValue at read time) any stored value representing a negative duration.
+- [x] **DM-DATA-014**: NumberValue values shall carry a finite Double and an optional unit string (null means unitless).
+- [x] **DM-DATA-015**: ErrorValue shall carry an ErrorKind (UNPARSABLE, UNRECOGNIZED_TYPE, or OUT_OF_RANGE) and the original raw string for diagnostics and future recovery.
 - [x] **DM-DATA-016**: ExerciseValue values shall carry two positive integer fields: sets (≥ 1) and reps (≥ 1).
 
 ## EventValue TypeConverter
@@ -36,18 +36,18 @@ LLD: `docs/llds/data-model.md`
 
 ## Category
 
-- [ ] **DM-DATA-020**: The system shall identify each Category by a UUID string that remains stable across local storage and future cloud sync.
-- [ ] **DM-DATA-021**: Category color shall be stored as an ARGB-packed Long.
-- [ ] **DM-DATA-022**: Category.unit shall be meaningful only when valueType is Number; the domain model shall not reject a non-null unit value for other value types.
-- [ ] **DM-DATA-023**: Category.allowEmptyText shall be meaningful only when valueType is Text; the domain model shall not reject the field for other value types.
-- [ ] **DM-DATA-024**: Category.sortOrder shall be an integer where a lower value indicates a higher position in the displayed list.
+- [x] **DM-DATA-020**: The system shall identify each Category by a UUID string that remains stable across local storage and future cloud sync.
+- [x] **DM-DATA-021**: Category color shall be stored as an ARGB-packed Long.
+- [x] **DM-DATA-022**: A Number category's unit — carried as the `unit` field of the `NumberValue` in `Category.defaultValue` — shall be meaningful only when `valueType` is Number; the domain model shall not reject a non-null `defaultValue` for other value types.
+- [x] **DM-DATA-023**: Category.allowEmptyText shall be meaningful only when valueType is Text; the domain model shall not reject the field for other value types.
+- [x] **DM-DATA-024**: Category.sortOrder shall be an integer where a lower value indicates a higher position in the displayed list.
 ## Event
 
-- [ ] **DM-DATA-030**: The system shall identify each Event by a UUID string that remains stable across local storage and future cloud sync.
-- [ ] **DM-DATA-031**: Event.timestamp shall be a `java.time.Instant` representing when the event occurred (user-editable).
-- [ ] **DM-DATA-032**: Event.createdAt shall be a `java.time.Instant` recording the wall-clock moment the record was first created; it shall not be modified on subsequent edits.
-- [ ] **DM-DATA-033**: Event.value shall be null for events whose category has valueType None.
-- [ ] **DM-DATA-034**: Event.imagePaths shall be a list of absolute file-system paths to images in app-private storage; an empty list means no images are attached.
+- [x] **DM-DATA-030**: The system shall identify each Event by a UUID string that remains stable across local storage and future cloud sync.
+- [x] **DM-DATA-031**: Event.timestamp shall be a `java.time.Instant` representing when the event occurred (user-editable).
+- [x] **DM-DATA-032**: Event.createdAt shall be a `java.time.Instant` recording the wall-clock moment the record was first created; it shall not be modified on subsequent edits.
+- [x] **DM-DATA-033**: Event.value shall be null for events whose category has valueType None.
+- [x] **DM-DATA-034**: Event.imagePaths shall be a list of absolute file-system paths to images in app-private storage; an empty list means no images are attached.
 
 ## Value Type Mismatch Helpers
 
@@ -56,8 +56,21 @@ LLD: `docs/llds/data-model.md`
 - [x] **DM-PROC-015**: `convertOrDefault` shall return `ConversionOutcome.Converted(v)` when `convertEventValue` produces a value whose runtime type matches the target type.
 - [x] **DM-PROC-016**: `convertOrDefault` shall return `ConversionOutcome.UsedDefault(v)` when the input is an `ErrorValue` (regardless of target type, provided target is not `None`/`Unknown`) or when `convertEventValue` does not produce a value of the target type; `v` shall be `defaultForType(targetType)`.
 
+## Category Hierarchy
+
+- [x] **DM-DATA-025**: The system shall represent Category as a sealed class with two variants: MetaCategory (top-level, no parent) and SubCategory (child of exactly one MetaCategory).
+- [x] **DM-DATA-026**: A MetaCategory shall carry non-null emoji, color, and valueType fields; it shall have no parentId or parent reference.
+- [x] **DM-DATA-027**: A SubCategory shall carry nullable emoji, color, and valueType fields where null indicates inheritance from the parent; it shall carry a non-null MetaCategory parent reference populated at the repository layer.
+- [x] **DM-DATA-028**: The system shall enforce a two-level constraint: a category with SubCategory children shall not be nested under another category; a SubCategory shall not be given children. Violations shall be rejected at the repository layer.
+- [x] **DM-PROC-017**: When loading Category records, the system shall assemble MetaCategory and SubCategory domain objects from a single flat query of the categories table, making the assembly atomic with respect to concurrent reads. (Implementation: single `getAll()` query followed by an in-memory two-pass — first pass builds a MetaCategory map keyed by id, second pass attaches SubCategories to their parent; SubCategories whose parent id is absent are surfaced as MetaCategories per DM-PROC-022.)
+- [x] **DM-PROC-018**: The `Category` sealed class shall declare abstract members `resolvedEmoji: String`, `resolvedColor: Long`, and `resolvedValueType: ValueType`; `MetaCategory` shall implement each by returning its own field directly; `SubCategory` shall implement each by returning its override field when non-null, or the parent's value otherwise.
+- [x] **DM-PROC-019**: When un-nesting a SubCategory (removing it from its group), the system shall resolve any null (inherited) fields to the parent's current values at the time of the operation before persisting the record as a MetaCategory.
+- [x] **DM-PROC-020**: When reparenting a category into a group, the system shall preserve all current explicit field values as overrides regardless of whether they match the new parent's values.
+- [x] **DM-PROC-021**: When migrating events due to a MetaCategory valueType change, the system shall include events belonging to SubCategories whose valueType is null (inheriting); SubCategories with an explicit valueType override shall be excluded from the migration.
+- [x] **DM-PROC-022**: When assembling Category records, if a SubCategory's parentId references an entity not present in the query result, the system shall surface that SubCategory as a MetaCategory using its own stored field values; any null fields (emoji, color, valueType) shall be resolved using the same null-field fallbacks used for MetaCategory assembly.
+
 ## Ordering and Invariants
 
-- [ ] **DM-PROC-010**: When two events share the same timestamp, the system shall order them by createdAt ascending, then by id string ascending as a tiebreaker.
-- [ ] **DM-PROC-011**: When logging a new event for a Number-type category, the system shall copy Category.unit into NumberValue.unit at the time of logging, so historical events retain the unit that was in effect when they were created.
-- [ ] **DM-PROC-012**: The domain model shall not reject TextValue("") regardless of Category.allowEmptyText; enforcement of the empty-text policy is the responsibility of the event logging UI.
+- [x] **DM-PROC-010**: When two events share the same timestamp, the system shall order them by createdAt ascending, then by id string ascending as a tiebreaker.
+- [x] **DM-PROC-011**: When logging a new event for a Number-type category, the system shall seed the event's `NumberValue.unit` from `Category.resolvedDefaultValue`'s `NumberValue.unit` at the time of logging, so historical events retain the unit that was in effect when they were created.
+- [x] **DM-PROC-012**: The domain model shall not reject TextValue("") regardless of Category.allowEmptyText; enforcement of the empty-text policy is the responsibility of the event logging UI.

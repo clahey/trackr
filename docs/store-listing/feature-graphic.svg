@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Trackr Play Store feature graphic — source of truth (editable master).
+     Canvas: 1024x500. Export to feature-graphic.png as RGB, fully opaque
+     (Play rejects transparency and does not accept SVG for this asset).
+     Heartbeat art lifted from app/src/main/res/drawable/ic_launcher_foreground.xml. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <style>
+    .wordmark {
+      font: 150px sans-serif;
+      fill: #FFF;
+    }
+    .logline {
+      font: 50px sans-serif;
+      fill: #FFF;
+    }
+  </style>
+  <defs>
+    <!-- Brand palette — canonical: docs/brand.md. 135deg gradient brand light blue ->
+         brand dark navy, same as the launcher icon; the "Fast." word and R-peak dot are brand yellow. -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#47AADC"/>
+      <stop offset="1" stop-color="#04325C"/>
+    </linearGradient>
+    <linearGradient id="fadeGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="50%" stop-color="#080808"/>
+      <stop offset="65%" stop-color="white" stop-opacity="1" />
+      <stop offset="70%" stop-color="white" stop-opacity="1" />
+      <stop offset="100%" stop-color="#080808"/>
+    </linearGradient>
+    <mask id="opacityMask">
+      <rect width="1024" height="500" fill="url(#fadeGrad)"/>
+    </mask>
+    <g id="heartbeat"><path d="M0,198 L60,198 C63,186 69,168 78,168 C87,168 93,186 96,198 L108,198 L117,216 L132,108 L147,216 L153,198 L174,198 C180,198 189,144 204,144 C219,144 228,198 240,198 L250,198"
+        fill="none" stroke="#FFFFFF" stroke-width="12"/></g>
+  </defs>
+
+  <!-- Full-bleed gradient: keep this covering the whole canvas (no transparency) -->
+  <rect width="1024" height="500" fill="url(#bg)"/>
+
+  <g mask="url(#opacityMask)">
+    <use href="#heartbeat" x="-200" y="100"></use>
+    <use href="#heartbeat" x="50" y="100"></use>
+    <use href="#heartbeat" x="300" y="100"></use>
+    <use href="#heartbeat" x="550" y="100"></use>
+    <use href="#heartbeat" x="800" y="100"></use>
+    <circle cx="132" cy="108" r="16.5" fill="#fcd214" transform="translate(550, 100)"/>
+  </g>
+  <text x="50" y="270" class="wordmark">Trackr</text>
+  <text x="80" y="350" class="logline">Log anything. <tspan fill="#fcd214" font-weight="bold">Fast.</tspan></text>
+</svg>

@@ -1,0 +1,109 @@
+schema_version: 1
+last_updated: 2026-07-27
+
+taxonomy:
+  data:
+    - data-model
+    - local-storage
+  ui:
+    - app-shell
+    - category-management
+    - drag-reorder-list
+    - event-logging
+    - theme
+  release:
+    - publishing
+
+arrows:
+  data-model:
+    status: AUDITED
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: [category-management, event-logging, local-storage]
+    blockedBy: []
+    detail: data-model.md
+    next: "Backfill @spec annotations on 21 unannotated specs (corrected from 24: DM-DATA-001/010-016/020-024/030-034, DM-PROC-010/012/019); not MVP-blocking. Also add test-file @spec citations for DM-PROC-011 and DM-DATA-025/026/027."
+    drift: "21 implemented specs have no @spec annotation anywhere in code — traceability gap, not a functional gap; count corrected 2026-07-27 (was 24)"
+
+  local-storage:
+    status: AUDITED
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: [category-management, event-logging]
+    blockedBy: [data-model]
+    detail: local-storage.md
+    next: "Backfill @spec on 12 unannotated specs (corrected from 9: LS-BE-001-004/033/050/054/060-062/070/071)."
+    drift: "12 implemented specs unannotated (corrected count; LS-BE-090/091/092 confirmed properly annotated, removed from list)"
+
+  theme:
+    status: OK
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: [app-shell, category-management, drag-reorder-list, event-logging]
+    blockedBy: []
+    detail: theme.md
+    next: "Backfill @spec THEME-UI-010 (unannotated anywhere) and THEME-UI-020/THEME-UI-021 (test-only, no production annotation); not MVP-blocking."
+    drift: null
+
+  app-shell:
+    status: AUDITED
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: []
+    blockedBy: [theme]
+    detail: app-shell.md
+    next: "Backfill @spec annotations on APP-ID-001/002/003 (implemented, just unlinked); otherwise fully coherent"
+    drift: "APP-ID-001/002/003 implemented with no @spec annotation"
+
+  drag-reorder-list:
+    status: AUDITED
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: [category-management]
+    blockedBy: [theme]
+    detail: drag-reorder-list.md
+    next: "Nice-to-have only: DRAG-UI-017/018 remain legitimately deferred pending on-device tuning. No MVP-blocking work."
+    drift: null
+
+  category-management:
+    status: AUDITED
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: [event-logging]
+    blockedBy: [data-model, local-storage, theme, drag-reorder-list]
+    detail: category-management.md
+    next: "CAT-UI-011a descoped (not fixed): Exercise default sets/reps >=1 validation deliberately not enforced, spec reworded to match. CAT-UI-002 (drag-to-reorder) resolved via the new drag-reorder-list segment + CAT-UI-080-084. 10 more stale [ ] markers reconciled to [x] this pass."
+    drift: null
+
+  event-logging:
+    status: PARTIAL
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: []
+    blockedBy: [data-model, local-storage, theme, category-management]
+    detail: event-logging.md
+    next: "EL-UI-077 (post-save scroll) implemented and split into EL-UI-077/077a/077b/077c. 2 minor gaps remain, none MVP-blocking: EL-UI-056 (error kind missing from display), EL-UI-057b (no field-level error highlighting)."
+    drift: null
+
+  publishing:
+    status: OK
+    sampled: 2026-07-27
+    audited: 2026-07-27
+    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    blocks: []
+    blockedBy: []
+    detail: ../llds/publishing.md  # no arrow doc: this node owns no EARS/tests by design (release signing, store listing, compliance — nothing runtime to spec); see the doc's own Context section
+    next: null
+    drift: null
+
+unmapped:
+  docs:
+    llds: []
+    specs: []
