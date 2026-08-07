@@ -103,6 +103,8 @@ private fun String.toLocalTimeHHmm(): LocalTime = LocalTime.parse(this, hhMm)
 fun ReminderEntity.toDomain(): Reminder = Reminder(
     categoryId = categoryId,
     enabled = enabled,
+    // .uppercase() (added 2026-08-07) accepts rows saved by earlier test builds under the old
+    // lowercase "fixed"/"random" encoding, since that test data made it onto a live device.
     mode = ReminderMode.valueOf(mode.uppercase()),
     times = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList(),
     windowStart = windowStart?.toLocalTimeHHmm(),
