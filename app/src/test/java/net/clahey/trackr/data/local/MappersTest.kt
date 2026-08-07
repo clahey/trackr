@@ -1,10 +1,13 @@
 package net.clahey.trackr.data.local
 
+import net.clahey.trackr.data.local.converters.StringListConverter
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
 
 class MappersTest {
 
@@ -60,5 +63,42 @@ class MappersTest {
         assertEquals(2, result.size)
         val sub = result.filterIsInstance<Category.SubCategory>().single()
         assertEquals("parent", sub.parent.id)
+    }
+
+    private fun reminderEntity(enabled: Boolean, daysActive: List<String>) = ReminderEntity(
+        categoryId = "cat1",
+        enabled = enabled,
+        mode = "fixed",
+        times = StringListConverter.encode(listOf("08:00")),
+        windowStart = null,
+        windowEnd = null,
+        occurrencesPerDay = null,
+        daysActive = StringListConverter.encode(daysActive),
+        showCategoryInNotification = false,
+        nextFireAt = null,
+    )
+
+    // @spec REM-DATA-002
+    @Test fun `toDomain preserves an enabled reminder with a non-empty daysActive`() {
+        val entity = reminderEntity(enabled = true, daysActive = listOf("MONDAY", "WEDNESDAY"))
+        val reminder = entity.toDomain()
+        assertTrue(reminder.enabled)
+        assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), reminder.daysActive)
+    }
+
+    // @spec REM-DATA-002
+    @Test fun `toDomain decodes an empty daysActive as disabled with all days set`() {
+        val entity = reminderEntity(enabled = true, daysActive = emptyList())
+        val reminder = entity.toDomain()
+        assertFalse("a malformed empty daysActive should decode as disabled", reminder.enabled)
+        assertEquals(DayOfWeek.entries.toSet(), reminder.daysActive)
+    }
+
+    // @spec REM-DATA-002
+    @Test fun `toDomain normalizes daysActive to all days even when already disabled`() {
+        val entity = reminderEntity(enabled = false, daysActive = emptyList())
+        val reminder = entity.toDomain()
+        assertFalse(reminder.enabled)
+        assertEquals(DayOfWeek.entries.toSet(), reminder.daysActive)
     }
 }

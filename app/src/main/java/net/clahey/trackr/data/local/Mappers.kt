@@ -100,20 +100,26 @@ private fun LocalTime.toHHmm(): String = format(hhMm)
 private fun String.toLocalTimeHHmm(): LocalTime = LocalTime.parse(this, hhMm)
 
 // @spec REM-DATA-002
-fun ReminderEntity.toDomain(): Reminder = Reminder(
-    categoryId = categoryId,
-    enabled = enabled,
-    // .uppercase() (added 2026-08-07) accepts rows saved by earlier test builds under the old
-    // lowercase "fixed"/"random" encoding, since that test data made it onto a live device.
-    mode = ReminderMode.valueOf(mode.uppercase()),
-    times = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList(),
-    windowStart = windowStart?.toLocalTimeHHmm(),
-    windowEnd = windowEnd?.toLocalTimeHHmm(),
-    occurrencesPerDay = occurrencesPerDay,
-    daysActive = StringListConverter.decode(daysActive).map { DayOfWeek.valueOf(it) }.toSet(),
-    showCategoryInNotification = showCategoryInNotification,
-    nextFireAt = nextFireAt?.let { InstantConverter.decode(it) },
-)
+fun ReminderEntity.toDomain(): Reminder {
+    val decodedDaysActive = StringListConverter.decode(daysActive).map { DayOfWeek.valueOf(it) }.toSet()
+    return Reminder(
+        categoryId = categoryId,
+        // An empty daysActive is malformed — the UI never saves one (REM-UI-009) — but
+        // ReminderScheduling.kt's day-walking loops spin forever against it, so a row that
+        // somehow has one is decoded as disabled rather than risking a hang.
+        enabled = enabled && decodedDaysActive.isNotEmpty(),
+        // .uppercase() (added 2026-08-07) accepts rows saved by earlier test builds under the old
+        // lowercase "fixed"/"random" encoding, since that test data made it onto a live device.
+        mode = ReminderMode.valueOf(mode.uppercase()),
+        times = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList(),
+        windowStart = windowStart?.toLocalTimeHHmm(),
+        windowEnd = windowEnd?.toLocalTimeHHmm(),
+        occurrencesPerDay = occurrencesPerDay,
+        daysActive = decodedDaysActive.ifEmpty { DayOfWeek.entries.toSet() },
+        showCategoryInNotification = showCategoryInNotification,
+        nextFireAt = nextFireAt?.let { InstantConverter.decode(it) },
+    )
+}
 
 fun Reminder.toEntity(): ReminderEntity = ReminderEntity(
     categoryId = categoryId,

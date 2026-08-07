@@ -19,7 +19,7 @@ data class Reminder(
     val windowStart: LocalTime?,             // RANDOM only
     val windowEnd: LocalTime?,               // RANDOM only; a value of 00:00 means end-of-day, not start-of-day — see Decisions
     val occurrencesPerDay: Int?,             // RANDOM only; >= 1
-    val daysActive: Set<DayOfWeek>,          // non-empty; defaults to all 7 on creation
+    val daysActive: Set<DayOfWeek>,          // non-empty; defaults to all 7 on creation. The UI never saves an empty set (REM-UI-009), and ReminderScheduling.kt's day-walking loops would spin forever against one, so Mappers.kt's ReminderEntity.toDomain() defends the boundary: an empty daysActive decodes as all 7 days with enabled forced false, rather than trusting a malformed row
     val showCategoryInNotification: Boolean, // default false, per HLD "public surfaces default to discreet" guideline
     val nextFireAt: Instant?,                // the currently-armed alarm's target instant; null when disabled or not yet armed. Written only by ReminderScheduler — saveCategoryWithReminder ignores this field and preserves the DB's current value (see § Data Model, § Scheduling Engine)
 )

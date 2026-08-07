@@ -254,5 +254,8 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     // @spec REM-DATA-007
     override suspend fun getAllEnabledRemindersOnce(): List<Reminder> =
-        reminderDao.getAllEnabledOnce().map { it.toDomain() }
+        // The DAO's WHERE enabled = 1 runs before toDomain()'s malformed-row check (empty
+        // daysActive forces enabled = false on decode); re-filtering here keeps that guarantee
+        // meaningful for this method's callers, which trust every item in the result is armable.
+        reminderDao.getAllEnabledOnce().map { it.toDomain() }.filter { it.enabled }
 }
