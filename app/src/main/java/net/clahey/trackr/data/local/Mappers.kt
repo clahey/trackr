@@ -103,7 +103,7 @@ private fun String.toLocalTimeHHmm(): LocalTime = LocalTime.parse(this, hhMm)
 fun ReminderEntity.toDomain(): Reminder = Reminder(
     categoryId = categoryId,
     enabled = enabled,
-    mode = if (mode == "random") ReminderMode.RANDOM else ReminderMode.FIXED,
+    mode = ReminderMode.valueOf(mode.uppercase()),
     times = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList(),
     windowStart = windowStart?.toLocalTimeHHmm(),
     windowEnd = windowEnd?.toLocalTimeHHmm(),
@@ -116,7 +116,7 @@ fun ReminderEntity.toDomain(): Reminder = Reminder(
 fun Reminder.toEntity(): ReminderEntity = ReminderEntity(
     categoryId = categoryId,
     enabled = enabled,
-    mode = if (mode == ReminderMode.RANDOM) "random" else "fixed",
+    mode = mode.name,
     times = if (times.isNotEmpty()) StringListConverter.encode(times.map { it.toHHmm() }) else null,
     windowStart = windowStart?.toHHmm(),
     windowEnd = windowEnd?.toHHmm(),

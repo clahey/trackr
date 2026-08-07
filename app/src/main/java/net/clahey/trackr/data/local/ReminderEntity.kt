@@ -17,7 +17,7 @@ import androidx.room.PrimaryKey
 data class ReminderEntity(
     @PrimaryKey val categoryId: String,
     val enabled: Boolean,
-    val mode: String, // "fixed" / "random"
+    val mode: String, // ReminderMode.name, e.g. "FIXED" / "RANDOM"
     val times: String?, // JSON list of "HH:mm" strings; FIXED only
     val windowStart: String?, // "HH:mm"; RANDOM only
     val windowEnd: String?, // "HH:mm"; RANDOM only
