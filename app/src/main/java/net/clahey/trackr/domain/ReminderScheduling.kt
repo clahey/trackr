@@ -18,33 +18,30 @@ fun computeNextFireTime(
     ReminderMode.RANDOM -> computeNextRandomFireTime(reminder, after, zone, random)
 }
 
-private fun computeNextFixedFireTime(reminder: Reminder, after: Instant, zone: ZoneId): Instant {
-    val sortedTimes = reminder.times.sorted()
-    val today = after.atZone(zone).toLocalDate()
+private fun computeNextFixedFireTime(reminder: Reminder, after: Instant, zone: ZoneId): Instant =
+    computeFixedFireTime(reminder, after, zone, forward = true)
+
+// Used only by shouldSuppressFixedNotification, to size its lookback window relative to this
+// reminder's own schedule (REM-SCHED-020).
+private fun computePreviousFixedFireTime(reminder: Reminder, before: Instant, zone: ZoneId): Instant =
+    computeFixedFireTime(reminder, before, zone, forward = false)
+
+private fun computeFixedFireTime(reminder: Reminder, pivot: Instant, zone: ZoneId, forward: Boolean): Instant {
+    val sortedTimes = reminder.times.sorted().let { if (forward) it else it.reversed() }
+    val today = pivot.atZone(zone).toLocalDate()
     if (reminder.daysActive.contains(today.dayOfWeek)) {
         for (time in sortedTimes) {
             val candidate = today.atTime(time).atZone(zone).toInstant()
-            if (candidate.isAfter(after)) return candidate
+            val qualifies = if (forward) candidate.isAfter(pivot) else candidate.isBefore(pivot)
+            if (qualifies) return candidate
         }
     }
-    val nextDate = nextActiveDay(reminder, today.plusDays(1))
-    return nextDate.atTime(sortedTimes.first()).atZone(zone).toInstant()
-}
-
-// Mirror image of computeNextFixedFireTime, walking times/daysActive backward — used only by
-// shouldSuppressFixedNotification to size its lookback window relative to this reminder's own
-// schedule (REM-SCHED-020).
-private fun computePreviousFixedFireTime(reminder: Reminder, before: Instant, zone: ZoneId): Instant {
-    val sortedTimes = reminder.times.sorted()
-    val today = before.atZone(zone).toLocalDate()
-    if (reminder.daysActive.contains(today.dayOfWeek)) {
-        for (time in sortedTimes.reversed()) {
-            val candidate = today.atTime(time).atZone(zone).toInstant()
-            if (candidate.isBefore(before)) return candidate
-        }
+    val fallbackDate = if (forward) {
+        nextActiveDay(reminder, today.plusDays(1))
+    } else {
+        previousActiveDay(reminder, today.minusDays(1))
     }
-    val prevDate = previousActiveDay(reminder, today.minusDays(1))
-    return prevDate.atTime(sortedTimes.last()).atZone(zone).toInstant()
+    return fallbackDate.atTime(sortedTimes.first()).atZone(zone).toInstant()
 }
 
 private val MAX_SUPPRESSION_LOOKBACK: Duration = Duration.ofHours(1)
