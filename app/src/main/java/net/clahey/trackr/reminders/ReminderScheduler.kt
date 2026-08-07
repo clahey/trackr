@@ -10,6 +10,7 @@ import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.computeNextFireTime
 import net.clahey.trackr.domain.isNextFireAtValid
+import net.clahey.trackr.domain.shouldSuppressFixedNotification
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.Duration
@@ -51,11 +52,14 @@ class ReminderScheduler @Inject constructor(
         alarmScheduler.cancel(categoryId)
     }
 
-    // @spec REM-SCHED-003, REM-SCHED-008, REM-SCHED-011
+    // @spec REM-SCHED-003, REM-SCHED-008, REM-SCHED-011, REM-SCHED-020
     suspend fun onAlarmFired(categoryId: String, firedAt: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
         val reminder = repository.getReminderForCategory(categoryId).first() ?: return
         if (!reminder.enabled) return
-        notifier.postReminderNotification(reminder)
+        val latestEventLoggedAt = repository.getEventsByCategory(categoryId).first().maxOfOrNull { it.timestamp }
+        if (!shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt)) {
+            notifier.postReminderNotification(reminder)
+        }
         val nextFireAt = computeNextFireTime(reminder, firedAt, zone)
         repository.saveReminder(reminder.copy(nextFireAt = nextFireAt))
         alarmScheduler.arm(categoryId, nextFireAt)

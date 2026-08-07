@@ -1,6 +1,7 @@
 package net.clahey.trackr.reminders
 
 import net.clahey.trackr.FakeTrackrRepository
+import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.ReminderMode
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -49,6 +50,11 @@ class ReminderSchedulerTest {
         daysActive = allDays,
         showCategoryInNotification = false,
         nextFireAt = nextFireAt,
+    )
+
+    private fun loggedEvent(id: String, categoryId: String, timestamp: Instant) = Event(
+        id = id, categoryId = categoryId, timestamp = timestamp,
+        value = null, notes = null, imagePaths = emptyList(), createdAt = timestamp,
     )
 
     private fun randomReminder(categoryId: String = "cat1", enabled: Boolean = true, nextFireAt: Instant? = null) = Reminder(
@@ -184,6 +190,50 @@ class ReminderSchedulerTest {
 
         assertTrue(notifier.posted.isEmpty())
         assertTrue(alarms.armCalls.isEmpty())
+    }
+
+    // @spec REM-SCHED-020
+    @Test fun `onAlarmFired suppresses the notification but still reschedules when logged shortly before firing`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val notifier = FakeReminderNotifier()
+        val sched = scheduler(repo, alarms, notifier)
+        repo.setReminders(fixedReminder(nextFireAt = Instant.parse("2024-01-01T20:00:00Z")))
+        repo.setEvents(loggedEvent("e1", "cat1", Instant.parse("2024-01-01T19:55:00Z")))
+
+        sched.onAlarmFired("cat1", firedAt = Instant.parse("2024-01-01T20:00:00Z"), zone = zone)
+
+        assertTrue("notification should have been suppressed", notifier.posted.isEmpty())
+        assertEquals(Instant.parse("2024-01-02T08:00:00Z"), repo.getReminderForCategory("cat1").first()!!.nextFireAt)
+        assertEquals(Instant.parse("2024-01-02T08:00:00Z"), alarms.armed["cat1"])
+    }
+
+    // @spec REM-SCHED-020
+    @Test fun `onAlarmFired still posts the notification when the log is outside the lookback window`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val notifier = FakeReminderNotifier()
+        val sched = scheduler(repo, alarms, notifier)
+        repo.setReminders(fixedReminder(nextFireAt = Instant.parse("2024-01-01T20:00:00Z")))
+        repo.setEvents(loggedEvent("e1", "cat1", Instant.parse("2024-01-01T08:05:00Z")))
+
+        sched.onAlarmFired("cat1", firedAt = Instant.parse("2024-01-01T20:00:00Z"), zone = zone)
+
+        assertEquals(1, notifier.posted.size)
+    }
+
+    // @spec REM-SCHED-020
+    @Test fun `onAlarmFired never suppresses a RANDOM reminder regardless of a recent log`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val notifier = FakeReminderNotifier()
+        val sched = scheduler(repo, alarms, notifier)
+        repo.setReminders(randomReminder(nextFireAt = Instant.parse("2024-01-01T14:00:00Z")))
+        repo.setEvents(loggedEvent("e1", "cat1", Instant.parse("2024-01-01T13:59:00Z")))
+
+        sched.onAlarmFired("cat1", firedAt = Instant.parse("2024-01-01T14:00:00Z"), zone = zone)
+
+        assertEquals(1, notifier.posted.size)
     }
 
     // @spec REM-SCHED-011

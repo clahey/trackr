@@ -31,6 +31,38 @@ private fun computeNextFixedFireTime(reminder: Reminder, after: Instant, zone: Z
     return nextDate.atTime(sortedTimes.first()).atZone(zone).toInstant()
 }
 
+// Mirror image of computeNextFixedFireTime, walking times/daysActive backward — used only by
+// shouldSuppressFixedNotification to size its lookback window relative to this reminder's own
+// schedule (REM-SCHED-020).
+private fun computePreviousFixedFireTime(reminder: Reminder, before: Instant, zone: ZoneId): Instant {
+    val sortedTimes = reminder.times.sorted()
+    val today = before.atZone(zone).toLocalDate()
+    if (reminder.daysActive.contains(today.dayOfWeek)) {
+        for (time in sortedTimes.reversed()) {
+            val candidate = today.atTime(time).atZone(zone).toInstant()
+            if (candidate.isBefore(before)) return candidate
+        }
+    }
+    val prevDate = previousActiveDay(reminder, today.minusDays(1))
+    return prevDate.atTime(sortedTimes.last()).atZone(zone).toInstant()
+}
+
+private val MAX_SUPPRESSION_LOOKBACK: Duration = Duration.ofHours(1)
+
+// @spec REM-SCHED-020
+fun shouldSuppressFixedNotification(
+    reminder: Reminder,
+    firedAt: Instant,
+    zone: ZoneId,
+    latestEventLoggedAt: Instant?,
+): Boolean {
+    if (reminder.mode != ReminderMode.FIXED || latestEventLoggedAt == null) return false
+    val previousTrigger = computePreviousFixedFireTime(reminder, firedAt, zone)
+    val tenPercent = Duration.between(previousTrigger, firedAt).dividedBy(10)
+    val lookback = minOf(tenPercent, MAX_SUPPRESSION_LOOKBACK)
+    return !latestEventLoggedAt.isBefore(firedAt.minus(lookback))
+}
+
 private fun computeNextRandomFireTime(reminder: Reminder, after: Instant, zone: ZoneId, random: Random): Instant {
     val today = after.atZone(zone).toLocalDate()
     if (reminder.daysActive.contains(today.dayOfWeek)) {
@@ -85,6 +117,12 @@ private fun drawWithin(box: SubWindow, random: Random): Instant {
 private fun nextActiveDay(reminder: Reminder, from: LocalDate): LocalDate {
     var date = from
     while (!reminder.daysActive.contains(date.dayOfWeek)) date = date.plusDays(1)
+    return date
+}
+
+private fun previousActiveDay(reminder: Reminder, from: LocalDate): LocalDate {
+    var date = from
+    while (!reminder.daysActive.contains(date.dayOfWeek)) date = date.minusDays(1)
     return date
 }
 
