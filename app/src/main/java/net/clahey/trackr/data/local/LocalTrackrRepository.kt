@@ -50,11 +50,9 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getCategoryById(id: String): Flow<Category?> =
         categoryDao.getByIdWithParent(id).map { it?.toDomain() }
 
-    private suspend fun requireNoChildren(category: Category) {
-        if (category is Category.SubCategory) {
-            val childCount = categoryDao.countByParentIdOnce(category.id)
-            if (childCount != 0) throw CategoryHasChildrenException(category.id, childCount)
-        }
+    private suspend fun requireNoChildren(category: Category.SubCategory) {
+        val childCount = categoryDao.countByParentIdOnce(category.id)
+        if (childCount != 0) throw CategoryHasChildrenException(category.id, childCount)
     }
 
     private suspend fun migrateEventsForCategory(categoryId: String, targetType: ValueType) {
@@ -70,7 +68,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
         db.withTransaction {
-            requireNoChildren(category)
+            if (category is Category.SubCategory) requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
         }
     }
@@ -78,7 +76,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021, DM-DATA-028
     override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
         db.withTransaction {
-            requireNoChildren(category)
+            if (category is Category.SubCategory) requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
             migrateEventsForCategory(category.id, category.resolvedValueType)
         }
@@ -102,7 +100,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     // @spec CAT-UI-080, CAT-UI-083
     override suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>) {
         db.withTransaction {
-            requireNoChildren(category)
+            if (category is Category.SubCategory) requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
             reindexDestinationGroup(category, orderedSiblingIds)
         }
@@ -115,7 +113,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         fromType: ValueType,
     ) {
         db.withTransaction {
-            requireNoChildren(category)
+            if (category is Category.SubCategory) requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
             reindexDestinationGroup(category, orderedSiblingIds)
             migrateEventsForCategory(category.id, category.resolvedValueType)
@@ -237,7 +235,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     // @spec REM-DATA-006, REM-DATA-008
     override suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType?) {
         db.withTransaction {
-            requireNoChildren(category)
+            if (category is Category.SubCategory) requireNoChildren(category)
             categoryDao.upsert(category.toEntity())
             if (migrateFromType != null) {
                 migrateEventsForCategory(category.id, category.resolvedValueType)
