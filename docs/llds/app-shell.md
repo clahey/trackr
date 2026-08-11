@@ -164,6 +164,7 @@ The repository and `ReminderScheduler` are injected into `TrackrApplication` via
 
 1. **Tab icons** — `Icons.Default.Home` / `Icons.Default.Label` are placeholders; final icons TBD.
 2. **Splash screen** — not implemented in v1; orphan scan is fast enough to be invisible.
+3. **Route/SavedStateHandle argument-name duplication** — argument key strings (`"categoryId"`, `"parentId"`, `"eventId"`, `"filterCategoryId"`, `"quickLogCategoryId"`) are hardcoded independently in the `Routes` object (route templates, builder functions, `navArgument(...)` declarations) and in each consuming ViewModel's `SavedStateHandle` lookup (§ ViewModel Arguments), rather than sharing a constant. `"categoryId"` and `"parentId"` each repeat across 4 call sites spanning `AppNavHost.kt` and `CategoryEditViewModel.kt`. Not yet consolidated — deferred.
 
 ## References
 
