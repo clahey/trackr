@@ -65,11 +65,16 @@ class ReminderScheduler @Inject constructor(
         alarmScheduler.arm(categoryId, nextFireAt)
     }
 
-    // @spec REM-SCHED-004, REM-SCHED-016
+    // @spec REM-SCHED-004, REM-SCHED-016, REM-SCHED-018
     suspend fun rearmAll(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
         repository.getAllEnabledRemindersOnce().forEach { reminder ->
-            val nextFireAt = computeNextFireTime(reminder, now, zone)
-            repository.saveReminder(reminder.copy(nextFireAt = nextFireAt))
+            val nextFireAt = if (isNextFireAtValid(reminder, reminder.nextFireAt, now, zone)) {
+                reminder.nextFireAt!!
+            } else {
+                val recomputed = computeNextFireTime(reminder, now, zone)
+                repository.saveReminder(reminder.copy(nextFireAt = recomputed))
+                recomputed
+            }
             alarmScheduler.arm(reminder.categoryId, nextFireAt)
         }
     }
@@ -80,30 +85,27 @@ class ReminderScheduler @Inject constructor(
         val isExactAvailable = alarmScheduler.canScheduleExact()
         val reminders = repository.getAllEnabledRemindersOnce()
 
-        // Exact-alarm permission upgrade: re-issue every already-armed alarm at its existing
-        // nextFireAt (no recompute) so a reminder armed inexactly before permission was granted
-        // doesn't stay degraded forever.
-        if (!wasExactAvailable && isExactAvailable) {
-            reminders.forEach { reminder ->
-                reminder.nextFireAt?.let { alarmScheduler.arm(reminder.categoryId, it) }
-            }
-        }
-        if (wasExactAvailable != isExactAvailable) {
-            dataStore.edit { it[lastKnownExactAlarmAvailableKey] = isExactAvailable }
-        }
-
-        // Staleness buffer matches the scheduling mode every currently-armed alarm is actually
-        // in (the stored/just-updated flag, not a second live check) so this pass doesn't race
-        // an alarm that's still legitimately in flight — see docs/llds/reminders.md § Decisions.
+        // Staleness buffer matches the scheduling mode every currently-armed alarm is actually in
+        // (this live read, not a second live check per reminder) so this pass doesn't race an
+        // alarm that's still legitimately in flight — see docs/llds/reminders.md § Decisions.
         val bufferMinutes = if (isExactAvailable) 10L else 30L
         val staleBefore = now.minus(Duration.ofMinutes(bufferMinutes))
+        val shouldReissueExisting = !wasExactAvailable && isExactAvailable
+
         reminders.forEach { reminder ->
             val nextFireAt = reminder.nextFireAt
             if (nextFireAt == null || nextFireAt.isBefore(staleBefore)) {
                 val recomputed = computeNextFireTime(reminder, now, zone)
                 repository.saveReminder(reminder.copy(nextFireAt = recomputed))
                 alarmScheduler.arm(reminder.categoryId, recomputed)
+            } else if (shouldReissueExisting) {
+                // Re-issue via the now-available exact API (no recompute) so a reminder armed
+                // inexactly before permission was granted doesn't stay degraded forever.
+                alarmScheduler.arm(reminder.categoryId, nextFireAt)
             }
+        }
+        if (wasExactAvailable != isExactAvailable) {
+            dataStore.edit { it[lastKnownExactAlarmAvailableKey] = isExactAvailable }
         }
     }
 }

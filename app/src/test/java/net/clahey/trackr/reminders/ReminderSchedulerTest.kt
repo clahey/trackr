@@ -252,19 +252,53 @@ class ReminderSchedulerTest {
 
     // ---- rearmAll — REM-SCHED-004, REM-SCHED-016 ----
 
-    // @spec REM-SCHED-004, REM-SCHED-016
-    @Test fun `rearmAll unconditionally recomputes and arms every enabled reminder`() = runTest {
+    // @spec REM-SCHED-004, REM-SCHED-016, REM-SCHED-018
+    @Test fun `rearmAll re-arms without recomputing when the stored nextFireAt is still valid`() = runTest {
         val repo = FakeTrackrRepository()
         val alarms = FakeAlarmScheduler()
         val sched = scheduler(repo, alarms)
-        // Even a currently-valid RANDOM nextFireAt gets recomputed — rearmAll can't trust
-        // Instant-based validity after a clock/timezone change or reboot.
+        // sub-windows: [08:00,14:00), [14:00,20:00) — nextFireAt sits in the box containing now
         val validNextFireAt = Instant.parse("2024-01-01T10:00:00Z")
         repo.setReminders(randomReminder(nextFireAt = validNextFireAt))
 
         sched.rearmAll(now = Instant.parse("2024-01-01T09:00:00Z"), zone = zone)
 
         assertEquals(1, alarms.armCalls.size)
+        assertEquals(validNextFireAt, alarms.armed["cat1"])
+        assertEquals(validNextFireAt, repo.getReminderForCategory("cat1").first()!!.nextFireAt)
+    }
+
+    // @spec REM-SCHED-004, REM-SCHED-018
+    @Test fun `rearmAll does not skip a still-pending occurrence on a routine daytime reboot`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val sched = scheduler(repo, alarms)
+        // sub-windows: [08:00,14:00), [14:00,20:00) — today's draw (10:00) is still pending, in
+        // box0, which also contains now (09:00). Recomputing unconditionally would look for the
+        // earliest box starting *after* 09:00 — box0 starts at 08:00, so it wouldn't qualify, and
+        // this would wrongly jump to box1 and skip the still-pending 10:00 occurrence entirely.
+        val pendingNextFireAt = Instant.parse("2024-01-01T10:00:00Z")
+        repo.setReminders(randomReminder(nextFireAt = pendingNextFireAt))
+
+        sched.rearmAll(now = Instant.parse("2024-01-01T09:00:00Z"), zone = zone)
+
+        assertEquals(pendingNextFireAt, alarms.armed["cat1"])
+    }
+
+    // @spec REM-SCHED-004, REM-SCHED-018
+    @Test fun `rearmAll recomputes when the stored nextFireAt is no longer valid`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val sched = scheduler(repo, alarms)
+        // A stale nextFireAt from a prior day is outside both today's current and next box.
+        val staleNextFireAt = Instant.parse("2023-12-31T10:00:00Z")
+        repo.setReminders(randomReminder(nextFireAt = staleNextFireAt))
+        val now = Instant.parse("2024-01-01T09:00:00Z")
+
+        sched.rearmAll(now = now, zone = zone)
+
+        val rearmed = alarms.armed["cat1"]!!
+        assertTrue("should have recomputed to a fresh, future instant", rearmed.isAfter(now))
     }
 
     // @spec REM-SCHED-016
@@ -362,6 +396,24 @@ class ReminderSchedulerTest {
 
         // Re-armed at its *existing* instant (no recompute), purely to upgrade to the exact API.
         assertEquals(existingNextFireAt, alarms.armed["cat1"])
+    }
+
+    // @spec REM-SCHED-017, REM-SCHED-019
+    @Test fun `reconcileOnStartup does not double-arm a stale reminder during an exact-alarm upgrade`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler(exactAvailable = true) // exact just became available...
+        val dataStore = FakePreferencesDataStore() // ...but the stored flag still says false (default)
+        val sched = scheduler(repo, alarms, dataStore = dataStore)
+        val now = Instant.parse("2024-01-01T09:00:00Z")
+        // 11 minutes past, stale under the 10-minute exact-mode buffer — the upgrade pass must not
+        // also arm this at its stale instant before the staleness pass corrects it.
+        repo.setReminders(fixedReminder(nextFireAt = now.minusSeconds(11 * 60)))
+
+        sched.reconcileOnStartup(now = now, zone = zone)
+
+        val callsForCat1 = alarms.armCalls.filter { it.first == "cat1" }
+        assertEquals("should arm exactly once, not once at the stale instant then again at the recomputed one", 1, callsForCat1.size)
+        assertTrue("the single arm call should use the recomputed instant, not the stale one", callsForCat1[0].second.isAfter(now))
     }
 
     // @spec REM-SCHED-019
