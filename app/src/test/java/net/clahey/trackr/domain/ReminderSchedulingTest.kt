@@ -120,6 +120,19 @@ class ReminderSchedulingTest {
     }
 
     // @spec REM-SCHED-007
+    @Test fun `RANDOM mode does not select a sub-window starting exactly at after, only strictly later`() {
+        val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
+        // sub-windows: [08:00,14:00), [14:00,20:00) — after lands exactly on the second box's own
+        // start, so neither box qualifies (08:00 isn't after 14:00; 14:00 isn't strictly after 14:00)
+        val after = instant(monday, LocalTime.of(14, 0))
+        val result = computeNextFireTime(reminder, after, zone, random = Random(42))
+        assertTrue(
+            !result.isBefore(instant(monday.plusDays(1), LocalTime.of(8, 0))) &&
+                result.isBefore(instant(monday.plusDays(1), LocalTime.of(14, 0))),
+        )
+    }
+
+    // @spec REM-SCHED-007
     @Test fun `RANDOM mode advances to next active day when after is past every sub-window today`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
         val after = instant(monday, LocalTime.of(21, 0))
@@ -148,6 +161,17 @@ class ReminderSchedulingTest {
             !result.isBefore(instant(monday.plusDays(1), LocalTime.of(0, 0))) &&
                 result.isBefore(instant(monday.plusDays(1), LocalTime.of(12, 0))),
         )
+    }
+
+    // @spec REM-SCHED-007
+    @Test fun `RANDOM mode places an instant well within the last box when occurrencesPerDay does not divide evenly`() {
+        // 12h window / 7 boxes doesn't divide evenly; the last box may end up to occurrencesPerDay - 1
+        // nanoseconds short of windowEnd (negligible at real clock precision), but well within it
+        // should still land in the last box, not fall through to "no box today."
+        val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 7)
+        val now = instant(monday, LocalTime.of(19, 0)) // inside the last box
+        val nextFireAt = instant(monday, LocalTime.of(19, 30))
+        assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-001, REM-SCHED-007
@@ -216,6 +240,19 @@ class ReminderSchedulingTest {
         val now = instant(monday, LocalTime.of(6, 0)) // before windowStart
         val nextFireAt = instant(monday, LocalTime.of(10, 0)) // today's first box
         assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
+    }
+
+    // @spec REM-SCHED-018
+    @Test fun `isNextFireAtValid places an instant exactly on an uneven interior boundary in the box that starts there`() {
+        // 481s window / 3 doesn't divide evenly: boundary(1) = floor(481e9/3)ns = 08:02:40.333333333.
+        // now sits exactly on that boundary, so the current box is box1 [08:02:40.333333333, 08:05:20.666666666),
+        // not box0 [08:00:00, 08:02:40.333333333) — box0 has already fully elapsed as of now.
+        val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(8, 8, 1), occurrencesPerDay = 3)
+        val now = instant(monday, LocalTime.of(8, 2, 40, 333_333_333))
+        val nextFireAtInBox1 = instant(monday, LocalTime.of(8, 3, 0))
+        val nextFireAtInBox0 = instant(monday, LocalTime.of(8, 1, 0))
+        assertTrue(isNextFireAtValid(reminder, nextFireAtInBox1, now, zone))
+        assertFalse(isNextFireAtValid(reminder, nextFireAtInBox0, now, zone))
     }
 
     // @spec REM-SCHED-018

@@ -63,11 +63,11 @@ fun shouldSuppressFixedNotification(
 private fun computeNextRandomFireTime(reminder: Reminder, after: Instant, zone: ZoneId, random: Random): Instant {
     val today = after.atZone(zone).toLocalDate()
     if (reminder.daysActive.contains(today.dayOfWeek)) {
-        val box = subWindowsFor(reminder, today, zone).firstOrNull { it.start.isAfter(after) }
-        if (box != null) return drawWithin(box, random)
+        val index = indexOfFirstStartAfter(reminder, today, zone, after)
+        if (index < reminder.occurrencesPerDay!!) return drawWithin(subWindowAt(reminder, today, zone, index), random)
     }
     val nextDate = nextActiveDay(reminder, today.plusDays(1))
-    return drawWithin(subWindowsFor(reminder, nextDate, zone).first(), random)
+    return drawWithin(subWindowAt(reminder, nextDate, zone, 0), random)
 }
 
 // @spec REM-SCHED-018
@@ -86,10 +86,15 @@ private data class SubWindow(val start: Instant, val end: Instant) {
     fun contains(instant: Instant): Boolean = !instant.isBefore(start) && instant.isBefore(end)
 }
 
-private fun subWindowsFor(reminder: Reminder, date: LocalDate, zone: ZoneId): List<SubWindow> {
+// A day's RANDOM-mode window start and per-box step (subNanos), the two date/zone-dependent values
+// the box functions below need; occurrencesPerDay is already on Reminder, no need to carry it here.
+// subNanos truncates totalNanos / occurrencesPerDay, so the last box can end up to
+// occurrencesPerDay - 1 nanoseconds short of the literal window end — irrelevant at any real
+// clock's millisecond-scale precision. A fixed per-box step keeps "which box contains an instant" a
+// single division, the exact inverse of the boundary formula below.
+private fun windowStep(reminder: Reminder, date: LocalDate, zone: ZoneId): Pair<Instant, Long> {
     val windowStart = reminder.windowStart!!
     val windowEnd = reminder.windowEnd!!
-    val occurrencesPerDay = reminder.occurrencesPerDay!!
     val startInstant = date.atTime(windowStart).atZone(zone).toInstant()
     // A windowEnd of midnight is the end-of-day sentinel (REM-UI-010), never literal start-of-day.
     val endInstant = if (windowEnd == LocalTime.MIDNIGHT) {
@@ -97,12 +102,34 @@ private fun subWindowsFor(reminder: Reminder, date: LocalDate, zone: ZoneId): Li
     } else {
         date.atTime(windowEnd).atZone(zone).toInstant()
     }
-    val subNanos = Duration.between(startInstant, endInstant).toNanos() / occurrencesPerDay
-    return (0 until occurrencesPerDay).map { i ->
-        val subStart = startInstant.plusNanos(subNanos * i)
-        val subEnd = if (i == occurrencesPerDay - 1) endInstant else startInstant.plusNanos(subNanos * (i + 1))
-        SubWindow(subStart, subEnd)
-    }
+    val totalNanos = Duration.between(startInstant, endInstant).toNanos()
+    return startInstant to totalNanos / reminder.occurrencesPerDay!!
+}
+
+private fun subWindowAt(reminder: Reminder, date: LocalDate, zone: ZoneId, index: Int): SubWindow {
+    val (startInstant, subNanos) = windowStep(reminder, date, zone)
+    return SubWindow(startInstant.plusNanos(subNanos * index), startInstant.plusNanos(subNanos * (index + 1)))
+}
+
+// The box containing `instant`, or occurrencesPerDay (a sentinel — there is no such box) once
+// `instant` reaches the last box's end. `instant` before this window's start is box 0 (the
+// not-yet-started first box counts as current — REM-SCHED-018).
+private fun indexContaining(reminder: Reminder, date: LocalDate, zone: ZoneId, instant: Instant): Int =
+    boxIndex(reminder, date, zone, instant, offset = 0)
+
+// The smallest index whose box starts strictly after `instant` — always one more than
+// indexContaining, since a box's own start never counts as "after" itself — or occurrencesPerDay
+// (a sentinel — no box today qualifies).
+private fun indexOfFirstStartAfter(reminder: Reminder, date: LocalDate, zone: ZoneId, instant: Instant): Int =
+    boxIndex(reminder, date, zone, instant, offset = 1)
+
+private fun boxIndex(reminder: Reminder, date: LocalDate, zone: ZoneId, instant: Instant, offset: Int): Int {
+    val (startInstant, subNanos) = windowStep(reminder, date, zone)
+    val offsetNanos = Duration.between(startInstant, instant).toNanos()
+    if (offsetNanos < 0) return 0
+    val occurrencesPerDay = reminder.occurrencesPerDay!!
+    val index = offsetNanos / subNanos + offset
+    return if (index >= occurrencesPerDay) occurrencesPerDay else index.toInt()
 }
 
 private fun drawWithin(box: SubWindow, random: Random): Instant {
@@ -128,12 +155,11 @@ private fun previousActiveDay(reminder: Reminder, from: LocalDate): LocalDate {
 // edit-time validity check (REM-SCHED-018) both reason about.
 private fun currentAndNextBox(reminder: Reminder, now: Instant, zone: ZoneId): Pair<SubWindow, SubWindow> {
     val (date, index) = currentBoxLocation(reminder, now, zone)
-    val boxesForDate = subWindowsFor(reminder, date, zone)
-    val currentBox = boxesForDate[index]
-    val nextBox = if (index + 1 < boxesForDate.size) {
-        boxesForDate[index + 1]
+    val currentBox = subWindowAt(reminder, date, zone, index)
+    val nextBox = if (index + 1 < reminder.occurrencesPerDay!!) {
+        subWindowAt(reminder, date, zone, index + 1)
     } else {
-        subWindowsFor(reminder, nextActiveDay(reminder, date.plusDays(1)), zone).first()
+        subWindowAt(reminder, nextActiveDay(reminder, date.plusDays(1)), zone, 0)
     }
     return currentBox to nextBox
 }
@@ -141,8 +167,8 @@ private fun currentAndNextBox(reminder: Reminder, now: Instant, zone: ZoneId): P
 private fun currentBoxLocation(reminder: Reminder, now: Instant, zone: ZoneId): Pair<LocalDate, Int> {
     val today = now.atZone(zone).toLocalDate()
     if (reminder.daysActive.contains(today.dayOfWeek)) {
-        val index = subWindowsFor(reminder, today, zone).indexOfFirst { now.isBefore(it.end) }
-        if (index >= 0) return today to index
+        val index = indexContaining(reminder, today, zone, now)
+        if (index < reminder.occurrencesPerDay!!) return today to index
     }
     return nextActiveDay(reminder, today.plusDays(1)) to 0
 }
