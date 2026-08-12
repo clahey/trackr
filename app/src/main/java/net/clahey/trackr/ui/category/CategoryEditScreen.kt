@@ -144,14 +144,7 @@ fun CategoryEditScreen(
     var showBackDiscardDialog by remember { mutableStateOf(false) }
 
     // @spec REM-UI-001..011, REM-PERM-001..004
-    val reminderEnabled by viewModel.reminderEnabled.collectAsState()
-    val reminderMode by viewModel.reminderMode.collectAsState()
-    val reminderTimes by viewModel.reminderTimes.collectAsState()
-    val reminderWindowStart by viewModel.reminderWindowStart.collectAsState()
-    val reminderWindowEnd by viewModel.reminderWindowEnd.collectAsState()
-    val reminderOccurrencesPerDay by viewModel.reminderOccurrencesPerDay.collectAsState()
-    val reminderDaysActive by viewModel.reminderDaysActive.collectAsState()
-    val reminderShowCategoryInNotification by viewModel.reminderShowCategoryInNotification.collectAsState()
+    val reminderUIState by viewModel.reminderUIState.collectAsState()
     val pendingPermissionConfirmation by viewModel.pendingPermissionConfirmation.collectAsState()
 
     val context = LocalContext.current
@@ -347,14 +340,14 @@ fun CategoryEditScreen(
 
             // @spec REM-UI-001..011, REM-PERM-001, REM-PERM-002
             ReminderSection(
-                enabled = reminderEnabled,
-                mode = reminderMode,
-                times = reminderTimes,
-                windowStart = reminderWindowStart,
-                windowEnd = reminderWindowEnd,
-                occurrencesPerDay = reminderOccurrencesPerDay,
-                daysActive = reminderDaysActive,
-                showCategoryInNotification = reminderShowCategoryInNotification,
+                enabled = reminderUIState.enabled,
+                mode = reminderUIState.mode,
+                times = reminderUIState.times,
+                windowStart = reminderUIState.windowStart,
+                windowEnd = reminderUIState.windowEnd,
+                occurrencesPerDay = reminderUIState.occurrencesPerDay,
+                daysActive = reminderUIState.daysActive,
+                showCategoryInNotification = reminderUIState.showCategoryInNotification,
                 validationField = (saveResult as? SaveResult.ValidationError)?.field,
                 onEnabledChange = { viewModel.setReminderEnabled(it) },
                 onModeChange = { viewModel.setReminderMode(it) },

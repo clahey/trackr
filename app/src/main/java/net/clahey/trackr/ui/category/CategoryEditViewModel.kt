@@ -39,6 +39,58 @@ import javax.inject.Inject
 enum class EmojiMode { INHERIT, CUSTOM }
 data class EmojiUIState(val mode: EmojiMode, val customValue: String)
 
+data class ReminderUIState(
+    val enabled: Boolean = false,
+    val mode: ReminderMode = ReminderMode.FIXED,
+    val times: List<LocalTime> = listOf(LocalTime.of(9, 0)),
+    val windowStart: LocalTime = LocalTime.MIDNIGHT,
+    val windowEnd: LocalTime = LocalTime.MIDNIGHT,
+    val occurrencesPerDay: Int = 1,
+    val daysActive: Set<DayOfWeek> = DayOfWeek.entries.toSet(),
+    val showCategoryInNotification: Boolean = false,
+) {
+    // @spec REM-UI-009, REM-UI-010
+    fun validationError(): String? {
+        if (!enabled) return null
+        if (daysActive.isEmpty()) return "reminder_days"
+        return when (mode) {
+            ReminderMode.FIXED -> if (times.isEmpty()) "reminder_times" else null
+            ReminderMode.RANDOM -> {
+                val validWindow = windowEnd == LocalTime.MIDNIGHT || windowEnd.isAfter(windowStart)
+                if (occurrencesPerDay < 1 || !validWindow) "reminder_window" else null
+            }
+        }
+    }
+
+    // @spec REM-DATA-002, REM-DATA-006, REM-DATA-008
+    fun toReminder(categoryId: String): Reminder = Reminder(
+        categoryId = categoryId,
+        enabled = enabled,
+        mode = mode,
+        times = times,
+        windowStart = windowStart,
+        windowEnd = windowEnd,
+        occurrencesPerDay = occurrencesPerDay,
+        daysActive = daysActive,
+        showCategoryInNotification = showCategoryInNotification,
+        nextFireAt = null, // ignored by saveCategoryWithReminder; the DB's current value survives (REM-DATA-008)
+    )
+
+    companion object {
+        // @spec REM-UI-001
+        fun fromStored(reminder: Reminder): ReminderUIState = ReminderUIState(
+            enabled = reminder.enabled,
+            mode = reminder.mode,
+            times = reminder.times.ifEmpty { listOf(LocalTime.of(9, 0)) },
+            windowStart = reminder.windowStart ?: LocalTime.MIDNIGHT,
+            windowEnd = reminder.windowEnd ?: LocalTime.MIDNIGHT,
+            occurrencesPerDay = reminder.occurrencesPerDay ?: 1,
+            daysActive = reminder.daysActive.ifEmpty { DayOfWeek.entries.toSet() },
+            showCategoryInNotification = reminder.showCategoryInNotification,
+        )
+    }
+}
+
 // @spec CAT-UI-004, CAT-UI-005, CAT-UI-012, CAT-UI-013,
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
@@ -207,37 +259,17 @@ class CategoryEditViewModel @Inject constructor(
     } else MutableStateFlow(0)
 
     // @spec REM-UI-001..011
-    private val _reminderEnabled = MutableStateFlow(false)
-    val reminderEnabled: StateFlow<Boolean> = _reminderEnabled.asStateFlow()
-    fun setReminderEnabled(value: Boolean) { _reminderEnabled.value = value; markEdited() }
+    private val _reminderUIState = MutableStateFlow(ReminderUIState())
+    val reminderUIState: StateFlow<ReminderUIState> = _reminderUIState.asStateFlow()
 
-    private val _reminderMode = MutableStateFlow(ReminderMode.FIXED)
-    val reminderMode: StateFlow<ReminderMode> = _reminderMode.asStateFlow()
-    fun setReminderMode(value: ReminderMode) { _reminderMode.value = value; markEdited() }
-
-    private val _reminderTimes = MutableStateFlow(listOf(LocalTime.of(9, 0)))
-    val reminderTimes: StateFlow<List<LocalTime>> = _reminderTimes.asStateFlow()
-    fun setReminderTimes(value: List<LocalTime>) { _reminderTimes.value = value; markEdited() }
-
-    private val _reminderWindowStart = MutableStateFlow(LocalTime.MIDNIGHT)
-    val reminderWindowStart: StateFlow<LocalTime> = _reminderWindowStart.asStateFlow()
-    fun setReminderWindowStart(value: LocalTime) { _reminderWindowStart.value = value; markEdited() }
-
-    private val _reminderWindowEnd = MutableStateFlow(LocalTime.MIDNIGHT)
-    val reminderWindowEnd: StateFlow<LocalTime> = _reminderWindowEnd.asStateFlow()
-    fun setReminderWindowEnd(value: LocalTime) { _reminderWindowEnd.value = value; markEdited() }
-
-    private val _reminderOccurrencesPerDay = MutableStateFlow(1)
-    val reminderOccurrencesPerDay: StateFlow<Int> = _reminderOccurrencesPerDay.asStateFlow()
-    fun setReminderOccurrencesPerDay(value: Int) { _reminderOccurrencesPerDay.value = value; markEdited() }
-
-    private val _reminderDaysActive = MutableStateFlow(DayOfWeek.entries.toSet())
-    val reminderDaysActive: StateFlow<Set<DayOfWeek>> = _reminderDaysActive.asStateFlow()
-    fun setReminderDaysActive(value: Set<DayOfWeek>) { _reminderDaysActive.value = value; markEdited() }
-
-    private val _reminderShowCategoryInNotification = MutableStateFlow(false)
-    val reminderShowCategoryInNotification: StateFlow<Boolean> = _reminderShowCategoryInNotification.asStateFlow()
-    fun setReminderShowCategoryInNotification(value: Boolean) { _reminderShowCategoryInNotification.value = value; markEdited() }
+    fun setReminderEnabled(value: Boolean) { _reminderUIState.value = _reminderUIState.value.copy(enabled = value); markEdited() }
+    fun setReminderMode(value: ReminderMode) { _reminderUIState.value = _reminderUIState.value.copy(mode = value); markEdited() }
+    fun setReminderTimes(value: List<LocalTime>) { _reminderUIState.value = _reminderUIState.value.copy(times = value); markEdited() }
+    fun setReminderWindowStart(value: LocalTime) { _reminderUIState.value = _reminderUIState.value.copy(windowStart = value); markEdited() }
+    fun setReminderWindowEnd(value: LocalTime) { _reminderUIState.value = _reminderUIState.value.copy(windowEnd = value); markEdited() }
+    fun setReminderOccurrencesPerDay(value: Int) { _reminderUIState.value = _reminderUIState.value.copy(occurrencesPerDay = value); markEdited() }
+    fun setReminderDaysActive(value: Set<DayOfWeek>) { _reminderUIState.value = _reminderUIState.value.copy(daysActive = value); markEdited() }
+    fun setReminderShowCategoryInNotification(value: Boolean) { _reminderUIState.value = _reminderUIState.value.copy(showCategoryInNotification = value); markEdited() }
 
     // @spec REM-PERM-003
     private val _pendingPermissionConfirmation = MutableStateFlow(false)
@@ -276,14 +308,7 @@ class CategoryEditViewModel @Inject constructor(
                 // @spec REM-UI-001
                 viewModelScope.launch {
                     val reminder = repository.getReminderForCategory(categoryId).first() ?: return@launch
-                    _reminderEnabled.value = reminder.enabled
-                    _reminderMode.value = reminder.mode
-                    if (reminder.times.isNotEmpty()) _reminderTimes.value = reminder.times
-                    reminder.windowStart?.let { _reminderWindowStart.value = it }
-                    reminder.windowEnd?.let { _reminderWindowEnd.value = it }
-                    reminder.occurrencesPerDay?.let { _reminderOccurrencesPerDay.value = it }
-                    if (reminder.daysActive.isNotEmpty()) _reminderDaysActive.value = reminder.daysActive
-                    _reminderShowCategoryInNotification.value = reminder.showCategoryInNotification
+                    _reminderUIState.value = ReminderUIState.fromStored(reminder)
                 }
             }
 
@@ -339,14 +364,14 @@ class CategoryEditViewModel @Inject constructor(
         }
 
         // @spec REM-UI-009
-        val reminderValidationField = reminderValidationField()
-        if (reminderValidationField != null) {
-            _saveResult.value = SaveResult.ValidationError(reminderValidationField)
+        val reminderValidationError = _reminderUIState.value.validationError()
+        if (reminderValidationError != null) {
+            _saveResult.value = SaveResult.ValidationError(reminderValidationError)
             return
         }
 
         // @spec REM-PERM-003
-        if (_reminderEnabled.value && !forceSaveDespitePermission &&
+        if (_reminderUIState.value.enabled && !forceSaveDespitePermission &&
             (!notificationPermissionGranted || !exactAlarmAvailable)
         ) {
             _pendingPermissionConfirmation.value = true
@@ -399,19 +424,7 @@ class CategoryEditViewModel @Inject constructor(
             )
         }
 
-        // @spec REM-DATA-002, REM-DATA-006, REM-DATA-008
-        val reminder = Reminder(
-            categoryId = category.id,
-            enabled = _reminderEnabled.value,
-            mode = _reminderMode.value,
-            times = _reminderTimes.value,
-            windowStart = _reminderWindowStart.value,
-            windowEnd = _reminderWindowEnd.value,
-            occurrencesPerDay = _reminderOccurrencesPerDay.value,
-            daysActive = _reminderDaysActive.value,
-            showCategoryInNotification = _reminderShowCategoryInNotification.value,
-            nextFireAt = null, // ignored by saveCategoryWithReminder; the DB's current value survives (REM-DATA-008)
-        )
+        val reminder = _reminderUIState.value.toReminder(category.id)
 
         val originalType = _originalValueType.value
         // @spec DM-PROC-021
@@ -427,20 +440,6 @@ class CategoryEditViewModel @Inject constructor(
         // @spec CAT-NAV-020
         _savedCategoryId.value = category.id
         _saveResult.value = SaveResult.Success
-    }
-
-    // @spec REM-UI-009, REM-UI-010
-    private fun reminderValidationField(): String? {
-        if (!_reminderEnabled.value) return null
-        if (_reminderDaysActive.value.isEmpty()) return "reminder_days"
-        return when (_reminderMode.value) {
-            ReminderMode.FIXED -> if (_reminderTimes.value.isEmpty()) "reminder_times" else null
-            ReminderMode.RANDOM -> {
-                val validWindow = _reminderWindowEnd.value == LocalTime.MIDNIGHT ||
-                    _reminderWindowEnd.value.isAfter(_reminderWindowStart.value)
-                if (_reminderOccurrencesPerDay.value < 1 || !validWindow) "reminder_window" else null
-            }
-        }
     }
 
     // @spec CAT-UI-004, CAT-UI-005, CAT-UI-007, CAT-NAV-005
