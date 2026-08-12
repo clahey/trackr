@@ -405,15 +405,36 @@ class ReminderSchedulerTest {
         val dataStore = FakePreferencesDataStore() // ...but the stored flag still says false (default)
         val sched = scheduler(repo, alarms, dataStore = dataStore)
         val now = Instant.parse("2024-01-01T09:00:00Z")
-        // 11 minutes past, stale under the 10-minute exact-mode buffer — the upgrade pass must not
-        // also arm this at its stale instant before the staleness pass corrects it.
-        repo.setReminders(fixedReminder(nextFireAt = now.minusSeconds(11 * 60)))
+        // The buffer during this transition is 30 min (wasExactAvailable is false, matching the
+        // inexact mode this reminder was actually armed under) — 31 min past is stale under that.
+        // The upgrade pass must not also arm this at its stale instant before the staleness pass
+        // corrects it.
+        repo.setReminders(fixedReminder(nextFireAt = now.minusSeconds(31 * 60)))
 
         sched.reconcileOnStartup(now = now, zone = zone)
 
         val callsForCat1 = alarms.armCalls.filter { it.first == "cat1" }
         assertEquals("should arm exactly once, not once at the stale instant then again at the recomputed one", 1, callsForCat1.size)
         assertTrue("the single arm call should use the recomputed instant, not the stale one", callsForCat1[0].second.isAfter(now))
+    }
+
+    // @spec REM-SCHED-017
+    @Test fun `reconcileOnStartup buffers by the mode alarms were actually armed under, not the just-upgraded one`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler(exactAvailable = true) // exact just became available...
+        val dataStore = FakePreferencesDataStore() // ...but the stored flag still says false (default) — armed inexactly
+        val sched = scheduler(repo, alarms, dataStore = dataStore)
+        val now = Instant.parse("2024-01-01T09:00:00Z")
+        // 15 min past: stale under the wrong 10-min (exact) buffer, but not under the correct
+        // 30-min (inexact) buffer this reminder was actually armed under.
+        val pendingNextFireAt = now.minusSeconds(15 * 60)
+        repo.setReminders(fixedReminder(nextFireAt = pendingNextFireAt))
+
+        sched.reconcileOnStartup(now = now, zone = zone)
+
+        // Still fresh under the correct buffer -> re-issued unchanged via the upgrade path, not
+        // wrongly discarded and recomputed just because the device can now schedule exactly.
+        assertEquals(pendingNextFireAt, alarms.armed["cat1"])
     }
 
     // @spec REM-SCHED-019

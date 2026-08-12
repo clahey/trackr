@@ -85,10 +85,10 @@ class ReminderScheduler @Inject constructor(
         val isExactAvailable = alarmScheduler.canScheduleExact()
         val reminders = repository.getAllEnabledRemindersOnce()
 
-        // Staleness buffer matches the scheduling mode every currently-armed alarm is actually in
-        // (this live read, not a second live check per reminder) so this pass doesn't race an
-        // alarm that's still legitimately in flight — see docs/llds/reminders.md § Decisions.
-        val bufferMinutes = if (isExactAvailable) 10L else 30L
+        // Staleness buffer matches the scheduling mode every currently-armed alarm was actually
+        // armed under, so this pass doesn't judge a reminder from the old regime against the new
+        // one's threshold mid-transition.
+        val bufferMinutes = if (wasExactAvailable) 10L else 30L
         val staleBefore = now.minus(Duration.ofMinutes(bufferMinutes))
         val shouldReissueExisting = !wasExactAvailable && isExactAvailable
 
