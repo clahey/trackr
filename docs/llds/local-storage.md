@@ -85,10 +85,10 @@ Entities mirror domain models with Room annotations. They are package-private to
 | `categoryId` | `String` PK, FK → categories(id) CASCADE DELETE | one row per category |
 | `enabled` | `Boolean` | |
 | `mode` | `String` | `"fixed"` / `"random"` |
-| `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only |
-| `windowStart` | `String?` | `"HH:mm"`; RANDOM only |
-| `windowEnd` | `String?` | `"HH:mm"`; RANDOM only |
-| `occurrencesPerDay` | `Int?` | RANDOM only |
+| `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only; null encodes an empty list |
+| `windowStart` | `String` | `"HH:mm"`; RANDOM only, preserved but unused while mode == FIXED |
+| `windowEnd` | `String` | `"HH:mm"`; RANDOM only, ditto |
+| `occurrencesPerDay` | `Int` | RANDOM only, ditto |
 | `daysActive` | `String` | JSON list of `DayOfWeek` names |
 | `showCategoryInNotification` | `Boolean` | default `false` |
 | `nextFireAt` | `Long?` | epoch millis; null when disabled |
@@ -218,7 +218,7 @@ Jetpack DataStore Preferences stores simple app-wide state that doesn't belong i
 
 ## Room Database
 
-Three entities (`CategoryEntity`, `EventEntity`, `ReminderEntity`), version 4, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
+Three entities (`CategoryEntity`, `EventEntity`, `ReminderEntity`), version 5, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
 
 ## Migration Strategy
 
@@ -235,7 +235,16 @@ Removes `unit` column and adds `default_value` column on `categories`. SQLite do
 5. Recreate any indexes dropped by the table recreation.
 
 ### Version 3 → 4
-Adds the `reminders` table (`ReminderEntity`, § Room Entities), a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`.
+Adds the `reminders` table (`ReminderEntity`, § Room Entities), a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`. `windowStart`/`windowEnd`/`occurrencesPerDay` are nullable at this version.
+
+### Version 4 → 5
+Makes `windowStart`/`windowEnd`/`occurrencesPerDay` `NOT NULL` (defaults `'00:00'`, `'00:00'`, `1`), matching the fact that the app never actually leaves them null (REM-DATA-002 — preserved across mode switches, never cleared) and eliminating a `!!` at every read site in `ReminderScheduling.kt`. SQLite cannot `ALTER COLUMN` nullability, so the migration recreates `reminders` (same five-step create/copy/drop/rename shape as version 2 → 3), `COALESCE`-ing any pre-existing null to the same defaults.
+
+### Version 3 → 5 (direct)
+A second path to version 5, coexisting with the 3 → 4 → 4 → 5 chain above: creates `reminders` with the version-5 (`NOT NULL`) shape directly, for any device that was never at version 4's transient nullable shape. Room picks whichever migration's declared start version matches a given device's current stored version, so a device that already upgraded through 4 uses `MIGRATION_4_5`, and this path is unreachable for it. Once no device is expected to still be below version 4, `MIGRATION_3_4`/`MIGRATION_4_5` can be retired in favor of this single path — see `docs/arrows/local-storage.md`.
+
+### Testing
+`app/src/androidTest/java/net/clahey/trackr/data/local/MigrationTest.kt` uses Room's `MigrationTestHelper` to run each migration above (except 1 → 2 — see Decisions) against a real device/emulator, seeding "before" data via raw SQL and asserting on the resulting rows; this is the only instrumented Room test in the project. `app/schemas/` is wired into the `androidTest` source set as assets so `MigrationTestHelper` can load each version's exported schema.
 
 ## Android Auto Backup
 
@@ -279,6 +288,8 @@ Both files declare the same include set. Only the three entries above are backed
 | `imagePaths` decode failure | Return `emptyList()` | Crash; propagate exception | Data-loss acceptable vs. crash for image paths; events remain accessible |
 | Startup lifecycle hook name | `onStartup()` on `TrackrRepository` | `cleanupOrphanedImages()`; `initialize()` | Generic name keeps the interface implementation-agnostic; future backends (GraphQL, sync) can use the same hook for different startup behavior without renaming |
 | Category sort order | `sortOrder: Int ASC`; new = `currentMin - 1`; reorder reassigns sequentially | `createdAt ASC`; alphabetical; linked-list prev/next | `sortOrder` int is simple to query and reorder; linked-list avoids bulk updates but complicates queries; alphabetical removes user control |
+| Migration testing | Real instrumented tests via Room's `MigrationTestHelper`, run against an emulator/device | Trust manual review alone; a Room unit-test-only fake (no real SQLite behind it) | A migration bug commits before Room's schema validation ever runs (validation happens in a separate `onOpen()` callback, after the migrating `onUpgrade()` has already committed — there is no automatic rollback on validation failure), so an untested migration risks leaving a real device's data in a broken, unopenable state discoverable only by installing the build. `FakeTrackrRepository`'s unit tests never touch real SQLite and can't catch this class of bug |
+| `MIGRATION_1_2` test coverage | Left untested; no `MigrationTestHelper` test exists for it | Hand-reconstruct a `1.json` schema to synthesize a "before" database | No `1.json` was ever exported (predates `exportSchema = true` being enabled in this project's history) and reconstructing one after the fact risks encoding a schema that doesn't actually match what Room generated at the time — a false sense of coverage is worse than a documented gap. `MIGRATION_1_2` is old, stable, and has shipped without incident; the gap is accepted and flagged rather than worked around |
 
 ## Open Questions & Future Decisions
 

@@ -1,0 +1,96 @@
+# Arrow: reminders
+
+Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integration, notification delivery, and the Category Edit screen's Reminder section.
+
+## Status
+
+**PARTIAL** — first audit, 2026-08-12. 49 of 49 specs implemented and annotated in code. 22 specs have no test-file `@spec` citation; these split into a small annotation-only backfill, and a larger, structural gap (no instrumented Compose UI tests, notification tests, or real-`AlarmManager` tests exist anywhere in this project yet — not unique to reminders). This arrow overlay entry didn't exist before this pass — flagged as an open question in `docs/llds/reminders.md` since the feature's initial implementation.
+
+## References
+
+### HLD
+- docs/high-level-design.md (System Design, "Silence over spam" / "Public surfaces default to discreet" guidelines, `AlarmManager.setExactAndAllowWhileIdle()` decision)
+
+### LLD
+- docs/llds/reminders.md
+
+### EARS
+- docs/specs/reminders.md (49 specs: REM-DATA-* [8], REM-UI-* [11], REM-SCHED-* [20], REM-NOTIF-* [6], REM-PERM-* [4])
+
+### Tests
+- app/src/test/java/net/clahey/trackr/domain/ReminderSchedulingTest.kt
+- app/src/test/java/net/clahey/trackr/reminders/ReminderSchedulerTest.kt
+- app/src/test/java/net/clahey/trackr/ui/category/CategoryEditViewModelReminderTest.kt
+- app/src/test/java/net/clahey/trackr/data/local/MappersTest.kt
+- app/src/test/java/net/clahey/trackr/FakeTrackrRepositoryTest.kt
+- app/src/test/java/net/clahey/trackr/ui/category/CategoryListViewModelTest.kt
+- app/src/androidTest/java/net/clahey/trackr/data/local/MigrationTest.kt
+
+### Code
+- app/src/main/java/net/clahey/trackr/domain/Reminder.kt
+- app/src/main/java/net/clahey/trackr/domain/ReminderScheduling.kt
+- app/src/main/java/net/clahey/trackr/reminders/ReminderScheduler.kt
+- app/src/main/java/net/clahey/trackr/reminders/ReminderReceiver.kt
+- app/src/main/java/net/clahey/trackr/reminders/ReminderRearmReceiver.kt
+- app/src/main/java/net/clahey/trackr/data/AlarmScheduler.kt
+- app/src/main/java/net/clahey/trackr/data/local/AndroidAlarmScheduler.kt
+- app/src/main/java/net/clahey/trackr/data/ReminderNotifier.kt
+- app/src/main/java/net/clahey/trackr/data/local/AndroidReminderNotifier.kt
+- app/src/main/java/net/clahey/trackr/data/local/ReminderEntity.kt
+- app/src/main/java/net/clahey/trackr/data/local/ReminderDao.kt
+- app/src/main/java/net/clahey/trackr/data/local/Mappers.kt
+- app/src/main/java/net/clahey/trackr/data/local/Migrations.kt
+- app/src/main/java/net/clahey/trackr/data/TrackrRepository.kt
+- app/src/main/java/net/clahey/trackr/data/local/LocalTrackrRepository.kt
+- app/src/main/java/net/clahey/trackr/ui/category/CategoryEditViewModel.kt
+- app/src/main/java/net/clahey/trackr/ui/category/CategoryEditScreen.kt
+- app/src/main/java/net/clahey/trackr/ui/category/CategoryListScreen.kt
+- app/src/main/java/net/clahey/trackr/ui/category/CategoryListViewModel.kt
+
+## Architecture
+
+**Purpose:** Per-category opt-in reminders that nudge the user to log, at either fixed clock times or randomly within a window, without needing a backend — pure on-device `AlarmManager` scheduling.
+
+**Key Components:**
+1. `Reminder` (domain) / `ReminderEntity` (Room) — one row per category, flat shape holding both FIXED- and RANDOM-mode fields together (§ local-storage's "Reminder mode representation" decision)
+2. `ReminderScheduling.kt` — pure functions computing fire times and validity, independent of `AlarmManager`/DB
+3. `ReminderScheduler` — owns all `AlarmManager` interaction (arm/cancel/enable/disable/rearm/reconcile), the only component that touches the OS scheduler
+4. `ReminderReceiver` / `ReminderRearmReceiver` — `BroadcastReceiver`s for alarm fires and boot/clock-change re-arms
+5. `ReminderUIState` (in `CategoryEditViewModel`) — the Category Edit screen's Reminder section state, consolidated (this session) from 8 flat fields into one state object owning its own validation
+
+## Spec Coverage
+
+| Category | Spec IDs | Implemented | Deferred | Gaps |
+|----------|----------|-------------|----------|------|
+| Data model | REM-DATA-* (8) | all | 0 | 0 |
+| Category Edit UI | REM-UI-* (11) | all | 0 | 0 |
+| Scheduling engine | REM-SCHED-* (20) | all | 0 | 0 |
+| Notifications | REM-NOTIF-* (6) | all | 0 | 0 |
+| Permissions | REM-PERM-* (4) | all | 0 | 0 |
+
+**Summary:** 49 of 49 active specs implemented; 0 active behavioral gaps. 22 specs have no test-file `@spec` citation (finding 2).
+
+## Key Findings
+
+1. **Full `@spec` annotation coverage in production code.** Every one of the 49 REM-* specs has at least one `@spec` citation somewhere in `app/src/main` — no traceability gap on the code side, unlike `local-storage`'s 12 unannotated specs.
+2. **22 specs have no test-file `@spec` citation**, but this isn't one uniform gap — it splits into three distinct causes:
+   - **No instrumented test infra exists yet for the relevant surface, project-wide** (not reminders-specific): `REM-UI-001` through `REM-UI-008` and `REM-PERM-001`/`REM-PERM-002` (Category Edit screen's Reminder section — no screen-level Compose UI test exists for `CategoryEditScreen` at all, matching the rest of the app); `REM-NOTIF-001` through `REM-NOTIF-006` (notification channel/content — no `NotificationManager`-level test exists anywhere in the project); `REM-SCHED-009`/`REM-SCHED-010` (the shared `PendingIntent` helper and the exact-vs-inexact `AlarmManager` API selection — both live in `AndroidAlarmScheduler.kt`, the real implementation, which `FakeAlarmScheduler` doesn't replicate closely enough to exercise this logic, and no instrumented test of it exists — same shape of gap `MigrationTest.kt` just closed for Room, not yet done here).
+   - **Testable the same way `MigrationTest.kt` now demonstrates, just not yet written**: `REM-DATA-001` (at-most-one-`Reminder`-per-category PK + `CASCADE DELETE` FK) — real SQLite constraint behavior `FakeTrackrRepository` can't enforce, but reachable via a Room instrumented test analogous to the new migration tests.
+   - **Annotation-only gap; the behavior is likely already exercised indirectly**: `REM-DATA-003`/`REM-DATA-004`/`REM-DATA-005` (field defaults) and `REM-SCHED-002` (`enableReminder`'s recompute-with-`after`-=-`now` path) — existing tests plausibly already exercise these without citing the exact spec ID at the assertion (e.g. `MappersTest.kt`'s malformed-`daysActive`-decode tests touch REM-DATA-004's "defaults to all seven days" territory, but for the decode-fallback case, not the create-time case the spec describes).
+3. **`REM-DATA-004`'s wording doesn't quite match where the default lives.** It reads "`daysActive` shall default to all seven days when a `Reminder` is first created," but `Reminder` (the domain data class) has no default parameter values at all — the "all seven days" default is `ReminderUIState`'s constructor default (`CategoryEditViewModel.kt`), applied at the UI-state-seeding layer, not intrinsic to `Reminder` itself. Minor precision gap, not a behavioral one.
+4. **Migration test coverage added this pass** (`MigrationTest.kt`) closes what would otherwise be a much larger gap — `REM-DATA-001`/`REM-DATA-002` and `LS-BE-070` now have real, device-verified coverage for the reminders table's schema evolution (`MIGRATION_3_4`, `MIGRATION_4_5`, the direct `MIGRATION_3_5` path). `MIGRATION_1_2` (unrelated to reminders) remains untestable — see `docs/llds/local-storage.md` § Decisions.
+
+## Work Required
+
+### Must Fix
+_None._
+
+### Should Fix
+1. Add test-file `@spec` citations for `REM-DATA-003`/`004`/`005` and `REM-SCHED-002` where existing tests already cover the behavior (annotation backfill, not new tests).
+2. Add a Room instrumented test for `REM-DATA-001` (CASCADE DELETE + PK uniqueness on `reminders`), mirroring `MigrationTest.kt`'s approach.
+3. Reword `REM-DATA-004` to describe the default as living in the Category Edit screen's seeding, not `Reminder` itself (or add the default to `Reminder`'s constructor to match the spec as written — a real design choice, not just a doc fix).
+
+### Nice to Have
+1. Screen-level Compose UI test for `CategoryEditScreen`'s Reminder section (`REM-UI-*`, `REM-PERM-001`/`002`) — no precedent yet anywhere in the project; would be a first, not a small addition.
+2. Notification-content test for `AndroidReminderNotifier` (`REM-NOTIF-*`) — same "no precedent yet" caveat.
+3. Instrumented test for `AndroidAlarmScheduler`'s `PendingIntent` construction and exact/inexact API selection (`REM-SCHED-009`/`010`).

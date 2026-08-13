@@ -1,5 +1,5 @@
 schema_version: 1
-last_updated: 2026-07-27
+last_updated: 2026-08-12
 
 taxonomy:
   data:
@@ -10,6 +10,7 @@ taxonomy:
     - category-management
     - drag-reorder-list
     - event-logging
+    - reminders
     - theme
   release:
     - publishing
@@ -91,6 +92,17 @@ arrows:
     detail: event-logging.md
     next: "EL-UI-077 (post-save scroll) implemented and split into EL-UI-077/077a/077b/077c. 2 minor gaps remain, none MVP-blocking: EL-UI-056 (error kind missing from display), EL-UI-057b (no field-level error highlighting)."
     drift: null
+
+  reminders:
+    status: PARTIAL
+    sampled: 2026-08-12
+    audited: 2026-08-12
+    audited_sha: 1a7333f8e7ddb8e9ada7b842a11fc5599705f75f
+    blocks: []
+    blockedBy: [local-storage, category-management]
+    detail: reminders.md
+    next: "22 of 49 specs have no test-file @spec citation: REM-DATA-003/004/005 + REM-SCHED-002 are annotation-only backfills (likely already exercised); REM-DATA-001 needs a Room instrumented test like the new MigrationTest.kt; REM-UI-*/REM-PERM-*/REM-NOTIF-*/REM-SCHED-009/010 need instrumented test infra (Compose UI, notification, real-AlarmManager) that doesn't exist anywhere in the project yet, not reminders-specific."
+    drift: "REM-DATA-004's wording (default lives on Reminder) doesn't match where the default is actually applied (ReminderUIState's constructor, in CategoryEditViewModel) — minor precision gap"
 
   publishing:
     status: OK
