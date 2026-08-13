@@ -127,9 +127,7 @@ private fun boxIndex(reminder: Reminder, date: LocalDate, zone: ZoneId, instant:
     val (startInstant, subNanos) = windowStep(reminder, date, zone)
     val offsetNanos = Duration.between(startInstant, instant).toNanos()
     if (offsetNanos < 0) return 0
-    val occurrencesPerDay = reminder.occurrencesPerDay
-    val index = offsetNanos / subNanos + offset
-    return if (index >= occurrencesPerDay) occurrencesPerDay else index.toInt()
+    return minOf(offsetNanos / subNanos + offset, reminder.occurrencesPerDay.toLong()).toInt()
 }
 
 private fun drawWithin(box: SubWindow, random: Random): Instant {
@@ -138,17 +136,14 @@ private fun drawWithin(box: SubWindow, random: Random): Instant {
     return box.start.plusNanos(random.nextLong(rangeNanos))
 }
 
-private fun nextActiveDay(reminder: Reminder, from: LocalDate): LocalDate {
+private fun walkToActiveDay(reminder: Reminder, from: LocalDate, step: Long): LocalDate {
     var date = from
-    while (!reminder.daysActive.contains(date.dayOfWeek)) date = date.plusDays(1)
+    while (!reminder.daysActive.contains(date.dayOfWeek)) date = date.plusDays(step)
     return date
 }
 
-private fun previousActiveDay(reminder: Reminder, from: LocalDate): LocalDate {
-    var date = from
-    while (!reminder.daysActive.contains(date.dayOfWeek)) date = date.minusDays(1)
-    return date
-}
+private fun nextActiveDay(reminder: Reminder, from: LocalDate): LocalDate = walkToActiveDay(reminder, from, step = 1)
+private fun previousActiveDay(reminder: Reminder, from: LocalDate): LocalDate = walkToActiveDay(reminder, from, step = -1)
 
 // The earliest sub-window (today, or the next active day) that has not yet fully elapsed as of `now`,
 // paired with the sub-window immediately following it — the pair a normal post-fire reschedule and an
