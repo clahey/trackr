@@ -234,14 +234,8 @@ Removes `unit` column and adds `default_value` column on `categories`. SQLite do
 4. Rename `categories_new` to `categories`.
 5. Recreate any indexes dropped by the table recreation.
 
-### Version 3 → 4
-Adds the `reminders` table (`ReminderEntity`, § Room Entities), a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`. `windowStart`/`windowEnd`/`occurrencesPerDay` are nullable at this version.
-
-### Version 4 → 5
-Makes `windowStart`/`windowEnd`/`occurrencesPerDay` `NOT NULL` (defaults `'00:00'`, `'00:00'`, `1`), matching the fact that the app never actually leaves them null (REM-DATA-002 — preserved across mode switches, never cleared) and eliminating a `!!` at every read site in `ReminderScheduling.kt`. SQLite cannot `ALTER COLUMN` nullability, so the migration recreates `reminders` (same five-step create/copy/drop/rename shape as version 2 → 3), `COALESCE`-ing any pre-existing null to the same defaults.
-
-### Version 3 → 5 (direct)
-A second path to version 5, coexisting with the 3 → 4 → 4 → 5 chain above: creates `reminders` with the version-5 (`NOT NULL`) shape directly, for any device that was never at version 4's transient nullable shape. Room picks whichever migration's declared start version matches a given device's current stored version, so a device that already upgraded through 4 uses `MIGRATION_4_5`, and this path is unreachable for it. Once no device is expected to still be below version 4, `MIGRATION_3_4`/`MIGRATION_4_5` can be retired in favor of this single path — see `docs/arrows/local-storage.md`.
+### Version 3 → 5
+Adds the `reminders` table (`ReminderEntity`, § Room Entities) directly in its current shape, a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`. `windowStart`/`windowEnd`/`occurrencesPerDay` are `NOT NULL` from creation, matching the fact that the app never actually leaves them null (REM-DATA-002 — preserved across mode switches, never cleared) and eliminating a `!!` at every read site in `ReminderScheduling.kt`.
 
 ### Testing
 `app/src/androidTest/java/net/clahey/trackr/data/local/MigrationTest.kt` uses Room's `MigrationTestHelper` to run each migration above (except 1 → 2 — see Decisions) against a real device/emulator, seeding "before" data via raw SQL and asserting on the resulting rows; this is the only instrumented Room test in the project. `app/schemas/` is wired into the `androidTest` source set as assets so `MigrationTestHelper` can load each version's exported schema.

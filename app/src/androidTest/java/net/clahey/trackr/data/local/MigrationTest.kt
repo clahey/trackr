@@ -59,57 +59,9 @@ class MigrationTest {
         }
     }
 
-    // MIGRATION_3_4 creates the reminders table fresh (no pre-existing rows to preserve or lose),
-    // and runMigrationsAndValidate already fails the test if the resulting schema doesn't match
-    // 4.json — there's no data-integrity behavior left to check beyond that, so no standalone test
-    // for it here; migrateAllTheWayFrom2To5_succeeds below exercises it as part of the full chain.
-
-    // @spec REM-DATA-002
-    @Test fun migrate4To5_coalescesNullWindowFieldsAndPreservesRealOnes() {
-        helper.createDatabase(TEST_DB, 4).apply {
-            execSQL(
-                """
-                INSERT INTO reminders
-                    (categoryId, enabled, mode, times, windowStart, windowEnd, occurrencesPerDay,
-                     daysActive, showCategoryInNotification, nextFireAt)
-                VALUES ('null-fields', 1, 'fixed', '["09:00"]', NULL, NULL, NULL, '["MONDAY"]', 0, NULL)
-                """.trimIndent(),
-            )
-            execSQL(
-                """
-                INSERT INTO reminders
-                    (categoryId, enabled, mode, times, windowStart, windowEnd, occurrencesPerDay,
-                     daysActive, showCategoryInNotification, nextFireAt)
-                VALUES ('real-window', 1, 'random', NULL, '08:00', '20:00', 4, '["MONDAY"]', 1, 1700000000000)
-                """.trimIndent(),
-            )
-            close()
-        }
-
-        val db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5)
-        db.query(
-            "SELECT windowStart, windowEnd, occurrencesPerDay FROM reminders WHERE categoryId = 'null-fields'",
-        ).use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals("00:00", cursor.getString(cursor.getColumnIndexOrThrow("windowStart")))
-            assertEquals("00:00", cursor.getString(cursor.getColumnIndexOrThrow("windowEnd")))
-            assertEquals(1, cursor.getInt(cursor.getColumnIndexOrThrow("occurrencesPerDay")))
-        }
-        db.query(
-            "SELECT windowStart, windowEnd, occurrencesPerDay, nextFireAt FROM reminders WHERE categoryId = 'real-window'",
-        ).use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals("08:00", cursor.getString(cursor.getColumnIndexOrThrow("windowStart")))
-            assertEquals("20:00", cursor.getString(cursor.getColumnIndexOrThrow("windowEnd")))
-            assertEquals(4, cursor.getInt(cursor.getColumnIndexOrThrow("occurrencesPerDay")))
-            assertEquals(1700000000000L, cursor.getLong(cursor.getColumnIndexOrThrow("nextFireAt")))
-        }
-    }
-
-    // The only test exercising MIGRATION_3_5 (not part of the chain migrateAllTheWayFrom2To5_succeeds
-    // uses below). Fresh table creation, same as MIGRATION_3_4 above — runMigrationsAndValidate's
-    // schema comparison against 5.json is what actually confirms this produces the right shape;
-    // this test's job is just making sure the migration runs at all for devices that take this path.
+    // Fresh table creation (no pre-existing rows to preserve or lose) — runMigrationsAndValidate
+    // already fails the test if the resulting schema doesn't match 5.json, so this test's job is
+    // just making sure the migration runs at all for a device starting fresh at version 3.
     @Test fun migrate3To5Directly_runs() {
         helper.createDatabase(TEST_DB, 3).apply { close() }
         helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_3_5)
@@ -128,7 +80,7 @@ class MigrationTest {
 
         val db = helper.runMigrationsAndValidate(
             TEST_DB, 5, true,
-            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+            MIGRATION_2_3, MIGRATION_3_5,
         )
         db.query("""SELECT defaultValue FROM categories WHERE id = 'c1'""").use { cursor ->
             assertTrue(cursor.moveToFirst())
