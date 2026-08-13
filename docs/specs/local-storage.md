@@ -13,8 +13,8 @@ LLD: `docs/llds/local-storage.md`
 
 ## Category Persistence
 
-- [x] **LS-BE-010**: The system shall store categories ordered by `sortOrder ASC`; `getCategories` shall return them in this order.
-- [x] **LS-BE-011**: When `saveCategory` is called for a new category, the system shall assign it a `sortOrder` of `currentMin - 1`, placing it at the top of the list.
+- [x] **LS-BE-010**: `getCategories` shall return categories grouped hierarchically: top-level categories ordered by their own `sortOrder ASC`, with each SubCategory listed immediately after its parent and ordered by the SubCategory's own `sortOrder ASC` among its siblings.
+- [x] **LS-BE-011**: `saveCategory` shall persist the `sortOrder` it is given as-is, without recomputing it; assigning a new category's `sortOrder` (e.g. `currentMin - 1` to place it at the top) is the caller's responsibility.
 - [x] **LS-BE-012**: `reorderCategories` shall accept an ordered list of category IDs and reassign sequential `sortOrder` values (0, 1, 2…) matching that order in a single operation.
 - [x] **LS-BE-013**: `getEventCountForCategory` shall return a `Flow<Int>` that reflects the live count of events for a given category.
 

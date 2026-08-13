@@ -29,14 +29,14 @@ arrows:
 
   local-storage:
     status: AUDITED
-    sampled: 2026-07-27
-    audited: 2026-07-27
-    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    sampled: 2026-08-12
+    audited: 2026-08-12
+    audited_sha: 996c81224dce4c55ca33729036259f1847552837
     blocks: [category-management, event-logging]
     blockedBy: [data-model]
     detail: local-storage.md
-    next: "Backfill @spec on 12 unannotated specs (corrected from 9: LS-BE-001-004/033/050/054/060-062/070/071)."
-    drift: "12 implemented specs unannotated (corrected count; LS-BE-090/091/092 confirmed properly annotated, removed from list)"
+    next: "Backfill @spec on 12 unannotated specs (LS-BE-001-004/033/050/054/060-062/070/071). Cross-segment: data-model.md's createdAt ordering claim (DM-PROC-010) contradicts this segment's tested descending order — needs data-model's owner to reconcile."
+    drift: "12 implemented specs unannotated (unchanged from prior pass). LS-BE-010/011 reworded to match code (spec text was wrong, not the code). Several LLD/HLD prose bugs found and fixed this pass (saveCategoryWithReminder no-op claim, missing migrateFromType param, stale mode casing, stale two-tables HLD line, resolved-but-still-listed Open Question)."
 
   theme:
     status: OK
@@ -97,12 +97,12 @@ arrows:
     status: PARTIAL
     sampled: 2026-08-12
     audited: 2026-08-12
-    audited_sha: 1a7333f8e7ddb8e9ada7b842a11fc5599705f75f
+    audited_sha: 996c81224dce4c55ca33729036259f1847552837
     blocks: []
     blockedBy: [local-storage, category-management]
     detail: reminders.md
     next: "22 of 49 specs have no test-file @spec citation: REM-DATA-003/004/005 + REM-SCHED-002 are annotation-only backfills (likely already exercised); REM-DATA-001 needs a Room instrumented test like the new MigrationTest.kt; REM-UI-*/REM-PERM-*/REM-NOTIF-*/REM-SCHED-009/010 need instrumented test infra (Compose UI, notification, real-AlarmManager) that doesn't exist anywhere in the project yet, not reminders-specific."
-    drift: "REM-DATA-004's wording (default lives on Reminder) doesn't match where the default is actually applied (ReminderUIState's constructor, in CategoryEditViewModel) — minor precision gap"
+    drift: "Deep full-text pass (2026-08-12) re-verified all 49 specs against code. Fixed: notification PendingIntent/id collision risk (categoryId.hashCode(), contradicted the LLD's own alarm-identity reasoning) now uses the same data-Uri technique as alarms; REM-DATA-003/004/REM-PERM-004/REM-NOTIF-005 spec wording reworded to match actual behavior; stale mode casing in reminders.md's ReminderEntity table corrected. No remaining known drift."
 
   publishing:
     status: OK

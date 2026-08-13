@@ -39,7 +39,7 @@ interface TrackrRepository {
     // Reminders (persistence only — no AlarmManager access; see docs/llds/reminders.md)
     fun getReminderForCategory(categoryId: String): Flow<Reminder?>
     suspend fun saveReminder(reminder: Reminder)                                  // upsert, standalone
-    suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?) // atomic: category upsert + reminder upsert/clear in one transaction
+    suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType? = null) // atomic: category upsert + reminder upsert/clear (+ optional event migration) in one transaction
     suspend fun getAllEnabledRemindersOnce(): List<Reminder>                      // boot / time-change re-arm
 
     // Lifecycle
@@ -84,7 +84,7 @@ Entities mirror domain models with Room annotations. They are package-private to
 |---|---|---|
 | `categoryId` | `String` PK, FK → categories(id) CASCADE DELETE | one row per category |
 | `enabled` | `Boolean` | |
-| `mode` | `String` | `"fixed"` / `"random"` |
+| `mode` | `String` | `ReminderMode.name`: `"FIXED"` / `"RANDOM"`; lowercase `"fixed"`/`"random"` accepted on decode only, as a compatibility fallback |
 | `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only; null encodes an empty list |
 | `windowStart` | `String` | `"HH:mm"`; RANDOM only, preserved but unused while mode == FIXED |
 | `windowEnd` | `String` | `"HH:mm"`; RANDOM only, ditto |
@@ -154,7 +154,7 @@ This mirrors the `ErrorValue` forward-compatibility contract: an old app version
 | `upsert(entity)` | `Unit` | suspend |
 | `deleteById(id)` | `Unit` | suspend |
 
-Sort order (`timestamp DESC, createdAt DESC, id ASC`) matches the canonical ordering in `data-model.md § Same-timestamp ordering`.
+Sort order is `timestamp DESC, createdAt DESC, id ASC` (LS-BE-020/021). The `id ASC` tiebreak matches `data-model.md § Same-timestamp ordering`'s canonical rule, but that section currently states `createdAt` **ascending** — the opposite of what's implemented here and covered by tests; this segment's ordering is correct and tested, the mismatch is flagged for `data-model.md`'s owner to reconcile.
 
 ### ReminderDao
 
@@ -194,7 +194,7 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **`saveReminder` / `getReminderForCategory` / `getAllEnabledRemindersOnce`:** thin pass-throughs to `ReminderDao`, mapping via `ReminderEntity.toDomain()`/`Reminder.toEntity()`. No transaction needed — each is a single-row read or upsert.
 
-**`saveCategoryWithReminder`:** runs inside a single Room transaction: upserts the `CategoryEntity` (via the same path `saveCategory` uses, including its childlessness guard) and upserts (or, when `reminder == null`, no-ops — there's nothing to delete explicitly; a category can only reach this method while it still exists) the `ReminderEntity`. This is a persistence-only transaction — it does not touch `AlarmManager`; arming or cancelling the alarm is a separate post-commit step the caller (`ReminderScheduler`, per `docs/llds/reminders.md § Scheduling Engine`) performs after this method returns successfully.
+**`saveCategoryWithReminder`:** runs inside a single Room transaction: upserts the `CategoryEntity` (via the same path `saveCategory` uses, including its childlessness guard); when `migrateFromType` is non-null, migrates that category's existing events to the new value type first (`migrateEventsForCategory`); then, for the reminder, either upserts the `ReminderEntity` (when `reminder != null`) or explicitly deletes it via `reminderDao.deleteByCategoryId` (when `reminder == null` — clearing a reminder while the category still exists is not implicit or CASCADE-driven; CASCADE only fires when the category row itself is deleted). Before upserting a non-null reminder, the method reads the existing row's `nextFireAt` inside the same transaction and copies it onto the entity being saved, discarding whatever `nextFireAt` the caller passed in — this is what keeps an edit-screen save from clobbering a value `ReminderScheduler` set concurrently (REM-DATA-008). This is a persistence-only transaction — it does not touch `AlarmManager`; arming or cancelling the alarm is a separate post-commit step the caller (`ReminderScheduler`, per `docs/llds/reminders.md § Scheduling Engine`) performs after this method returns successfully.
 
 ## ImageStore
 
@@ -295,10 +295,9 @@ Both files declare the same include set. Only the three entries above are backed
 
 ### Deferred
 
-1. **Nullable Long params in `getEvents` SQL** — Room's handling of `Long?` in `IS NULL OR` queries needs verification during implementation. Fallback: two separate DAO methods (`getAll()`, `getAllInRange(start, end)`) dispatched in the repository.
-2. **`imagePaths` join table** — if per-image ordering, querying, or metadata is needed, a `event_images` join table may be preferable. Deferred until requirements emerge.
-3. **Pagination** — `getEvents` returns all rows. A `PagingSource` (Paging 3) may be needed at scale. Deferred until observed.
-4. **Backup / export** — out of scope for v1.
+1. **`imagePaths` join table** — if per-image ordering, querying, or metadata is needed, a `event_images` join table may be preferable. Deferred until requirements emerge.
+2. **Pagination** — `getEvents` returns all rows. A `PagingSource` (Paging 3) may be needed at scale. Deferred until observed.
+3. **Backup / export** — out of scope for v1.
 
 ## References
 

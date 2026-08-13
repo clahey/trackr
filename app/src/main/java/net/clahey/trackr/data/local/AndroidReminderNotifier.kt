@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import net.clahey.trackr.MainActivity
@@ -45,16 +46,17 @@ class AndroidReminderNotifier @Inject constructor(
             context.getString(R.string.reminder_notification_body_generic)
         }
 
-        val requestCode = reminder.categoryId.hashCode()
-        val contentIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra(ReminderReceiver.EXTRA_CATEGORY_ID, reminder.categoryId)
-        }
-        // Distinct request codes keep each category's tap target from clobbering another's
-        // still-visible notification (PendingIntent matching ignores extras, same reasoning as
-        // the alarm identity design — see docs/llds/reminders.md § Scheduling Engine).
+        // Same `data` Uri technique as AndroidAlarmScheduler.buildPendingIntent: PendingIntent
+        // matching considers `data` but ignores `extras`, so a per-category Uri (not a hashCode
+        // request code) is what keeps one category's tap target from clobbering another's.
+        val contentIntent = Intent(context, MainActivity::class.java)
+            .setData(Uri.parse("trackr://reminder/${reminder.categoryId}"))
+            .apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra(ReminderReceiver.EXTRA_CATEGORY_ID, reminder.categoryId)
+            }
         val pendingIntent = PendingIntent.getActivity(
-            context, requestCode, contentIntent,
+            context, 0, contentIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
@@ -67,6 +69,9 @@ class AndroidReminderNotifier @Inject constructor(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(requestCode, notification)
+        // NotificationManager.notify's id has no Uri-based equivalent to the PendingIntent fix
+        // above — it's a plain int, so a hashCode collision between two categories' ids remains a
+        // (very unlikely) residual risk: one notification's tray entry could replace the other's.
+        notificationManager.notify(reminder.categoryId.hashCode(), notification)
     }
 }
