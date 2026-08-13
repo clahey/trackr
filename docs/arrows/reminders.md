@@ -56,7 +56,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 2. `ReminderScheduling.kt` — pure functions computing fire times and validity, independent of `AlarmManager`/DB
 3. `ReminderScheduler` — owns all `AlarmManager` interaction (arm/cancel/enable/disable/rearm/reconcile), the only component that touches the OS scheduler
 4. `ReminderReceiver` / `ReminderRearmReceiver` — `BroadcastReceiver`s for alarm fires and boot/clock-change re-arms
-5. `ReminderUIState` (in `CategoryEditViewModel`) — the Category Edit screen's Reminder section state, consolidated (this session) from 8 flat fields into one state object owning its own validation
+5. `ReminderUIState` (in `CategoryEditViewModel`) — the Category Edit screen's Reminder section state, one object owning its own validation
 
 ## Spec Coverage
 

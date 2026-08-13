@@ -108,8 +108,8 @@ fun ReminderEntity.toDomain(): Reminder {
         // ReminderScheduling.kt's day-walking loops spin forever against it, so a row that
         // somehow has one is decoded as disabled rather than risking a hang.
         enabled = enabled && decodedDaysActive.isNotEmpty(),
-        // .uppercase() (added 2026-08-07) accepts rows saved by earlier test builds under the old
-        // lowercase "fixed"/"random" encoding, since that test data made it onto a live device.
+        // .uppercase() accepts rows saved by earlier test builds under the old lowercase
+        // "fixed"/"random" encoding, since that test data made it onto a live device.
         mode = ReminderMode.valueOf(mode.uppercase()),
         times = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList(),
         windowStart = windowStart.toLocalTimeHHmm(),
