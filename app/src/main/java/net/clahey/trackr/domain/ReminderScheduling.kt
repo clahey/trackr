@@ -37,9 +37,9 @@ private fun computeFixedFireTime(reminder: Reminder, pivot: Instant, zone: ZoneI
         }
     }
     val fallbackDate = if (forward) {
-        nextActiveDay(reminder, today.plusDays(1))
+        nextActiveDay(reminder, today)
     } else {
-        previousActiveDay(reminder, today.minusDays(1))
+        previousActiveDay(reminder, today)
     }
     return fallbackDate.atTime(sortedTimes.first()).atZone(zone).toInstant()
 }
@@ -66,7 +66,7 @@ private fun computeNextRandomFireTime(reminder: Reminder, after: Instant, zone: 
         val index = indexOfFirstStartAfter(reminder, today, zone, after)
         if (index < reminder.occurrencesPerDay) return drawWithin(subWindowAt(reminder, today, zone, index), random)
     }
-    val nextDate = nextActiveDay(reminder, today.plusDays(1))
+    val nextDate = nextActiveDay(reminder, today)
     return drawWithin(subWindowAt(reminder, nextDate, zone, 0), random)
 }
 
@@ -137,7 +137,7 @@ private fun drawWithin(box: SubWindow, random: Random): Instant {
 }
 
 private fun walkToActiveDay(reminder: Reminder, from: LocalDate, step: Long): LocalDate {
-    var date = from
+    var date = from.plusDays(step)
     while (!reminder.daysActive.contains(date.dayOfWeek)) date = date.plusDays(step)
     return date
 }
@@ -154,7 +154,7 @@ private fun currentAndNextBox(reminder: Reminder, now: Instant, zone: ZoneId): P
     val nextBox = if (index + 1 < reminder.occurrencesPerDay) {
         subWindowAt(reminder, date, zone, index + 1)
     } else {
-        subWindowAt(reminder, nextActiveDay(reminder, date.plusDays(1)), zone, 0)
+        subWindowAt(reminder, nextActiveDay(reminder, date), zone, 0)
     }
     return currentBox to nextBox
 }
@@ -165,5 +165,5 @@ private fun currentBoxLocation(reminder: Reminder, now: Instant, zone: ZoneId): 
         val index = indexContaining(reminder, today, zone, now)
         if (index < reminder.occurrencesPerDay) return today to index
     }
-    return nextActiveDay(reminder, today.plusDays(1)) to 0
+    return nextActiveDay(reminder, today) to 0
 }
