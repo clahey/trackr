@@ -126,8 +126,8 @@ class CategoryListViewModelTest {
         seededRepo.setReminders(
             net.clahey.trackr.domain.Reminder(
                 categoryId = "c1", enabled = true, mode = net.clahey.trackr.domain.ReminderMode.FIXED,
-                times = listOf(java.time.LocalTime.of(9, 0)), windowStart = null, windowEnd = null,
-                occurrencesPerDay = null, daysActive = java.time.DayOfWeek.entries.toSet(),
+                times = listOf(java.time.LocalTime.of(9, 0)), windowStart = java.time.LocalTime.MIDNIGHT, windowEnd = java.time.LocalTime.MIDNIGHT,
+                occurrencesPerDay = 1, daysActive = java.time.DayOfWeek.entries.toSet(),
                 showCategoryInNotification = false, nextFireAt = null,
             ),
         )

@@ -7,6 +7,8 @@ import net.clahey.trackr.data.local.EventDao
 import net.clahey.trackr.data.local.MIGRATION_1_2
 import net.clahey.trackr.data.local.MIGRATION_2_3
 import net.clahey.trackr.data.local.MIGRATION_3_4
+import net.clahey.trackr.data.local.MIGRATION_3_5
+import net.clahey.trackr.data.local.MIGRATION_4_5
 import net.clahey.trackr.data.local.ReminderDao
 import net.clahey.trackr.data.local.TrackrDatabase
 import dagger.Module
@@ -25,7 +27,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): TrackrDatabase =
         Room.databaseBuilder(context, TrackrDatabase::class.java, "trackr.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_3_5, MIGRATION_4_5)
             .build()
 
     @Provides

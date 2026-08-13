@@ -19,9 +19,9 @@ data class ReminderEntity(
     val enabled: Boolean,
     val mode: String, // ReminderMode.name, e.g. "FIXED" / "RANDOM"
     val times: String?, // JSON list of "HH:mm" strings; FIXED only
-    val windowStart: String?, // "HH:mm"; RANDOM only
-    val windowEnd: String?, // "HH:mm"; RANDOM only
-    val occurrencesPerDay: Int?, // RANDOM only
+    val windowStart: String, // "HH:mm"; RANDOM only, preserved but unused while mode == FIXED
+    val windowEnd: String, // "HH:mm"; RANDOM only, preserved but unused while mode == FIXED
+    val occurrencesPerDay: Int, // RANDOM only, preserved but unused while mode == FIXED
     val daysActive: String, // JSON list of DayOfWeek names
     val showCategoryInNotification: Boolean,
     val nextFireAt: Long?, // epoch millis; null when disabled or not yet armed

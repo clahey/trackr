@@ -141,8 +141,8 @@ class CategoryEditViewModelReminderTest {
         repo.saveReminder(
             Reminder(
                 categoryId = "cat1", enabled = true, mode = ReminderMode.FIXED,
-                times = listOf(LocalTime.of(9, 0)), windowStart = null, windowEnd = null,
-                occurrencesPerDay = null, daysActive = DayOfWeek.entries.toSet(),
+                times = listOf(LocalTime.of(9, 0)), windowStart = LocalTime.MIDNIGHT, windowEnd = LocalTime.MIDNIGHT,
+                occurrencesPerDay = 1, daysActive = DayOfWeek.entries.toSet(),
                 showCategoryInNotification = false, nextFireAt = null,
             ),
         )

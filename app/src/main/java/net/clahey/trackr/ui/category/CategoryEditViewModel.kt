@@ -82,9 +82,9 @@ data class ReminderUIState(
             enabled = reminder.enabled,
             mode = reminder.mode,
             times = reminder.times.ifEmpty { listOf(LocalTime.of(9, 0)) },
-            windowStart = reminder.windowStart ?: LocalTime.MIDNIGHT,
-            windowEnd = reminder.windowEnd ?: LocalTime.MIDNIGHT,
-            occurrencesPerDay = reminder.occurrencesPerDay ?: 1,
+            windowStart = reminder.windowStart,
+            windowEnd = reminder.windowEnd,
+            occurrencesPerDay = reminder.occurrencesPerDay,
             daysActive = reminder.daysActive.ifEmpty { DayOfWeek.entries.toSet() },
             showCategoryInNotification = reminder.showCategoryInNotification,
         )

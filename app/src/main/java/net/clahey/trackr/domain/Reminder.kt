@@ -12,9 +12,9 @@ data class Reminder(
     val enabled: Boolean,
     val mode: ReminderMode,
     val times: List<LocalTime>,
-    val windowStart: LocalTime?,
-    val windowEnd: LocalTime?,
-    val occurrencesPerDay: Int?,
+    val windowStart: LocalTime, // RANDOM only; preserved but unused while mode == FIXED (REM-DATA-002)
+    val windowEnd: LocalTime, // RANDOM only; preserved but unused while mode == FIXED (REM-DATA-002)
+    val occurrencesPerDay: Int, // RANDOM only; preserved but unused while mode == FIXED (REM-DATA-002)
     val daysActive: Set<DayOfWeek>,
     val showCategoryInNotification: Boolean,
     val nextFireAt: Instant?,
