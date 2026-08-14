@@ -117,27 +117,51 @@ class CategoryEditViewModel @Inject constructor(
     private val _hasUserEdits = MutableStateFlow(false)
     val hasUserEdits: StateFlow<Boolean> = _hasUserEdits.asStateFlow()
 
+    // @spec CAT-UI-018 — one flag per initial-state read, seeded true when the current mode doesn't
+    // issue that read (these mirror init's `when` branches). Each is flipped on the read's
+    // *completion*, not its success, so a category with no reminder row still opens the gate.
+    private val _categoryLoaded = MutableStateFlow(categoryId == null)
+    private val _reminderLoaded = MutableStateFlow(categoryId == null)
+    private val _parentLoaded = MutableStateFlow(categoryId != null || parentId == null)
+    private val _colorLoaded = MutableStateFlow(categoryId != null || parentId != null)
+
+    // @spec CAT-UI-018
+    val isLoaded: StateFlow<Boolean> =
+        combine(_categoryLoaded, _reminderLoaded, _parentLoaded, _colorLoaded) { c, r, p, col ->
+            c && r && p && col
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     private fun markEdited() {
         _isDirty.value = true
         _hasUserEdits.value = true
     }
 
+    // Every field setter routes through here so the CAT-UI-018 gate can't be forgotten on a new
+    // one: seeding writes state directly, so an edit accepted before the seed lands would be
+    // silently overwritten by it.
+    // @spec CAT-UI-018
+    private inline fun edit(block: () -> Unit) {
+        if (!isLoaded.value) return
+        block()
+        markEdited()
+    }
+
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name.asStateFlow()
-    fun setName(value: String) { _name.value = value; markEdited() }
+    fun setName(value: String) = edit { _name.value = value }
 
     // @spec CAT-UI-054
     private val _emojiUIState = MutableStateFlow(EmojiUIState(EmojiMode.INHERIT, ""))
     val emojiUIState: StateFlow<EmojiUIState> = _emojiUIState.asStateFlow()
-    fun setEmojiUIState(value: EmojiUIState) { _emojiUIState.value = value; markEdited() }
+    fun setEmojiUIState(value: EmojiUIState) = edit { _emojiUIState.value = value }
 
     private val _colorState = MutableStateFlow<Long?>(null)
     val colorState: StateFlow<Long?> = _colorState.asStateFlow()
-    fun setColorState(value: Long?) { _colorState.value = value; markEdited() }
+    fun setColorState(value: Long?) = edit { _colorState.value = value }
 
     private val _valueTypeState = MutableStateFlow<ValueType?>(null)
     val valueTypeState: StateFlow<ValueType?> = _valueTypeState.asStateFlow()
-    fun setValueTypeState(value: ValueType?) { _valueTypeState.value = value; markEdited() }
+    fun setValueTypeState(value: ValueType?) = edit { _valueTypeState.value = value }
 
     private val _numberDefaultUnit = MutableStateFlow("")
     val numberDefaultUnit: StateFlow<String> = _numberDefaultUnit.asStateFlow()
@@ -150,9 +174,9 @@ class CategoryEditViewModel @Inject constructor(
 
     private var defaultValueDirty = false
 
-    fun updateNumberDefaultUnit(value: String) { _numberDefaultUnit.value = value; defaultValueDirty = true; markEdited() }
-    fun updateExerciseDefaultSets(value: String) { _exerciseDefaultSets.value = value; defaultValueDirty = true; markEdited() }
-    fun updateExerciseDefaultReps(value: String) { _exerciseDefaultReps.value = value; defaultValueDirty = true; markEdited() }
+    fun updateNumberDefaultUnit(value: String) = edit { _numberDefaultUnit.value = value; defaultValueDirty = true }
+    fun updateExerciseDefaultSets(value: String) = edit { _exerciseDefaultSets.value = value; defaultValueDirty = true }
+    fun updateExerciseDefaultReps(value: String) = edit { _exerciseDefaultReps.value = value; defaultValueDirty = true }
     private var storedDefaultValue: EventValue? = null
 
     private val _parentCategory = MutableStateFlow<Category.MetaCategory?>(null)
@@ -262,14 +286,14 @@ class CategoryEditViewModel @Inject constructor(
     private val _reminderUIState = MutableStateFlow(ReminderUIState())
     val reminderUIState: StateFlow<ReminderUIState> = _reminderUIState.asStateFlow()
 
-    fun setReminderEnabled(value: Boolean) { _reminderUIState.value = _reminderUIState.value.copy(enabled = value); markEdited() }
-    fun setReminderMode(value: ReminderMode) { _reminderUIState.value = _reminderUIState.value.copy(mode = value); markEdited() }
-    fun setReminderTimes(value: List<LocalTime>) { _reminderUIState.value = _reminderUIState.value.copy(times = value); markEdited() }
-    fun setReminderWindowStart(value: LocalTime) { _reminderUIState.value = _reminderUIState.value.copy(windowStart = value); markEdited() }
-    fun setReminderWindowEnd(value: LocalTime) { _reminderUIState.value = _reminderUIState.value.copy(windowEnd = value); markEdited() }
-    fun setReminderOccurrencesPerDay(value: Int) { _reminderUIState.value = _reminderUIState.value.copy(occurrencesPerDay = value); markEdited() }
-    fun setReminderDaysActive(value: Set<DayOfWeek>) { _reminderUIState.value = _reminderUIState.value.copy(daysActive = value); markEdited() }
-    fun setReminderShowCategoryInNotification(value: Boolean) { _reminderUIState.value = _reminderUIState.value.copy(showCategoryInNotification = value); markEdited() }
+    fun setReminderEnabled(value: Boolean) = edit { _reminderUIState.value = _reminderUIState.value.copy(enabled = value) }
+    fun setReminderMode(value: ReminderMode) = edit { _reminderUIState.value = _reminderUIState.value.copy(mode = value) }
+    fun setReminderTimes(value: List<LocalTime>) = edit { _reminderUIState.value = _reminderUIState.value.copy(times = value) }
+    fun setReminderWindowStart(value: LocalTime) = edit { _reminderUIState.value = _reminderUIState.value.copy(windowStart = value) }
+    fun setReminderWindowEnd(value: LocalTime) = edit { _reminderUIState.value = _reminderUIState.value.copy(windowEnd = value) }
+    fun setReminderOccurrencesPerDay(value: Int) = edit { _reminderUIState.value = _reminderUIState.value.copy(occurrencesPerDay = value) }
+    fun setReminderDaysActive(value: Set<DayOfWeek>) = edit { _reminderUIState.value = _reminderUIState.value.copy(daysActive = value) }
+    fun setReminderShowCategoryInNotification(value: Boolean) = edit { _reminderUIState.value = _reminderUIState.value.copy(showCategoryInNotification = value) }
 
     // @spec REM-PERM-003
     private val _pendingPermissionConfirmation = MutableStateFlow(false)
@@ -281,6 +305,9 @@ class CategoryEditViewModel @Inject constructor(
             categoryId != null -> {
                 viewModelScope.launch {
                     val cat = repository.getCategoryById(categoryId).first()
+                    // @spec CAT-UI-018 — the not-found navigation below is not gated; it fires as
+                    // soon as this read resolves, without waiting on the reminder read.
+                    _categoryLoaded.value = true
                     if (cat == null) { _navigateBack.value = true; return@launch }
                     _name.value = cat.name
                     storedDefaultValue = cat.defaultValue
@@ -305,10 +332,12 @@ class CategoryEditViewModel @Inject constructor(
                     }
                     _originalValueType.value = cat.resolvedValueType
                 }
-                // @spec REM-UI-001
+                // @spec REM-UI-001, CAT-UI-018
                 viewModelScope.launch {
-                    val reminder = repository.getReminderForCategory(categoryId).first() ?: return@launch
-                    _reminderUIState.value = ReminderUIState.fromStored(reminder)
+                    repository.getReminderForCategory(categoryId).first()?.let {
+                        _reminderUIState.value = ReminderUIState.fromStored(it)
+                    }
+                    _reminderLoaded.value = true
                 }
             }
 
@@ -316,6 +345,8 @@ class CategoryEditViewModel @Inject constructor(
                 // SubCategory create mode. Do NOT advance color counter (CAT-UI-043).
                 viewModelScope.launch {
                     val parent = repository.getCategoryById(parentId).first()
+                    // @spec CAT-UI-018
+                    _parentLoaded.value = true
                     if (parent is Category.MetaCategory) {
                         _parentCategory.value = parent
                         // @spec CAT-UI-062
@@ -337,6 +368,8 @@ class CategoryEditViewModel @Inject constructor(
                     _colorState.value = categoryColorForIndex(
                         repository.getAndIncrementNextCategoryColorIndex(categoryColorPalette.size)
                     )
+                    // @spec CAT-UI-018
+                    _colorLoaded.value = true
                 }
             }
         }
@@ -348,6 +381,10 @@ class CategoryEditViewModel @Inject constructor(
         exactAlarmAvailable: Boolean = true,
         forceSaveDespitePermission: Boolean = false,
     ) {
+        // @spec CAT-UI-018 — saving before the seed reads land would persist defaults over stored
+        // values: a MetaCategory over a SubCategory whose parent hadn't loaded, or a disabled
+        // default reminder over a configured one.
+        if (!isLoaded.value) return
         val nameVal = _name.value.trim()
         if (nameVal.isEmpty()) { _saveResult.value = SaveResult.ValidationError("name"); return }
 

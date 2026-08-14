@@ -138,6 +138,8 @@ fun CategoryEditScreen(
     val isEditMode = viewModel.isEditMode
     val isDirty by viewModel.isDirty.collectAsState()
     val hasUserEdits by viewModel.hasUserEdits.collectAsState()
+    // @spec CAT-UI-018
+    val isLoaded by viewModel.isLoaded.collectAsState()
 
     val pendingDelete by viewModel.pendingDeleteConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
@@ -263,27 +265,35 @@ fun CategoryEditScreen(
                 onValueChange = { viewModel.setName(it) },
                 label = { Text(stringResource(R.string.category_field_name)) },
                 modifier = Modifier.fillMaxWidth(),
+                // @spec CAT-UI-018
+                enabled = isLoaded,
                 isError = (saveResult as? SaveResult.ValidationError)?.field == "name",
             )
 
             val emojiIsError = (saveResult as? SaveResult.ValidationError)?.field == "emoji"
             // @spec CAT-UI-074, CAT-UI-076
-            OutlinedFieldBox(label = stringResource(R.string.category_field_emoji), isError = emojiIsError) {
+            OutlinedFieldBox(
+                label = stringResource(R.string.category_field_emoji),
+                isError = emojiIsError,
+                enabled = isLoaded,
+            ) {
                 EmojiField(
                     emojiUIState = emojiUIState,
                     parentEmoji = parentCategory?.emoji,
                     isError = emojiIsError,
+                    enabled = isLoaded,
                     onUIStateChange = { viewModel.setEmojiUIState(it) },
                 )
             }
 
             // @spec CAT-UI-056, CAT-UI-075
-            OutlinedFieldBox(label = stringResource(R.string.category_field_color)) {
+            OutlinedFieldBox(label = stringResource(R.string.category_field_color), enabled = isLoaded) {
                 ColorPicker(
                     colorState = colorState,
                     parentCategory = parentCategory,
                     effectiveColor = effectiveColor,
                     isColorInherited = isColorInherited,
+                    enabled = isLoaded,
                     onSelectColor = { viewModel.setColorState(it) },
                 )
             }
@@ -293,6 +303,7 @@ fun CategoryEditScreen(
                 selected = effectiveValueType,
                 isValueTypeInherited = isValueTypeInherited,
                 parentCategory = parentCategory,
+                enabled = isLoaded,
                 onSelect = { viewModel.setValueTypeState(it) },
             )
 
@@ -315,6 +326,8 @@ fun CategoryEditScreen(
                     onValueChange = { viewModel.updateNumberDefaultUnit(it) },
                     label = { Text(stringResource(R.string.category_field_unit_optional)) },
                     modifier = Modifier.fillMaxWidth(),
+                    // @spec CAT-UI-018
+                    enabled = isLoaded,
                 )
             }
             // @spec CAT-UI-011a
@@ -328,19 +341,24 @@ fun CategoryEditScreen(
                         onValueChange = { viewModel.updateExerciseDefaultSets(it) },
                         label = { Text(stringResource(R.string.category_field_default_sets)) },
                         modifier = Modifier.weight(1f),
+                        // @spec CAT-UI-018
+                        enabled = isLoaded,
                     )
                     OutlinedTextField(
                         value = exerciseDefaultReps,
                         onValueChange = { viewModel.updateExerciseDefaultReps(it) },
                         label = { Text(stringResource(R.string.category_field_default_reps)) },
                         modifier = Modifier.weight(1f),
+                        // @spec CAT-UI-018
+                        enabled = isLoaded,
                     )
                 }
             }
 
             // @spec REM-UI-001..011, REM-PERM-001, REM-PERM-002
             ReminderSection(
-                enabled = reminderUIState.enabled,
+                enabled = isLoaded,
+                reminderOn = reminderUIState.enabled,
                 mode = reminderUIState.mode,
                 times = reminderUIState.times,
                 windowStart = reminderUIState.windowStart,
@@ -349,7 +367,7 @@ fun CategoryEditScreen(
                 daysActive = reminderUIState.daysActive,
                 showCategoryInNotification = reminderUIState.showCategoryInNotification,
                 validationField = (saveResult as? SaveResult.ValidationError)?.field,
-                onEnabledChange = { viewModel.setReminderEnabled(it) },
+                onReminderOnChange = { viewModel.setReminderEnabled(it) },
                 onModeChange = { viewModel.setReminderMode(it) },
                 onTimesChange = { viewModel.setReminderTimes(it) },
                 onWindowStartChange = { viewModel.setReminderWindowStart(it) },
@@ -359,11 +377,12 @@ fun CategoryEditScreen(
                 onShowCategoryInNotificationChange = { viewModel.setReminderShowCategoryInNotification(it) },
             )
 
-            // @spec CAT-UI-067
+            // @spec CAT-UI-067, CAT-UI-018
             if (isDirty) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { doSave() },
+                    enabled = isLoaded,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.action_save))
@@ -388,6 +407,8 @@ private fun EmojiField(
     emojiUIState: EmojiUIState,
     parentEmoji: String?,
     isError: Boolean,
+    // @spec CAT-UI-018
+    enabled: Boolean,
     onUIStateChange: (EmojiUIState) -> Unit,
 ) {
     val isInherited = parentEmoji != null && emojiUIState.mode == EmojiMode.INHERIT
@@ -412,6 +433,7 @@ private fun EmojiField(
                     .fillMaxWidth()
                     .toggleable(
                         value = isInherited,
+                        enabled = enabled,
                         onValueChange = { checked ->
                             onUIStateChange(emojiUIState.copy(
                                 mode = if (checked) EmojiMode.INHERIT else EmojiMode.CUSTOM,
@@ -421,14 +443,19 @@ private fun EmojiField(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(R.string.category_emoji_inherit))
+                Text(
+                    stringResource(R.string.category_emoji_inherit),
+                    modifier = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
+                )
                 Text(
                     text = parentEmoji,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.alpha(if (isInherited) 1f else 0.38f),
+                    modifier = Modifier.alpha(
+                        if (!enabled) DISABLED_ALPHA else if (isInherited) 1f else DISABLED_ALPHA
+                    ),
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                Switch(checked = isInherited, onCheckedChange = null)
+                Switch(checked = isInherited, onCheckedChange = null, enabled = enabled)
             }
         }
 
@@ -448,7 +475,10 @@ private fun EmojiField(
                             if (isSelected) Modifier.background(MaterialTheme.colorScheme.primaryContainer)
                             else Modifier
                         )
-                        .clickable { onUIStateChange(EmojiUIState(EmojiMode.CUSTOM, emoji)) },
+                        .alpha(if (enabled) 1f else DISABLED_ALPHA)
+                        .clickable(enabled = enabled) {
+                            onUIStateChange(EmojiUIState(EmojiMode.CUSTOM, emoji))
+                        },
                 ) {
                     Text(text = emoji, style = MaterialTheme.typography.titleMedium)
                 }
@@ -460,7 +490,7 @@ private fun EmojiField(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedButton(onClick = { showPicker = true }) {
+            OutlinedButton(onClick = { showPicker = true }, enabled = enabled) {
                 Icon(
                     Icons.Default.EmojiEmotions,
                     contentDescription = null,
@@ -511,14 +541,17 @@ private data class SwatchSpec(
 )
 
 @Composable
-private fun Swatch(spec: SwatchSpec, width: Dp, height: Dp, shape: Shape) {
+private fun Swatch(spec: SwatchSpec, width: Dp, height: Dp, shape: Shape, enabled: Boolean) {
     val modifier = Modifier
         .width(width)
         .height(height)
         .clip(shape)
+        // @spec CAT-UI-018 — a swatch is a bare clickable Box, so it needs the disabled dimming
+        // applied by hand; Material would have supplied it.
+        .alpha(if (enabled) 1f else DISABLED_ALPHA)
         .background(Color(spec.color))
         .then(if (spec.isSelected) Modifier.border(3.dp, Color.White, shape) else Modifier)
-        .then(spec.onClick?.let { Modifier.clickable(onClick = it) } ?: Modifier)
+        .then(spec.onClick?.let { Modifier.clickable(enabled = enabled, onClick = it) } ?: Modifier)
     Box(contentAlignment = Alignment.Center, modifier = modifier) {
         if (spec.label != null) {
             Text(
@@ -538,6 +571,8 @@ private fun ColorPicker(
     parentCategory: Category.MetaCategory?,
     effectiveColor: Long,
     isColorInherited: Boolean,
+    // @spec CAT-UI-018
+    enabled: Boolean,
     onSelectColor: (Long?) -> Unit,
 ) {
     val swatchHeight = 44.dp
@@ -579,6 +614,7 @@ private fun ColorPicker(
                             width = swatchWidth * spec.cells + spacing * (spec.cells - 1),
                             height = swatchHeight,
                             shape = cornerShape,
+                            enabled = enabled,
                         )
                     }
                 }
@@ -594,6 +630,8 @@ private fun ValueTypeSelector(
     selected: ValueType,
     isValueTypeInherited: Boolean,
     parentCategory: Category.MetaCategory?,
+    // @spec CAT-UI-018
+    enabled: Boolean,
     onSelect: (ValueType?) -> Unit,
 ) {
     val types = listOf(
@@ -613,11 +651,13 @@ private fun ValueTypeSelector(
     val displayLabel = if (inheritLabel != null && isValueTypeInherited) inheritLabel
     else stringResource(valueTypeStringRes(selected))
 
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (enabled) expanded = it }) {
         OutlinedTextField(
             value = displayLabel,
             onValueChange = {},
             readOnly = true,
+            // @spec CAT-UI-018
+            enabled = enabled,
             label = { Text(stringResource(R.string.category_field_value_type)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
@@ -641,6 +681,12 @@ private fun ValueTypeSelector(
     }
 }
 
+// Material's disabled alpha token. Applied by hand to the form's raw `clickable` surfaces, which —
+// unlike Material components — render identically whether or not they still accept clicks, so
+// without this they'd sit at full saturation next to dimmed text fields and switches.
+// @spec CAT-UI-018
+private const val DISABLED_ALPHA = 0.38f
+
 private fun formatTime(time: LocalTime): String = time.format(DateTimeFormatter.ofPattern("h:mm a"))
 
 // @spec REM-UI-001, REM-UI-002, REM-UI-003, REM-UI-007, REM-UI-008, REM-UI-009, REM-UI-010,
@@ -648,7 +694,10 @@ private fun formatTime(time: LocalTime): String = time.format(DateTimeFormatter.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReminderSection(
+    // @spec CAT-UI-018 — the screen's load gate. `reminderOn` is the reminder's own on/off state
+    // (REM-UI-002/003); `enabled` keeps Compose's meaning of "this control accepts input".
     enabled: Boolean,
+    reminderOn: Boolean,
     mode: ReminderMode,
     times: List<LocalTime>,
     windowStart: LocalTime,
@@ -657,7 +706,7 @@ private fun ReminderSection(
     daysActive: Set<DayOfWeek>,
     showCategoryInNotification: Boolean,
     validationField: String?,
-    onEnabledChange: (Boolean) -> Unit,
+    onReminderOnChange: (Boolean) -> Unit,
     onModeChange: (ReminderMode) -> Unit,
     onTimesChange: (List<LocalTime>) -> Unit,
     onWindowStartChange: (LocalTime) -> Unit,
@@ -686,22 +735,27 @@ private fun ReminderSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
+            ) {
                 Icon(Icons.Default.Notifications, contentDescription = null)
                 Text(stringResource(R.string.reminder_section_title))
             }
             // @spec REM-PERM-001
             Switch(
-                checked = enabled,
+                checked = reminderOn,
+                enabled = enabled,
                 onCheckedChange = { checked ->
-                    onEnabledChange(checked)
+                    onReminderOnChange(checked)
                     if (checked) requestNotificationPermissionIfNeeded()
                 },
             )
         }
 
         // @spec REM-UI-003
-        if (enabled) {
+        if (reminderOn) {
             // Fires once each time this content is entered — turning the section on, or
             // reopening an already-on one — matching "entering/expanding the Reminder section".
             LaunchedEffect(Unit) { requestNotificationPermissionIfNeeded() }
@@ -726,11 +780,13 @@ private fun ReminderSection(
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     selected = mode == ReminderMode.FIXED,
+                    enabled = enabled,
                     onClick = { onModeChange(ReminderMode.FIXED) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 ) { Text(stringResource(R.string.reminder_mode_fixed)) }
                 SegmentedButton(
                     selected = mode == ReminderMode.RANDOM,
+                    enabled = enabled,
                     onClick = { onModeChange(ReminderMode.RANDOM) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 ) { Text(stringResource(R.string.reminder_mode_random)) }
@@ -738,7 +794,7 @@ private fun ReminderSection(
 
             if (mode == ReminderMode.FIXED) {
                 // @spec REM-UI-004
-                ReminderTimesEditor(times = times, onTimesChange = onTimesChange)
+                ReminderTimesEditor(times = times, enabled = enabled, onTimesChange = onTimesChange)
                 if (validationField == "reminder_times") {
                     Text(
                         stringResource(R.string.reminder_validation_no_time),
@@ -752,12 +808,14 @@ private fun ReminderSection(
                     TimePickerFieldButton(
                         label = stringResource(R.string.reminder_window_start),
                         time = windowStart,
+                        enabled = enabled,
                         onTimeChange = onWindowStartChange,
                         modifier = Modifier.weight(1f),
                     )
                     TimePickerFieldButton(
                         label = stringResource(R.string.reminder_window_end),
                         time = windowEnd,
+                        enabled = enabled,
                         onTimeChange = onWindowEndChange,
                         modifier = Modifier.weight(1f),
                     )
@@ -768,6 +826,8 @@ private fun ReminderSection(
                     onValueChange = { v -> v.toIntOrNull()?.let { if (it in 1..12) onOccurrencesPerDayChange(it) } },
                     label = { Text(stringResource(R.string.reminder_occurrences_per_day)) },
                     modifier = Modifier.fillMaxWidth(),
+                    // @spec CAT-UI-018
+                    enabled = enabled,
                 )
                 if (validationField == "reminder_window") {
                     Text(
@@ -779,8 +839,12 @@ private fun ReminderSection(
             }
 
             // @spec REM-UI-007
-            Text(stringResource(R.string.reminder_active_days), style = MaterialTheme.typography.labelMedium)
-            DaysOfWeekRow(daysActive = daysActive, onDaysActiveChange = onDaysActiveChange)
+            Text(
+                stringResource(R.string.reminder_active_days),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
+            )
+            DaysOfWeekRow(daysActive = daysActive, enabled = enabled, onDaysActiveChange = onDaysActiveChange)
             if (validationField == "reminder_days") {
                 Text(
                     stringResource(R.string.reminder_validation_no_active_day),
@@ -795,8 +859,15 @@ private fun ReminderSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(stringResource(R.string.reminder_show_category_in_notification))
-                Switch(checked = showCategoryInNotification, onCheckedChange = onShowCategoryInNotificationChange)
+                Text(
+                    stringResource(R.string.reminder_show_category_in_notification),
+                    modifier = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
+                )
+                Switch(
+                    checked = showCategoryInNotification,
+                    enabled = enabled,
+                    onCheckedChange = onShowCategoryInNotificationChange,
+                )
             }
         }
     }
@@ -805,7 +876,12 @@ private fun ReminderSection(
 // @spec REM-UI-004
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReminderTimesEditor(times: List<LocalTime>, onTimesChange: (List<LocalTime>) -> Unit) {
+private fun ReminderTimesEditor(
+    times: List<LocalTime>,
+    // @spec CAT-UI-018
+    enabled: Boolean,
+    onTimesChange: (List<LocalTime>) -> Unit,
+) {
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     var showAddPicker by remember { mutableStateOf(false) }
 
@@ -813,6 +889,7 @@ private fun ReminderTimesEditor(times: List<LocalTime>, onTimesChange: (List<Loc
         items(times.size) { index ->
             InputChip(
                 selected = false,
+                enabled = enabled,
                 onClick = { editingIndex = index },
                 label = { Text(formatTime(times[index])) },
                 trailingIcon = if (times.size > 1) {
@@ -822,14 +899,18 @@ private fun ReminderTimesEditor(times: List<LocalTime>, onTimesChange: (List<Loc
                             contentDescription = stringResource(R.string.action_remove),
                             modifier = Modifier
                                 .size(16.dp)
-                                .clickable { onTimesChange(times.filterIndexed { i, _ -> i != index }) },
+                                .clickable(enabled = enabled) {
+                                    onTimesChange(times.filterIndexed { i, _ -> i != index })
+                                },
                         )
                     }
                 } else null,
             )
         }
         item {
-            TextButton(onClick = { showAddPicker = true }) { Text(stringResource(R.string.reminder_add_time)) }
+            TextButton(onClick = { showAddPicker = true }, enabled = enabled) {
+                Text(stringResource(R.string.reminder_add_time))
+            }
         }
     }
 
@@ -870,11 +951,13 @@ private fun ReminderTimesEditor(times: List<LocalTime>, onTimesChange: (List<Loc
 private fun TimePickerFieldButton(
     label: String,
     time: LocalTime,
+    // @spec CAT-UI-018
+    enabled: Boolean,
     onTimeChange: (LocalTime) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { showPicker = true }, modifier = modifier) {
+    OutlinedButton(onClick = { showPicker = true }, enabled = enabled, modifier = modifier) {
         Column {
             Text(label, style = MaterialTheme.typography.labelSmall)
             Text(formatTime(time))
@@ -898,7 +981,12 @@ private fun TimePickerFieldButton(
 
 // @spec REM-UI-007
 @Composable
-private fun DaysOfWeekRow(daysActive: Set<DayOfWeek>, onDaysActiveChange: (Set<DayOfWeek>) -> Unit) {
+private fun DaysOfWeekRow(
+    daysActive: Set<DayOfWeek>,
+    // @spec CAT-UI-018
+    enabled: Boolean,
+    onDaysActiveChange: (Set<DayOfWeek>) -> Unit,
+) {
     val days = listOf(
         DayOfWeek.MONDAY to R.string.reminder_day_mon,
         DayOfWeek.TUESDAY to R.string.reminder_day_tue,
@@ -912,6 +1000,7 @@ private fun DaysOfWeekRow(daysActive: Set<DayOfWeek>, onDaysActiveChange: (Set<D
         items(days) { (day, labelRes) ->
             FilterChip(
                 selected = day in daysActive,
+                enabled = enabled,
                 onClick = { onDaysActiveChange(if (day in daysActive) daysActive - day else daysActive + day) },
                 label = { Text(stringResource(labelRes)) },
             )

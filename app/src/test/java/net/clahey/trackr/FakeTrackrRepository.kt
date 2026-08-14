@@ -11,6 +11,7 @@ import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.convertEventValue
 import net.clahey.trackr.domain.reconcileSiblingOrder
 import net.clahey.trackr.domain.starterCategoriesToInsert
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -44,7 +45,14 @@ class FakeTrackrRepository : TrackrRepository {
             { it.sortOrder },
         ))
     }
-    override fun getCategoryById(id: String): Flow<Category?> = categories.map { it.find { c -> c.id == id } }
+    // Held-open read gates. A test that needs to observe the window between a screen's init and
+    // its reads completing (CAT-UI-018) sets one to an incomplete Deferred; every emission from
+    // the corresponding read then suspends until the test completes it. Null means no gate.
+    var categoryReadGate: CompletableDeferred<Unit>? = null
+    var reminderReadGate: CompletableDeferred<Unit>? = null
+
+    override fun getCategoryById(id: String): Flow<Category?> =
+        categories.map { list -> categoryReadGate?.await(); list.find { c -> c.id == id } }
     // @spec DM-DATA-028
     override suspend fun saveCategory(category: Category) {
         categories.update { list ->
@@ -242,7 +250,7 @@ class FakeTrackrRepository : TrackrRepository {
 
     // @spec REM-DATA-006
     override fun getReminderForCategory(categoryId: String): Flow<Reminder?> =
-        reminders.map { it[categoryId] }
+        reminders.map { map -> reminderReadGate?.await(); map[categoryId] }
 
     // @spec REM-DATA-006
     override suspend fun saveReminder(reminder: Reminder) {

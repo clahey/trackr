@@ -17,16 +17,29 @@ import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-// @spec CAT-UI-074, CAT-UI-075, CAT-UI-076
+// @spec CAT-UI-074, CAT-UI-075, CAT-UI-076, CAT-UI-018
 @Composable
 fun OutlinedFieldBox(
     label: String,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
+    // This box draws its own border and label, so it has no disabled state to inherit. The colors
+    // below are OutlinedTextField's disabled tokens, so a disabled box matches a disabled field
+    // sitting next to it. Disabled wins over isError: a form that can't be edited can't be
+    // submitted, so there is no error to report.
+    enabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val borderColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
-    val labelColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+    val borderColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        isError -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.outline
+    }
+    val labelColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        isError -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     val shape = MaterialTheme.shapes.extraSmall
 
     Box(
