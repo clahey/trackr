@@ -4,7 +4,7 @@ Category list and edit screens: hierarchy (MetaCategory/SubCategory), inheritanc
 
 ## Status
 
-**PARTIAL** — last audited 2026-07-27. 74 of 76 specs confirmed implemented, 2 legitimately deferred, 0 genuine gaps remain. CAT-UI-002 (drag-to-reorder) is now fully resolved — the generic widget landed as its own segment (`drag-reorder-list`) and this segment gained five new specs (CAT-UI-080-084) covering the category-specific adapter/persistence/reparent logic, all implemented. CAT-UI-011a was reworded this pass to match accepted current behavior (no minimum-value enforcement on Exercise default sets/reps) rather than fixed in code — see finding 0. 10 previously-stale `[ ]` markers (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) reconciled to `[x]` this pass — the spec file was stale, not the code.
+**PARTIAL** — last audited 2026-08-14. 75 of 77 specs confirmed implemented, 2 legitimately deferred, 0 genuine gaps remain. CAT-UI-018 (initial-load edit gate) was added 2026-08-14 to close a real data-loss defect — see finding 6. CAT-UI-002 (drag-to-reorder) is now fully resolved — the generic widget landed as its own segment (`drag-reorder-list`) and this segment gained five new specs (CAT-UI-080-084) covering the category-specific adapter/persistence/reparent logic, all implemented. CAT-UI-011a was reworded this pass to match accepted current behavior (no minimum-value enforcement on Exercise default sets/reps) rather than fixed in code — see finding 0. 10 previously-stale `[ ]` markers (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) reconciled to `[x]` this pass — the spec file was stale, not the code.
 
 ## References
 
@@ -15,13 +15,14 @@ Category list and edit screens: hierarchy (MetaCategory/SubCategory), inheritanc
 - docs/llds/category-management.md
 
 ### EARS
-- docs/specs/category-management.md (76 specs: CAT-NAV-*, CAT-UI-*)
+- docs/specs/category-management.md (77 specs: CAT-NAV-*, CAT-UI-*)
 
 ### Tests
 - app/src/androidTest/java/net/clahey/trackr/ui/components/OutlinedFieldBoxTest.kt
 - app/src/test/java/net/clahey/trackr/FakeTrackrRepositoryTest.kt
 - app/src/test/java/net/clahey/trackr/ui/category/CategoryEditViewModelHierarchyTest.kt
 - app/src/test/java/net/clahey/trackr/ui/category/CategoryEditViewModelTest.kt
+- app/src/test/java/net/clahey/trackr/ui/category/CategoryEditViewModelLoadGateTest.kt
 - app/src/test/java/net/clahey/trackr/ui/category/CategoryListViewModelGroupTest.kt
 - app/src/test/java/net/clahey/trackr/ui/category/CategoryListViewModelHierarchyTest.kt
 - app/src/test/java/net/clahey/trackr/ui/category/CategoryListViewModelTest.kt
@@ -58,7 +59,7 @@ _Note: the drag-to-reorder **widget** itself (`DragReorderList.kt`) is owned by 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
 | List | CAT-UI-001 to 006 | 5 | 0 | 0 (CAT-UI-002 resolved — see findings) |
-| Edit — Display | CAT-UI-010 to 017 | 8 | 0 | 0 |
+| Edit — Display | CAT-UI-010 to 018 | 9 | 0 | 0 |
 | Edit — Validation | CAT-UI-020 to 022 | all | 0 | 0 |
 | Edit — ValueType migration | CAT-UI-030 to 047 | all | 0 | 0 |
 | Edit — Default Value | CAT-UI-063 to 066 | all | 0 | 0 |
@@ -67,7 +68,7 @@ _Note: the drag-to-reorder **widget** itself (`DragReorderList.kt`) is owned by 
 | Navigation | CAT-NAV-* | all | 0 | 0 |
 | SubCategory group menu | CAT-UI-058, CAT-NAV-011 | 0 | 2 | 0 |
 
-**Summary:** 74 of 76 active specs implemented; 0 active gaps; 2 deferred. Fully reconciled this pass — no more stale `[ ]` markers.
+**Summary:** 75 of 77 active specs implemented; 0 active gaps; 2 deferred. No stale `[ ]` markers.
 
 ## Key Findings
 
@@ -84,6 +85,7 @@ _Note: the drag-to-reorder **widget** itself (`DragReorderList.kt`) is owned by 
 3. **CAT-UI-039 fixed this session.** `ValueTypeConversion.kt`'s `convertEventValue` gained a `NumberValue → Scale` branch: converts when the value is an exact integer in `[1, 10]` **and** the unit is null/blank (a populated unit blocks conversion rather than silently dropping it — refined from the original spec text during implementation). This makes `Scale → Number` a true reversible pair (Scale's `[1,10]` integer invariant round-trips losslessly), so `CategoryEditViewModel.warningTierFor` was updated: `Scale→Number` moved from "fully safe but irreversible" to "reversible, no warning"; `Number→Scale` classified "partial" (not all values convert). LLD conversion table, both specs' text, and tests (`ValueTypeConversionTest`, `CategoryEditViewModelTest`) updated together.
 4. _(Historical, resolved this pass — see finding 0)_ CAT-UI-002 was the one confirmed genuine gap as of 2026-06-17: no drag handle, gesture, or drop-persistence code existed anywhere in `CategoryListScreen.kt`/`CategoryListViewModel.kt` despite the backend `reorderCategories` method existing. Now implemented via the `drag-reorder-list` segment + CAT-UI-080-084.
 5. No reverse orphans — every `@spec CAT-*` annotation in code points to a real spec ID (re-verified 2026-07-27).
+6. **CAT-UI-018 added 2026-08-14, closing a real data-loss defect.** `CategoryEditViewModel` seeded its form state from independent one-shot reads while accepting input throughout, so a save issued before a read landed persisted defaults over stored values — writing a `MetaCategory` over a `SubCategory` whose parent hadn't loaded, or a disabled default reminder over a configured one. A read landing after the user had typed overwrote their input instead. The new spec gates all editing and saving until every initial-state read for the current mode completes, counting a read that finds no row as complete — without that clause the common case (a category with no reminder) would have stayed gated forever. `CAT-UI-017`'s not-found navigation is deliberately exempt from the gate. Seven tests in `CategoryEditViewModelLoadGateTest.kt`; `FakeTrackrRepository` gained opt-in read gates so the pre-load window is observable at all. The screen renders the gate with `enabled` threaded per widget rather than a blanket input-blocking wrapper — the wrapper left every field reachable via TalkBack, which activates through the semantics tree rather than pointer events. See `docs/llds/category-management.md` § Decisions and Open Question 11 (a category deleted between the two reads leaves a live editor for a deleted row — accepted, same background-sync reachability gate as Open Questions 9 and 10).
 
 **Audit-method lesson:** the false negative on CAT-UI-015/016 came from grepping Kotlin source for a literal UI string instead of accounting for string-resource indirection. Future audits of this segment (and others using `stringResource(R.string....)`) should grep `strings.xml` for the resolved text, or grep for the resource name itself, not the displayed string.
 

@@ -1,5 +1,5 @@
 schema_version: 1
-last_updated: 2026-08-12
+last_updated: 2026-08-14
 
 taxonomy:
   data:
@@ -30,13 +30,13 @@ arrows:
   local-storage:
     status: AUDITED
     sampled: 2026-08-12
-    audited: 2026-08-12
-    audited_sha: 996c81224dce4c55ca33729036259f1847552837
+    audited: 2026-08-14
+    audited_sha: 2e897ea72bdd3d4eee6baf6f25eb95659d6bbb12
     blocks: [category-management, event-logging]
     blockedBy: [data-model]
     detail: local-storage.md
-    next: "Backfill @spec on 12 unannotated specs (LS-BE-001-004/033/050/054/060-062/070/071). Cross-segment: data-model.md's createdAt ordering claim (DM-PROC-010) contradicts this segment's tested descending order — needs data-model's owner to reconcile."
-    drift: "12 implemented specs unannotated (unchanged from prior pass). LS-BE-010/011 reworded to match code (spec text was wrong, not the code). Several LLD/HLD prose bugs found and fixed this pass (saveCategoryWithReminder no-op claim, missing migrateFromType param, stale mode casing, stale two-tables HLD line, resolved-but-still-listed Open Question)."
+    next: "Add test-file @spec citations for the specs in finding 4. Cross-segment: data-model.md's createdAt ordering claim (DM-PROC-010) contradicts this segment's tested descending order — needs data-model's owner to reconcile; explicitly left alone on 2026-08-14."
+    drift: "All 32 specs now annotated (12-spec backfill completed 2026-08-14) — no traceability gap left on the code side. LS-BE-010/011 reworded to match code (spec text was wrong, not the code). Several LLD/HLD prose bugs found and fixed in the 2026-08-12 pass (saveCategoryWithReminder no-op claim, missing migrateFromType param, stale mode casing, stale two-tables HLD line, resolved-but-still-listed Open Question)."
 
   theme:
     status: OK
@@ -74,13 +74,13 @@ arrows:
   category-management:
     status: AUDITED
     sampled: 2026-07-27
-    audited: 2026-07-27
-    audited_sha: 1e5539f1984814dfb3b1b5f85979084b17b392d3
+    audited: 2026-08-14
+    audited_sha: 2e897ea72bdd3d4eee6baf6f25eb95659d6bbb12
     blocks: [event-logging]
     blockedBy: [data-model, local-storage, theme, drag-reorder-list]
     detail: category-management.md
-    next: "CAT-UI-011a descoped (not fixed): Exercise default sets/reps >=1 validation deliberately not enforced, spec reworded to match. CAT-UI-002 (drag-to-reorder) resolved via the new drag-reorder-list segment + CAT-UI-080-084. 10 more stale [ ] markers reconciled to [x] this pass."
-    drift: null
+    next: "Nice-to-have only: CAT-UI-011a's >=1 validation on Exercise default sets/reps remains deliberately unenforced (descoped, spec reworded to match). No MVP-blocking work."
+    drift: "CAT-UI-018 added 2026-08-14 (77 specs, was 76): the edit screen accepted input and saves before its initial reads landed, silently persisting defaults over stored values. Fixed with a per-read load gate; 7 tests in CategoryEditViewModelLoadGateTest.kt. LLD gained Open Question 11 (category deleted between the two reads leaves a live editor for a deleted row — accepted, background-sync reachability gate)."
 
   event-logging:
     status: PARTIAL
@@ -96,12 +96,12 @@ arrows:
   reminders:
     status: PARTIAL
     sampled: 2026-08-12
-    audited: 2026-08-12
-    audited_sha: 996c81224dce4c55ca33729036259f1847552837
+    audited: 2026-08-14
+    audited_sha: 2e897ea72bdd3d4eee6baf6f25eb95659d6bbb12
     blocks: []
     blockedBy: [local-storage, category-management]
     detail: reminders.md
-    next: "22 of 49 specs have no test-file @spec citation: REM-DATA-003/004/005 + REM-SCHED-002 are annotation-only backfills (likely already exercised); REM-DATA-001 needs a Room instrumented test like the new MigrationTest.kt; REM-UI-*/REM-PERM-*/REM-NOTIF-*/REM-SCHED-009/010 need instrumented test infra (Compose UI, notification, real-AlarmManager) that doesn't exist anywhere in the project yet, not reminders-specific."
+    next: "18 of 49 specs have no test-file @spec citation, down from 22 (REM-DATA-003/004/005 + REM-SCHED-002 closed 2026-08-14). REM-DATA-001 needs a Room instrumented test — one was written and passing on 2026-08-14, then removed at the user's request; deferred, not abandoned. REM-UI-*/REM-PERM-*/REM-NOTIF-*/REM-SCHED-009/010 need instrumented test infra (Compose UI, notification, real-AlarmManager) that doesn't exist anywhere in the project yet, not reminders-specific."
     drift: "Deep full-text pass (2026-08-12) re-verified all 49 specs against code. Fixed: notification PendingIntent/id collision risk (categoryId.hashCode(), contradicted the LLD's own alarm-identity reasoning) now uses the same data-Uri technique as alarms; REM-DATA-003/004/REM-PERM-004/REM-NOTIF-005 spec wording reworded to match actual behavior; stale mode casing in reminders.md's ReminderEntity table corrected. No remaining known drift."
 
   publishing:

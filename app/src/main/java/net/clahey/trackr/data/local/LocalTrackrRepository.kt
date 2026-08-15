@@ -65,7 +65,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         }
     }
 
-    // @spec DM-DATA-028
+    // @spec LS-BE-003, DM-DATA-028
     override suspend fun saveCategory(category: Category) {
         db.withTransaction {
             if (category is Category.SubCategory) requireNoChildren(category)
@@ -154,6 +154,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getSubCategoryCount(categoryId: String): Flow<Int> =
         categoryDao.countByParentId(categoryId)
 
+    // @spec LS-BE-004
     override fun getEvents(start: Instant?, end: Instant?): Flow<List<Event>> {
         val startMs = start?.toEpochMilli()
         val endMs = end?.toEpochMilli()
@@ -176,7 +177,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getEventById(id: String): Flow<Event?> =
         eventDao.getById(id).map { it?.toDomain() }
 
-    // @spec LS-BE-032
+    // @spec LS-BE-003, LS-BE-032
     override suspend fun saveEvent(event: Event) {
         val oldPaths = eventDao.getByIdOnce(event.id)?.imagePaths() ?: emptyList()
         eventDao.upsert(event.toEntity())
@@ -189,6 +190,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         eventDao.deleteById(id)
     }
 
+    // @spec LS-BE-033
     override suspend fun deleteEventFiles(imagePaths: List<String>) {
         imagePaths.forEach { imageStore.delete(it) }
     }

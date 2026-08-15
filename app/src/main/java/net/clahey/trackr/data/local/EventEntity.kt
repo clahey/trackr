@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+// @spec LS-BE-071
 @Entity(
     tableName = "events",
     foreignKeys = [ForeignKey(

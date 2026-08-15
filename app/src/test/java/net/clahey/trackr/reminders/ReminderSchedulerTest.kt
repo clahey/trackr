@@ -72,7 +72,9 @@ class ReminderSchedulerTest {
 
     // ---- enableReminder / REM-SCHED-013, REM-SCHED-018 ----
 
-    // @spec REM-SCHED-013
+    // The armed instant (20:00) is the first fixed time after `now` (09:00) — it would differ if
+    // `after` were anything else, so this pins REM-SCHED-002's `after` = now.
+    // @spec REM-SCHED-013, REM-SCHED-002, REM-DATA-005
     @Test fun `enableReminder computes and arms on first enable`() = runTest {
         val repo = FakeTrackrRepository()
         val alarms = FakeAlarmScheduler()
@@ -117,7 +119,7 @@ class ReminderSchedulerTest {
         assertTrue("should have validated against the repository's value, not the stale argument", alarms.armCalls.isEmpty())
     }
 
-    // @spec REM-SCHED-013, REM-SCHED-015
+    // @spec REM-SCHED-013, REM-SCHED-015, REM-SCHED-002
     @Test fun `enableReminder recomputes when the stored nextFireAt is no longer valid under an edited config`() = runTest {
         val repo = FakeTrackrRepository()
         val alarms = FakeAlarmScheduler()
@@ -134,7 +136,7 @@ class ReminderSchedulerTest {
 
     // ---- disableReminder / cancel — REM-SCHED-012, REM-SCHED-014 ----
 
-    // @spec REM-SCHED-014
+    // @spec REM-SCHED-014, REM-DATA-005
     @Test fun `disableReminder clears nextFireAt, persists enabled false, and cancels the alarm`() = runTest {
         val repo = FakeTrackrRepository()
         val alarms = FakeAlarmScheduler()

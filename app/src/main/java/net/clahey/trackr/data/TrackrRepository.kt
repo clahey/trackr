@@ -8,6 +8,8 @@ import net.clahey.trackr.domain.ValueType
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
+// Reads are Flow, writes are suspend — the shape the whole interface holds to.
+// @spec LS-BE-001, LS-BE-002
 interface TrackrRepository {
     fun getCategories(): Flow<List<Category>>
     fun getCategoryById(id: String): Flow<Category?>
@@ -23,6 +25,7 @@ interface TrackrRepository {
     fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
     fun getSubCategoryCount(categoryId: String): Flow<Int>
 
+    // @spec LS-BE-004
     fun getEvents(start: Instant? = null, end: Instant? = null): Flow<List<Event>>
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>
     // @spec EL-UI-011

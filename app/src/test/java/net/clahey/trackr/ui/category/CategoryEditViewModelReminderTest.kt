@@ -156,4 +156,23 @@ class CategoryEditViewModelReminderTest {
         assertEquals(SaveResult.Success, vm.saveResult.value)
         assertEquals(listOf("cat1"), alarms.cancelCalls)
     }
+
+    // @spec REM-DATA-003, REM-DATA-004
+    @Test fun `a category with no reminder row seeds the UI state defaults`() = runTest {
+        repo.setCategories(
+            Category.MetaCategory(
+                id = "cat1", name = "Category", emoji = "📌", color = 0xFFE53935L,
+                valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = 0,
+            ),
+        )
+        vm = CategoryEditViewModel(
+            repo,
+            ReminderScheduler(repo, alarms, FakeReminderNotifier(), FakePreferencesDataStore()),
+            SavedStateHandle(mapOf("categoryId" to "cat1")),
+        )
+
+        val state = vm.reminderUIState.value
+        assertFalse(state.showCategoryInNotification)
+        assertEquals(DayOfWeek.entries.toSet(), state.daysActive)
+    }
 }

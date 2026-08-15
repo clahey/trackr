@@ -3,7 +3,7 @@ package net.clahey.trackr.data.local.converters
 import androidx.room.TypeConverter
 import net.clahey.trackr.domain.ValueType
 
-// @spec DM-DATA-002, DM-DATA-003, DM-DATA-004
+// @spec LS-BE-054, DM-DATA-002, DM-DATA-003, DM-DATA-004
 object ValueTypeConverter {
     @TypeConverter
     fun encode(value: ValueType): String = when (value) {

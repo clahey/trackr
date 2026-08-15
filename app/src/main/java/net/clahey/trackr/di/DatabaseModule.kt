@@ -21,6 +21,9 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    // No fallbackToDestructiveMigration: every schema change must arrive with an explicit
+    // migration, or the app crashes on open rather than silently dropping the user's data.
+    // @spec LS-BE-070
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): TrackrDatabase =
