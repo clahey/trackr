@@ -292,49 +292,49 @@ class ReminderSchedulingTest {
         // times = [08:00, 20:00]; previous trigger before 20:00 is 08:00 -> 12h gap -> 10% (72min) exceeds
         // the 1h cap, so the effective window is 60min
         val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(20, 0)))
-        val firedAt = instant(monday, LocalTime.of(20, 0))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
         val latestEventLoggedAt = instant(monday, LocalTime.of(19, 55))
-        assertTrue(shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt))
+        assertTrue(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt))
     }
 
     // @spec REM-SCHED-020
     @Test fun `does not suppress when the latest event is well outside the lookback window`() {
         val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(20, 0)))
-        val firedAt = instant(monday, LocalTime.of(20, 0))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
         val latestEventLoggedAt = instant(monday, LocalTime.of(8, 5)) // ~5min after the AM slot, far before PM's window
-        assertFalse(shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt))
+        assertFalse(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt))
     }
 
     // @spec REM-SCHED-020
     @Test fun `does not suppress when no event has been logged`() {
         val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(20, 0)))
-        val firedAt = instant(monday, LocalTime.of(20, 0))
-        assertFalse(shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt = null))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
+        assertFalse(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt = null))
     }
 
     // @spec REM-SCHED-020
     @Test fun `never suppresses RANDOM mode regardless of a recent log`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
-        val firedAt = instant(monday, LocalTime.of(20, 0))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
         val latestEventLoggedAt = instant(monday, LocalTime.of(19, 59))
-        assertFalse(shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt))
+        assertFalse(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt))
     }
 
     // @spec REM-SCHED-020
     @Test fun `caps the lookback window at one hour for a widely-spaced schedule`() {
         // single daily time -> previous trigger is 24h earlier -> uncapped 10% would be 144min
         val reminder = fixedReminder(times = listOf(LocalTime.of(20, 0)))
-        val firedAt = instant(monday, LocalTime.of(20, 0))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
         val latestEventLoggedAt = instant(monday, LocalTime.of(18, 30)) // 90min before, inside 144min but outside the 60min cap
-        assertFalse(shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt))
+        assertFalse(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt))
     }
 
     // @spec REM-SCHED-020
     @Test fun `suppresses within the capped one-hour window for a widely-spaced schedule`() {
         val reminder = fixedReminder(times = listOf(LocalTime.of(20, 0)))
-        val firedAt = instant(monday, LocalTime.of(20, 0))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
         val latestEventLoggedAt = instant(monday, LocalTime.of(19, 30)) // 30min before, inside the 60min cap
-        assertTrue(shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt))
+        assertTrue(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt))
     }
 
     // @spec REM-SCHED-020
@@ -344,19 +344,62 @@ class ReminderSchedulingTest {
             times = listOf(LocalTime.of(8, 0)),
             daysActive = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY),
         )
-        val firedAt = instant(monday.plusDays(2), LocalTime.of(8, 0)) // Wednesday
+        val scheduledAt = instant(monday.plusDays(2), LocalTime.of(8, 0)) // Wednesday
         val withinCap = instant(monday.plusDays(2), LocalTime.of(7, 30))
         val outsideCap = instant(monday.plusDays(2), LocalTime.of(6, 0))
-        assertTrue(shouldSuppressFixedNotification(reminder, firedAt, zone, withinCap))
-        assertFalse(shouldSuppressFixedNotification(reminder, firedAt, zone, outsideCap))
+        assertTrue(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, withinCap))
+        assertFalse(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, outsideCap))
     }
 
     // @spec REM-SCHED-020
     @Test fun `treats a log exactly at the window boundary as suppressing`() {
         // 1h gap between times -> uncapped 10% window of 6min, so the cap doesn't interfere
         val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(9, 0)))
-        val firedAt = instant(monday, LocalTime.of(9, 0))
+        val scheduledAt = instant(monday, LocalTime.of(9, 0))
         val latestEventLoggedAt = instant(monday, LocalTime.of(8, 54)) // exactly 6min before
-        assertTrue(shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt))
+        assertTrue(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt))
+    }
+
+    // @spec REM-SCHED-020
+    @Test fun `sizes the lookback from the scheduled time even when delivery runs late`() {
+        // The regression the on-time tests above structurally cannot catch: every one of them passes a
+        // firedAt equal to a scheduled time, the single value at which a pivot on firedAt still skips the
+        // current occurrence. Real delivery is always at least slightly late, and pivoting the backward
+        // walk there returns 20:00 itself -> a lookback of the jitter rather than the capped hour.
+        val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(20, 0)))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
+        val firedAt = scheduledAt.plusMillis(400)
+        val latestEventLoggedAt = instant(monday, LocalTime.of(19, 55))
+        assertTrue(shouldSuppressFixedNotification(reminder, scheduledAt, firedAt, zone, latestEventLoggedAt))
+    }
+
+    // @spec REM-SCHED-020
+    @Test fun `suppresses a log made while a delayed delivery was still pending`() {
+        // Doze can hold an inexact alarm for hours; a log during that stretch should still suppress,
+        // which is why the window ends at firedAt rather than at scheduledAt.
+        val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(20, 0)))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
+        val firedAt = instant(monday, LocalTime.of(22, 30))
+        val latestEventLoggedAt = instant(monday, LocalTime.of(21, 0))
+        assertTrue(shouldSuppressFixedNotification(reminder, scheduledAt, firedAt, zone, latestEventLoggedAt))
+    }
+
+    // @spec REM-SCHED-020
+    @Test fun `does not suppress a delayed delivery when the log predates the window`() {
+        val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(20, 0)))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
+        val firedAt = instant(monday, LocalTime.of(22, 30))
+        val latestEventLoggedAt = instant(monday, LocalTime.of(18, 30)) // before 19:00, the window's start
+        assertFalse(shouldSuppressFixedNotification(reminder, scheduledAt, firedAt, zone, latestEventLoggedAt))
+    }
+
+    // @spec REM-SCHED-020
+    @Test fun `does not suppress on an event timestamped after delivery`() {
+        // Event timestamps are user-editable, so a future-dated entry must not suppress a reminder it
+        // postdates — the window is closed at firedAt, not left open-ended.
+        val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0), LocalTime.of(20, 0)))
+        val scheduledAt = instant(monday, LocalTime.of(20, 0))
+        val latestEventLoggedAt = instant(monday.plusDays(1), LocalTime.of(9, 0))
+        assertFalse(shouldSuppressFixedNotification(reminder, scheduledAt, scheduledAt, zone, latestEventLoggedAt))
     }
 }

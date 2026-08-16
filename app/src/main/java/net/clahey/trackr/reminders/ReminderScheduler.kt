@@ -57,7 +57,8 @@ class ReminderScheduler @Inject constructor(
         val reminder = repository.getReminderForCategory(categoryId).first() ?: return
         if (!reminder.enabled) return
         val latestEventLoggedAt = repository.getEventsByCategory(categoryId).first().maxOfOrNull { it.timestamp }
-        if (!shouldSuppressFixedNotification(reminder, firedAt, zone, latestEventLoggedAt)) {
+        val scheduledAt = reminder.nextFireAt ?: firedAt
+        if (!shouldSuppressFixedNotification(reminder, scheduledAt, firedAt, zone, latestEventLoggedAt)) {
             notifier.postReminderNotification(reminder)
         }
         val nextFireAt = computeNextFireTime(reminder, firedAt, zone)

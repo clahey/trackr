@@ -1,0 +1,254 @@
+# Review backlog
+
+Numbered, cross-segment work items from the code review of the reminders branch
+(PR #4, `reminders` → `after-rename`).
+
+Numbers are stable and are never reused — an item that is dropped keeps its
+number and is marked so, so that references to "#7" mean the same thing in a
+later session. Check an item off when it lands, and record the outcome where it
+belongs: the spec text, the owning LLD, and that segment's arrow doc § Work
+Required. Delete this file once everything is checked.
+
+**Verified** means a reviewer constructed the failure from the code.
+**Unverified** items still need that step before they are fixed — the claim may
+not survive contact with the source.
+
+## Items
+
+- [ ] **2** — Delete path is outside the load gate — *category-management*, verified
+- [x] **3** — FIXED-mode notification suppression never suppresses — *reminders*, verified
+- [ ] **4** — `enableReminder` returns without arming — *reminders*, verified
+- [ ] **5** — Suppression ignores child-category events — *reminders*, verified
+- [ ] **6** — Quick-log deep link re-fires on back-stack restore — *app-shell*, unverified
+- [ ] **7** — Permission banner can go stale — *category-management*, unverified
+- [ ] **8** — Occurrences-per-day field rejects most input — *reminders*, unverified
+- [ ] **9** — Exact-alarm prompt never re-checks — *reminders*, unverified
+- [ ] **10** — Duplicate notification-permission request — *reminders*, unverified
+- [ ] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
+- [ ] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
+- [ ] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified
+- [ ] **14** — Fake repository does not cascade reminder deletion — *local-storage*, unverified
+- [ ] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
+- [ ] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
+- [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
+- [ ] **18** — Exact-alarm check hand-rolled instead of using the port — *reminders*, verified
+- [ ] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
+- [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, unverified
+
+## Detail
+
+### 2 — Delete path is outside the CAT-UI-018 load gate
+`CategoryEditViewModel.kt:483`, `CategoryEditScreen.kt:235`
+
+`requestDelete()` has no `isLoaded` check and the trash `IconButton` gets no
+`enabled`. The counts it consults, `ownEventCount`/`subCategoryCount`
+(`CategoryEditViewModel.kt:275-283`), are `stateIn(..., Eagerly, 0)` and are not
+part of `isLoaded`, so they read 0 until their COUNT queries emit. With both at
+0, `deletionConfirmationIfNeeded` (`CategoryListViewModel.kt:41`) returns null
+and the delete proceeds with no dialog, cascade-deleting the category's events
+and image files. Subcategories are promoted rather than deleted
+(`LocalTrackrRepository.kt:130-137`), but that reparenting also happens without
+the confirmation the user should have seen.
+
+Accepted approach: a second readiness flag covering the counts, consulted by
+`requestDelete` — blocking until the counts land rather than disabling the
+button, so the delay reads as latency rather than as a broken control. The form
+itself has no reason to wait on COUNT queries, so this is a sibling of
+`isLoaded`, not a fifth flag inside it. Spec-affecting: CAT-UI-018 needs a
+clause or a sibling spec.
+
+### 3 — FIXED-mode notification suppression never suppresses
+`ReminderScheduling.kt:57`
+
+The lookback window is derived from the gap to the previous scheduled fire,
+found by walking backward from `firedAt` with a strict `isBefore`
+(`ReminderScheduling.kt:35`). Production passes `Instant.now()`
+(`ReminderReceiver.kt:23` → the default at `ReminderScheduler.kt:56`), which is
+always strictly after the scheduled instant, so the walk returns the trigger
+that just fired and the window collapses to delivery jitter. With times
+`[08:00, 20:00]` delivered at `20:00:00.400` the lookback is 40 ms instead of
+~60 min. Under the inexact `setAndAllowWhileIdle` path
+(`AndroidAlarmScheduler.kt:29`) the delivery delay can be minutes.
+
+Every existing test passes `firedAt` exactly equal to a scheduled time
+(`ReminderSchedulingTest.kt:291-361`, `ReminderSchedulerTest.kt:198-236`) — the
+single value at which the strict comparison skips today's entry, which is why
+the suite is green. REM-SCHED-020 is effectively unimplemented.
+
+### 4 — `enableReminder` returns without arming
+`ReminderScheduler.kt:37`
+
+The early return skips `alarmScheduler.arm()` at line 40, not just the
+recompute, assuming a pending OS alarm exists for the stored `nextFireAt`.
+Force-stop, app update, and OEM task-killers clear pending alarms while leaving
+the row intact. `reconcileOnStartup` does not heal it — line 97 only re-arms a
+null or stale `nextFireAt`. RANDOM-only, since `isNextFireAtValid` returns false
+for FIXED.
+
+Accepted approach: keep the skip-recompute/skip-save behavior, but always arm on
+the way out. Arming is idempotent via `FLAG_UPDATE_CURRENT` and the per-category
+data `Uri` (`AndroidAlarmScheduler.kt:40-47`), so the cost is one binder call.
+Spec-affecting: REM-SCHED-013 currently reads as prohibiting the call.
+
+### 5 — Suppression ignores child-category events
+`ReminderScheduler.kt:59`
+
+Uses `getEventsByCategory` (direct events only).
+`getEventsByCategoryIdIncludingChildren` exists at `TrackrRepository.kt:32` and
+is used for the same "this category's activity" semantics at
+`HomeViewModel.kt:95-96`. REM-UI-001 allows reminders on MetaCategories, so a
+MetaCategory whose logging happens entirely in its SubCategories has zero direct
+rows and is never suppressed. Spec-affecting: REM-SCHED-020 is silent on
+hierarchy.
+
+### 6 — Quick-log deep link re-fires on back-stack restore
+`MainActivity.kt:23-34` (approximate — unverified)
+
+The notification's `EXTRA_CATEGORY_ID` is read but never cleared (no
+`removeExtra`/`setIntent`), and the cold-start path bakes the id into the
+NavHost `startDestination`. After process death the timeline entry is restored
+with `quickLogCategoryId` still set, a fresh `HomeViewModel` consumes it, and
+the sheet opens unprompted with `ActiveFilter.TopLevel` silently reapplied.
+Rotation is not the trigger — ViewModels survive it.
+
+### 7 — Permission banner can go stale
+`CategoryListViewModel.kt:78` (approximate — unverified)
+
+`hasEnabledReminder` hangs a one-shot `getAllEnabledRemindersOnce()` off the
+`categories` StateFlow via `mapLatest`. Room invalidation is per-table and
+StateFlow conflates equal emissions, so a save touching only the reminder row
+may never re-trigger it and the REM-PERM-004 banner stays hidden. It also
+re-decodes every enabled reminder on every unrelated category write. Fix is a
+reactive `Flow<Boolean>` EXISTS query on `ReminderDao`, which addresses the
+staleness and the waste together.
+
+### 8 — Occurrences-per-day field rejects most input
+`CategoryEditScreen.kt:826` (approximate — unverified)
+
+`onValueChange` drops anything outside 1..12 while `value` comes from state, so
+clearing the digit reverts and reachable values may be limited to those typable
+by appending. Accepted approach: back the field with a string in the UI model,
+matching `exerciseDefaultSets`/`exerciseDefaultReps`, and validate on save
+through the existing `SaveResult.ValidationError` path.
+
+Unlike CAT-UI-011a — where bounds enforcement was descoped because a bad value
+only stores a bad default — `occurrencesPerDay` feeds the RANDOM sub-window
+division, so a non-positive value is an arithmetic hazard downstream. The bound
+needs an explicit spec line rather than inheriting the sets/reps precedent.
+
+### 9 — Exact-alarm prompt never re-checks
+`CategoryEditScreen.kt:764` (approximate — unverified)
+
+Reads `canScheduleExactAlarms()` inline during composition. Returning from
+Settings changes no observed state, so nothing recomposes and the card keeps
+asking for a permission the user just granted. `CategoryListScreen` already
+solves this with a `LifecycleEventObserver` + `permissionRecheckTrigger` +
+`remember(trigger)`. Fixing it also removes a binder IPC per recomposition.
+
+### 10 — Duplicate notification-permission request
+`CategoryEditScreen.kt:761` (approximate — unverified)
+
+The Switch's `onCheckedChange` requests POST_NOTIFICATIONS, and the
+`LaunchedEffect(Unit)` inside the newly-visible `if (reminderOn)` block requests
+it again as that block enters composition.
+
+### 11 — `ReminderMode.valueOf` throws on an unrecognized mode
+`Mappers.kt:113`
+
+Unguarded `valueOf(mode.uppercase())` throws `IllegalArgumentException`, which
+propagates through `getAllEnabledRemindersOnce()` into `reconcileOnStartup` in
+an unsupervised startup coroutine — a crash on every launch. No current write
+path produces an out-of-range value (`Mappers.kt:127` writes `mode.name`;
+lowercase legacy values are handled), so this is a robustness regression from
+the previously total decode rather than a reachable defect. The empty-
+`daysActive` guard next door suggests the asymmetry is unintentional.
+
+### 12 — Empty `times` on a FIXED reminder throws
+`ReminderScheduling.kt:44`
+
+`sortedTimes.first()` has no empty guard, so an enabled FIXED reminder with
+empty times throws `NoSuchElementException` on the same unsupervised startup
+path as #11. Not writable today: `CategoryEditViewModel.kt:57` rejects the save,
+`CategoryEditScreen.kt:895` hides the delete affordance below two entries, and
+reopening refills a default.
+
+### 13 — Schema `4.json` describes an unreachable version
+`app/schemas/net.clahey.trackr.data.local.TrackrDatabase/4.json`
+
+Version 4 existed only in unmerged commits on this branch, so no distributed
+build ever wrote `user_version = 4`. There is no 4→5 migration and no
+`fallbackToDestructiveMigration` (`DatabaseModule.kt:24-31`), so the file
+implies a reachable state that is not reachable. Either delete it or write the
+migration; the current state is a trap for a future reader.
+
+### 14 — Fake repository does not cascade reminder deletion
+`FakeTrackrRepository.kt:101` (approximate — unverified)
+
+`deleteCategory` removes the category and its events but leaves the reminders
+entry, while the real schema drops it via `ON DELETE CASCADE`. The test double
+models the opposite of production, so an orphan-reminder regression in
+`LocalTrackrRepository` would not be caught by the unit suite.
+
+### 15 — `@spec` range shorthand is not greppable per ID
+`CategoryEditViewModel.kt:285`, `CategoryEditScreen.kt:148`, `CategoryEditScreen.kt:358`
+
+`REM-UI-001..011` and `REM-PERM-001..004` are not EARS IDs and match nothing in
+`docs/specs/`. `grep REM-UI-006` does not find these sites, so the range form
+defeats the traceability the annotation exists for. CLAUDE.md's format is a
+comma-separated list of literal IDs.
+
+### 16 — `RemindersModule` cites a spec it does not implement
+`RemindersModule.kt:18`
+
+Cites `APP-REM-001`, which owns the fact that `AndroidManifest.xml` declares the
+two receivers — already annotated at its real entry point in the manifest. The
+module's actual bindings (`AlarmScheduler`, `ReminderNotifier`, `AlarmManager`,
+`NotificationManager`) are covered by no spec, so this is code with no correct
+intent linkage plus a polluted citation.
+
+### 17 — Four copies of the time-picker dialog
+`CategoryEditScreen.kt:917`, `:932`, `:966`, and `ui/components/TimestampField.kt:144`
+
+The same `rememberTimePickerState` + `AlertDialog` body appears three times in
+`CategoryEditScreen` and a fourth time in the shared component. Extract one
+`TimePickerDialog(initial, onConfirm, onDismiss)` into `ui/components/` and have
+all four call it.
+
+### 18 — Exact-alarm check hand-rolled instead of using the port
+`CategoryEditScreen.kt:154`, `:764`, `CategoryListScreen.kt:107`, `:171`
+
+`Build.VERSION.SDK_INT < S || canScheduleExactAlarms()` is written out in four
+UI sites while `AlarmScheduler.canScheduleExact()`
+(`AndroidAlarmScheduler.kt:22`) is the injectable, fakeable form and goes
+uncalled. The copies have already drifted in shape, and none of it is reachable
+from ViewModel tests — which is why `save()` grew three defaulted boolean
+parameters.
+
+### 19 — `onAlarmFired` scans the whole event table for a MAX
+`ReminderScheduler.kt:59`
+
+Loads and fully decodes every event row of the category (EventValue JSON,
+image-path list) to compute `maxOfOrNull { it.timestamp }`, on a Doze wakeup
+inside a `goAsync()` budget, and discards all of it for RANDOM reminders where
+`shouldSuppressFixedNotification` short-circuits on the mode check. Wants a DAO
+aggregate (`SELECT MAX(timestamp) ...`) behind the FIXED-mode branch.
+
+### 20 — App-startup work runs on every alarm-triggered process wake
+`TrackrApplication.kt:36` (unverified)
+
+The receivers declare no `android:process`, so an alarm delivered to a dead
+process runs `TrackrApplication.onCreate` first — `repository.onStartup()`
+(event-table read plus image-directory GC) and `reconcileOnStartup()` (DataStore
+read, all enabled reminders, an arm per reminder). Before reminders existed this
+ran only on user launch. Needs checking for a write race between
+`reconcileOnStartup` and the `onAlarmFired` the wake exists to serve, both
+touching the same `nextFireAt`.
+
+## Dropped
+
+### 1 — Receivers skip `super.onReceive`, so Hilt never injects
+Retracted. Reminders have been observed firing on a real device, and
+`ReminderScheduler.onAlarmFired` is what posts the notification, so injection
+demonstrably works. `ReminderRearmReceiver` is structurally identical, so the
+same holds for it. Whether the reboot and timezone-change paths work end to end
+is a separate, still-untested question.

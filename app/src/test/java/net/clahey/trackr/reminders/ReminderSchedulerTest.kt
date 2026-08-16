@@ -211,6 +211,22 @@ class ReminderSchedulerTest {
     }
 
     // @spec REM-SCHED-020
+    @Test fun `onAlarmFired sizes suppression from the stored nextFireAt, not the delivery instant`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val notifier = FakeReminderNotifier()
+        val sched = scheduler(repo, alarms, notifier)
+        repo.setReminders(fixedReminder(nextFireAt = Instant.parse("2024-01-01T20:00:00Z")))
+        repo.setEvents(loggedEvent("e1", "cat1", Instant.parse("2024-01-01T19:55:00Z")))
+
+        // Delivered 400ms late, as every real alarm is. The scheduler must pivot the backward walk on the
+        // armed instant it reads off the row, not on when the broadcast happened to arrive.
+        sched.onAlarmFired("cat1", firedAt = Instant.parse("2024-01-01T20:00:00.400Z"), zone = zone)
+
+        assertTrue("notification should have been suppressed", notifier.posted.isEmpty())
+    }
+
+    // @spec REM-SCHED-020
     @Test fun `onAlarmFired still posts the notification when the log is outside the lookback window`() = runTest {
         val repo = FakeTrackrRepository()
         val alarms = FakeAlarmScheduler()

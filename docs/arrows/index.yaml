@@ -102,7 +102,7 @@ arrows:
     blockedBy: [local-storage, category-management]
     detail: reminders.md
     next: "18 of 49 specs have no test-file @spec citation, down from 22 (REM-DATA-003/004/005 + REM-SCHED-002 closed 2026-08-14). REM-DATA-001 needs a Room instrumented test — one was written and passing on 2026-08-14, then removed at the user's request; deferred, not abandoned. REM-UI-*/REM-PERM-*/REM-NOTIF-*/REM-SCHED-009/010 need instrumented test infra (Compose UI, notification, real-AlarmManager) that doesn't exist anywhere in the project yet, not reminders-specific."
-    drift: "Deep full-text pass (2026-08-12) re-verified all 49 specs against code. Fixed: notification PendingIntent/id collision risk (categoryId.hashCode(), contradicted the LLD's own alarm-identity reasoning) now uses the same data-Uri technique as alarms; REM-DATA-003/004/REM-PERM-004/REM-NOTIF-005 spec wording reworded to match actual behavior; stale mode casing in reminders.md's ReminderEntity table corrected. No remaining known drift."
+    drift: "REM-SCHED-020 suppression never fired in production — the lookback was sized from the delivery instant instead of the scheduled one, collapsing it to alarm jitter; fixed 2026-08-15 (see reminders.md finding 7), along with an unbounded window that let future-dated events suppress. Deep full-text pass (2026-08-12) re-verified all 49 specs against code. Fixed: notification PendingIntent/id collision risk (categoryId.hashCode(), contradicted the LLD's own alarm-identity reasoning) now uses the same data-Uri technique as alarms; REM-DATA-003/004/REM-PERM-004/REM-NOTIF-005 spec wording reworded to match actual behavior; stale mode casing in reminders.md's ReminderEntity table corrected. No remaining known drift."
 
   publishing:
     status: OK

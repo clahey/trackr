@@ -46,18 +46,25 @@ private fun computeFixedFireTime(reminder: Reminder, pivot: Instant, zone: ZoneI
 
 private val MAX_SUPPRESSION_LOOKBACK: Duration = Duration.ofHours(1)
 
+// The window spans `scheduledAt - lookback` through `firedAt`, and the two instants are only equal when
+// delivery is perfectly punctual — which it never is. Sizing pivots on `scheduledAt` because the backward
+// walk qualifies candidates strictly before its pivot: `scheduledAt` is itself one of the reminder's
+// times, so pivoting on delivery returns the occurrence being delivered and shrinks the lookback to the
+// delivery jitter.
 // @spec REM-SCHED-020
 fun shouldSuppressFixedNotification(
     reminder: Reminder,
+    scheduledAt: Instant,
     firedAt: Instant,
     zone: ZoneId,
     latestEventLoggedAt: Instant?,
 ): Boolean {
     if (reminder.mode != ReminderMode.FIXED || latestEventLoggedAt == null) return false
-    val previousTrigger = computePreviousFixedFireTime(reminder, firedAt, zone)
-    val tenPercent = Duration.between(previousTrigger, firedAt).dividedBy(10)
+    val previousTrigger = computePreviousFixedFireTime(reminder, scheduledAt, zone)
+    val tenPercent = Duration.between(previousTrigger, scheduledAt).dividedBy(10)
     val lookback = minOf(tenPercent, MAX_SUPPRESSION_LOOKBACK)
-    return !latestEventLoggedAt.isBefore(firedAt.minus(lookback))
+    return !latestEventLoggedAt.isBefore(scheduledAt.minus(lookback)) &&
+        !latestEventLoggedAt.isAfter(firedAt)
 }
 
 private fun computeNextRandomFireTime(reminder: Reminder, after: Instant, zone: ZoneId, random: Random): Instant {
