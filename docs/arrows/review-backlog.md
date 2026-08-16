@@ -17,8 +17,8 @@ not survive contact with the source.
 
 - [x] **2** — Delete path is outside the load gate — *category-management*, verified
 - [x] **3** — FIXED-mode notification suppression never suppresses — *reminders*, verified
-- [ ] **4** — `enableReminder` returns without arming — *reminders*, verified
-- [ ] **5** — Suppression ignores child-category events — *reminders*, verified
+- [x] **4** — `enableReminder` returns without arming — *reminders*, verified
+- [x] **5** — Suppression ignores child-category events — *reminders*, verified
 - [ ] **6** — Quick-log deep link re-fires on back-stack restore — *app-shell*, unverified
 - [ ] **7** — Permission banner can go stale — *category-management*, unverified
 - [ ] **8** — Occurrences-per-day field rejects most input — *reminders*, unverified
@@ -32,7 +32,7 @@ not survive contact with the source.
 - [ ] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
 - [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
 - [ ] **18** — Exact-alarm check hand-rolled instead of using the port — *reminders*, verified
-- [ ] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
+- [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
 - [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, unverified
 - [ ] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
 - [ ] **22** — Localize the load flags to their `when` branches — *category-management*, PR comment

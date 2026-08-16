@@ -221,6 +221,16 @@ class FakeTrackrRepository : TrackrRepository {
                 .sortedWith(compareByDescending<Event> { it.timestamp }.thenByDescending { it.createdAt }.thenBy { it.id })
         }
     override fun getEventById(id: String): Flow<Event?> = events.map { it.find { e -> e.id == id } }
+
+    // @spec LS-BE-014
+    override suspend fun getLatestEventTimestampIncludingChildren(categoryId: String): Instant? {
+        val childIds = categories.value.filterIsInstance<Category.SubCategory>()
+            .filter { it.parent.id == categoryId }
+            .map { it.id }.toSet()
+        return events.value
+            .filter { e -> e.categoryId == categoryId || e.categoryId in childIds }
+            .maxOfOrNull { it.timestamp }
+    }
     override suspend fun saveEvent(event: Event) {
         events.update { list -> list.filter { it.id != event.id } + event }
     }

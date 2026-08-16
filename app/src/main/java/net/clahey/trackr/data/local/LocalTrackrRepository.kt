@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.room.withTransaction
 import net.clahey.trackr.data.ImageStore
 import net.clahey.trackr.data.TrackrRepository
+import net.clahey.trackr.data.local.converters.InstantConverter
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
@@ -176,6 +177,10 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
 
     override fun getEventById(id: String): Flow<Event?> =
         eventDao.getById(id).map { it?.toDomain() }
+
+    // @spec LS-BE-014
+    override suspend fun getLatestEventTimestampIncludingChildren(categoryId: String): Instant? =
+        eventDao.latestTimestampIncludingChildren(categoryId)?.let { InstantConverter.decode(it) }
 
     // @spec LS-BE-003, LS-BE-032
     override suspend fun saveEvent(event: Event) {

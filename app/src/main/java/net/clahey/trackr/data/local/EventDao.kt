@@ -54,6 +54,16 @@ interface EventDao {
     """)
     suspend fun getByCategoryIncludingChildrenWithNullTypeOnce(categoryId: String): List<EventEntity>
 
+    // @spec LS-BE-014
+    @Query("""
+        SELECT MAX(timestamp) FROM events
+        WHERE categoryId = :categoryId
+           OR categoryId IN (
+               SELECT id FROM categories WHERE parentId = :categoryId
+           )
+    """)
+    suspend fun latestTimestampIncludingChildren(categoryId: String): Long?
+
     @Query("SELECT * FROM events")
     suspend fun getAllOnce(): List<EventEntity>
 

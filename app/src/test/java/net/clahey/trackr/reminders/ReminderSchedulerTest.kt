@@ -1,9 +1,11 @@
 package net.clahey.trackr.reminders
 
 import net.clahey.trackr.FakeTrackrRepository
+import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.ReminderMode
+import net.clahey.trackr.domain.ValueType
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.first
@@ -89,8 +91,11 @@ class ReminderSchedulerTest {
         assertEquals(Instant.parse("2024-01-01T20:00:00Z"), alarms.armed["cat1"])
     }
 
+    // A valid stored nextFireAt means "don't recompute", not "an alarm is already pending" — the OS
+    // drops pending alarms on force-stop and app update while the row survives, and re-arming is the
+    // only thing that heals that.
     // @spec REM-SCHED-013, REM-SCHED-018
-    @Test fun `enableReminder is a no-op when the current RANDOM nextFireAt is still valid`() = runTest {
+    @Test fun `enableReminder re-arms without recomputing when the current RANDOM nextFireAt is still valid`() = runTest {
         val repo = FakeTrackrRepository()
         val alarms = FakeAlarmScheduler()
         val sched = scheduler(repo, alarms)
@@ -101,7 +106,7 @@ class ReminderSchedulerTest {
         sched.enableReminder(randomReminder(), now = Instant.parse("2024-01-01T09:00:00Z"), zone = zone)
 
         assertEquals(armedAt, repo.getReminderForCategory("cat1").first()!!.nextFireAt)
-        assertTrue("no arm call should happen for an already-valid nextFireAt", alarms.armCalls.isEmpty())
+        assertEquals(armedAt, alarms.armed["cat1"])
     }
 
     // @spec REM-SCHED-013
@@ -116,7 +121,10 @@ class ReminderSchedulerTest {
 
         sched.enableReminder(staleArgument, now = Instant.parse("2024-01-01T09:00:00Z"), zone = zone)
 
-        assertTrue("should have validated against the repository's value, not the stale argument", alarms.armCalls.isEmpty())
+        // Validating against the stale argument would have failed the box check and recomputed a
+        // fresh random instant; arming the repository's own value is what proves it was re-read.
+        assertEquals(armedAt, alarms.armed["cat1"])
+        assertEquals(armedAt, repo.getReminderForCategory("cat1").first()!!.nextFireAt)
     }
 
     // @spec REM-SCHED-013, REM-SCHED-015, REM-SCHED-002
@@ -252,6 +260,34 @@ class ReminderSchedulerTest {
         sched.onAlarmFired("cat1", firedAt = Instant.parse("2024-01-01T14:00:00Z"), zone = zone)
 
         assertEquals(1, notifier.posted.size)
+    }
+
+    // A reminder on a MetaCategory whose logging all happens in its SubCategories would otherwise
+    // never suppress — the parent row has no events of its own. The child carries its own
+    // valueType, which also pins the all-children query rather than the inheriting-children one.
+    // @spec REM-SCHED-020, LS-BE-014
+    @Test fun `onAlarmFired suppresses on an event logged under a SubCategory`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val notifier = FakeReminderNotifier()
+        val sched = scheduler(repo, alarms, notifier)
+        val parent = Category.MetaCategory(
+            id = "cat1", name = "Exercise", emoji = "🏃", color = 0xFF0000FFL,
+            valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = 0,
+        )
+        repo.setCategories(
+            parent,
+            Category.SubCategory(
+                id = "child", name = "Run", emoji = null, color = null, valueType = ValueType.None,
+                defaultValue = null, allowEmptyText = true, sortOrder = 0, parent = parent,
+            ),
+        )
+        repo.setReminders(fixedReminder(nextFireAt = Instant.parse("2024-01-01T20:00:00Z")))
+        repo.setEvents(loggedEvent("e1", "child", Instant.parse("2024-01-01T19:55:00Z")))
+
+        sched.onAlarmFired("cat1", firedAt = Instant.parse("2024-01-01T20:00:00Z"), zone = zone)
+
+        assertTrue("logging under a child should suppress the parent's reminder", notifier.posted.isEmpty())
     }
 
     // @spec REM-SCHED-011

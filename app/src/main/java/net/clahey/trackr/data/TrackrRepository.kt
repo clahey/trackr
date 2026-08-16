@@ -31,6 +31,8 @@ interface TrackrRepository {
     // @spec EL-UI-011
     fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>>
     fun getEventById(id: String): Flow<Event?>
+    // @spec LS-BE-014
+    suspend fun getLatestEventTimestampIncludingChildren(categoryId: String): Instant?
     suspend fun saveEvent(event: Event)
     suspend fun deleteEvent(id: String)
     suspend fun deleteEventFiles(imagePaths: List<String>)

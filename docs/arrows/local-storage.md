@@ -4,7 +4,7 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 
 ## Status
 
-**PARTIAL** — last audited 2026-08-12 (deep full-text pass; supersedes the 2026-07-27 reference-only audit), annotation backfill completed 2026-08-14. 32 of 32 specs implemented and annotated. LS-BE-010 and LS-BE-011 were reworded in the 2026-08-12 pass to match actual (and correct) behavior — hierarchical category ordering and caller-assigned `sortOrder`, respectively — rather than changing code; see finding 6. Remaining work is test-file citations (finding 4) and one cross-segment reconciliation this segment can't make alone (see Work Required).
+**PARTIAL** — last audited 2026-08-12 (deep full-text pass; supersedes the 2026-07-27 reference-only audit), annotation backfill completed 2026-08-14. 33 of 33 specs implemented and annotated. LS-BE-010 and LS-BE-011 were reworded in the 2026-08-12 pass to match actual (and correct) behavior — hierarchical category ordering and caller-assigned `sortOrder`, respectively — rather than changing code; see finding 6. Remaining work is test-file citations (finding 4) and one cross-segment reconciliation this segment can't make alone (see Work Required).
 
 ## References
 
@@ -15,7 +15,7 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 - docs/llds/local-storage.md
 
 ### EARS
-- docs/specs/local-storage.md (32 specs: LS-BE-*)
+- docs/specs/local-storage.md (33 specs: LS-BE-*)
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/data/local/converters/InstantConverterTest.kt
@@ -52,7 +52,7 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 | Image store / startup | LS-BE-070, LS-BE-080/081, LS-BE-093 | all | 0 | 0 |
 | Auto Backup | LS-BE-090 to 092 | all | 0 | 0 |
 
-**Summary:** 32 of 32 active specs implemented; 0 active gaps.
+**Summary:** 33 of 33 active specs implemented; 0 active gaps.
 
 ## Key Findings
 
@@ -63,6 +63,8 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 5. **Real Room migration test coverage now exists** (2026-08-12): `MigrationTest.kt` uses `MigrationTestHelper` against an emulator/device to run `MIGRATION_2_3` and `MIGRATION_3_5` and assert on the resulting data — the first instrumented Room test in this project; `docs/schemas/` assets are wired into the `androidTest` source set for this. `MIGRATION_1_2` is the one migration this can't cover: no `1.json` schema was ever exported (predates `exportSchema = true` being enabled) and it isn't reconstructable after the fact, so there's no "before" schema `MigrationTestHelper` can build a v1 database from. LS-BE-070 is now backed by a real test for the first time. (`MIGRATION_3_4`/`MIGRATION_4_5`, the two-step path superseded by `MIGRATION_3_5`, were retired 2026-08-13 once the one device that had reached version 4 was confirmed upgraded past it — see finding 7.)
 7. **`MIGRATION_3_4`/`MIGRATION_4_5` retired (2026-08-13).** They existed only to carry the one real device through its transient version-4 state to version 5; once that device was confirmed at version 5 (checked directly via `PRAGMA user_version` on the installed app's database), there was no remaining reason to keep the two-step path alive. `MIGRATION_3_5` is now the sole path from before the `reminders` table existed to the current schema. `MigrationTest.kt`'s `migrate4To5_coalescesNullWindowFieldsAndPreservesRealOnes` test (which existed specifically to verify `MIGRATION_4_5`'s `COALESCE` behavior) was removed along with it — that behavior no longer exists in the app.
 6. **Deep full-text audit (2026-08-12)** — read every spec, the full LLD, and the actual code (not just checked reference existence). Result: 30/32 CONSISTENT outright; LS-BE-010 and LS-BE-011 reworded to match actual (correct) code rather than the code being wrong (LS-BE-010 now describes the real hierarchical grouping instead of a flat `sortOrder ASC` claim; LS-BE-011 now attributes `currentMin - 1` assignment to the caller, matching the LLD's own "caller sets sortOrder" comment). The migration chain and nullability story (the area most likely to have rotted after the recent NOT NULL change) checked out exactly against the LLD — no drift found there. Several LLD/HLD prose bugs were found and fixed in the same pass: `saveCategoryWithReminder`'s LLD prose said clearing a reminder "no-ops" when the code actually issues an explicit `DELETE` (and the LLD was also missing the `migrateFromType` param and the `nextFireAt`-preservation logic entirely); the HLD's "two tables" line was stale (three, including `reminders`); `ReminderEntity.mode`'s documented casing (`"fixed"`/`"random"`) was stale (actual: uppercase `.name`, lowercase decode-only fallback); a resolved "Deferred" Open Question (nullable `Long` params in `getEvents`) was removed since the dispatch-pattern decision already shipped. One finding was **not** fixable within this segment: `local-storage.md`'s claim that its event sort order "matches" `data-model.md`'s canonical ordering is false on the `createdAt` axis — `data-model.md § Same-timestamp ordering` says ascending, this segment's code/tests use descending. This segment's own ordering is correct and tested; the doc now states that plainly and flags the mismatch for `data-model`'s owner rather than asserting a false match (cross-segment, not fixed here — see Work Required).
+
+7. **LS-BE-014 added 2026-08-16 (33 specs, was 32)** — `getLatestEventTimestampIncludingChildren`, a `MAX(timestamp)` aggregate over a category and its SubCategories. Requested by the `reminders` segment, whose fire path was loading and fully decoding every event row of a category to compute one maximum, on a Doze wakeup inside a `goAsync()` budget (see `reminders.md` finding 9). Added as a `suspend` one-shot rather than a `Flow` — the caller is a fired alarm making a single decision, with no subscriber to update. No schema change: it is a new query over existing columns.
 
 ## Work Required
 

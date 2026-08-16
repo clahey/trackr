@@ -8,6 +8,7 @@ import net.clahey.trackr.data.AlarmScheduler
 import net.clahey.trackr.data.ReminderNotifier
 import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Reminder
+import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.computeNextFireTime
 import net.clahey.trackr.domain.isNextFireAtValid
 import net.clahey.trackr.domain.shouldSuppressFixedNotification
@@ -34,9 +35,17 @@ class ReminderScheduler @Inject constructor(
     // @spec REM-SCHED-002, REM-SCHED-013, REM-SCHED-015, REM-SCHED-018
     suspend fun enableReminder(reminder: Reminder, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
         val currentNextFireAt = repository.getReminderForCategory(reminder.categoryId).first()?.nextFireAt
-        if (isNextFireAtValid(reminder, currentNextFireAt, now, zone)) return
-        val nextFireAt = computeNextFireTime(reminder, now, zone)
-        repository.saveReminder(reminder.copy(nextFireAt = nextFireAt))
+        // A valid stored nextFireAt means the occurrence doesn't need recomputing — not that an
+        // alarm is still pending for it. Force-stop, app update, and OEM task-kill all clear
+        // pending alarms while leaving the row intact, so this arms either way; re-arming an alarm
+        // that is already pending replaces it rather than stacking.
+        val nextFireAt = if (isNextFireAtValid(reminder, currentNextFireAt, now, zone)) {
+            currentNextFireAt!!
+        } else {
+            val recomputed = computeNextFireTime(reminder, now, zone)
+            repository.saveReminder(reminder.copy(nextFireAt = recomputed))
+            recomputed
+        }
         alarmScheduler.arm(reminder.categoryId, nextFireAt)
     }
 
@@ -56,7 +65,13 @@ class ReminderScheduler @Inject constructor(
     suspend fun onAlarmFired(categoryId: String, firedAt: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
         val reminder = repository.getReminderForCategory(categoryId).first() ?: return
         if (!reminder.enabled) return
-        val latestEventLoggedAt = repository.getEventsByCategory(categoryId).first().maxOfOrNull { it.timestamp }
+        // Only FIXED can suppress, and this runs on a Doze wakeup inside the receiver's goAsync()
+        // budget — so the read is skipped outright for the mode that would discard it.
+        val latestEventLoggedAt = if (reminder.mode == ReminderMode.FIXED) {
+            repository.getLatestEventTimestampIncludingChildren(categoryId)
+        } else {
+            null
+        }
         val scheduledAt = reminder.nextFireAt ?: firedAt
         if (!shouldSuppressFixedNotification(reminder, scheduledAt, firedAt, zone, latestEventLoggedAt)) {
             notifier.postReminderNotification(reminder)

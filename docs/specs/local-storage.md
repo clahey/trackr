@@ -17,6 +17,7 @@ LLD: `docs/llds/local-storage.md`
 - [x] **LS-BE-011**: `saveCategory` shall persist the `sortOrder` it is given as-is, without recomputing it; assigning a new category's `sortOrder` (e.g. `currentMin - 1` to place it at the top) is the caller's responsibility.
 - [x] **LS-BE-012**: `reorderCategories` shall accept an ordered list of category IDs and reassign sequential `sortOrder` values (0, 1, 2…) matching that order in a single operation.
 - [x] **LS-BE-013**: `getEventCountForCategory` shall return a `Flow<Int>` that reflects the live count of events for a given category.
+- [x] **LS-BE-014**: `getLatestEventTimestampIncludingChildren(categoryId)` shall return, in a single aggregate query, the greatest event `timestamp` among the category's own events and those of all its SubCategories, or null when neither has any. It is a `suspend` one-shot rather than a `Flow`: the caller is a fired alarm computing a single decision, with no subscriber to update.
 
 ## Event Persistence
 

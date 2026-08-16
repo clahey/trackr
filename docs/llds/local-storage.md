@@ -30,6 +30,7 @@ interface TrackrRepository {
     fun getEventsByCategory(categoryId: String): Flow<List<Event>>
     fun getEventsByCategoryIdIncludingChildren(id: String): Flow<List<Event>>  // id + all SubCategories (any valueType)
     fun getEventById(id: String): Flow<Event?>
+    suspend fun getLatestEventTimestampIncludingChildren(categoryId: String): Instant?  // MAX aggregate; id + all SubCategories
     suspend fun saveEvent(event: Event)            // upsert
     suspend fun deleteEvent(id: String)
 
