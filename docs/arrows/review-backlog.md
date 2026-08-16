@@ -15,7 +15,7 @@ not survive contact with the source.
 
 ## Items
 
-- [ ] **2** — Delete path is outside the load gate — *category-management*, verified
+- [x] **2** — Delete path is outside the load gate — *category-management*, verified
 - [x] **3** — FIXED-mode notification suppression never suppresses — *reminders*, verified
 - [ ] **4** — `enableReminder` returns without arming — *reminders*, verified
 - [ ] **5** — Suppression ignores child-category events — *reminders*, verified
@@ -34,6 +34,14 @@ not survive contact with the source.
 - [ ] **18** — Exact-alarm check hand-rolled instead of using the port — *reminders*, verified
 - [ ] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
 - [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, unverified
+- [ ] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
+- [ ] **22** — Localize the load flags to their `when` branches — *category-management*, PR comment
+- [ ] **23** — `HomeScreen` empty check should be a positive test — *event-logging*, PR comment
+- [ ] **24** — LLD should say the value is preserved — *local-storage*, PR comment
+- [ ] **25** — Conversation cruft belongs in the decision table — *local-storage*, PR comment
+- [ ] **26** — "Single row read" comment is confusing for a get-all — *local-storage*, PR comment
+- [ ] **27** — Three Open Questions deleted without justification — *local-storage*, PR comment
+- [ ] **28** — Redundant hardcoded tint on the notification icon — *reminders*, verified
 
 ## Detail
 
@@ -243,6 +251,66 @@ read, all enabled reminders, an arm per reminder). Before reminders existed this
 ran only on user launch. Needs checking for a write race between
 `reconcileOnStartup` and the `onAlarmFired` the wake exists to serve, both
 touching the same `nextFireAt`.
+
+### 21 — Collapse the eight reminder setters into one `setReminderUIState`
+`CategoryEditViewModel.kt:265`, `CategoryEditScreen.kt:359-378`
+
+Each of the eight reminder fields is spelled out five times: as a
+`ReminderUIState` property, a `ReminderSection` parameter, an `onXChange`
+parameter, a wiring lambda at the call site, and a
+`copy(x = value)` setter. Adding a field means editing five places, and a
+mistyped `copy()` target compiles silently. One `setReminderUIState` plus
+`onStateChange: (ReminderUIState) -> Unit`, with each control calling
+`onStateChange(state.copy(field = ...))`, collapses all five to one.
+
+### 22 — Localize the load flags to their `when` branches
+`CategoryEditViewModel.kt:123`
+
+The four flags are seeded with correlated expressions (`categoryId != null ||
+parentId == null` and friends) that re-encode init's `when` dispatch a second
+time, so a reader must cross-check the two to convince themselves the gate ever
+opens. Seeding all four false and setting the inapplicable ones true at the top
+of each `when` branch keeps that logic in one place.
+
+### 23 — `HomeScreen` empty check should be a positive test
+`HomeScreen.kt:194`
+
+Invert to test for content directly rather than early-returning on the empty
+case.
+
+### 24 — LLD should say the value is preserved
+`docs/llds/local-storage.md:88`
+
+### 25 — Conversation cruft belongs in the decision table
+`docs/llds/local-storage.md:193`
+
+The reminders aside reads as residue from the change that introduced it; the
+substance belongs in a Decisions row.
+
+### 26 — "Single row read" comment is confusing for a get-all
+`docs/llds/local-storage.md:195`
+
+The comment reasons about a single-row read, but the method fetches all rows.
+The conclusion (no transaction needed) stands; the reasoning as written does
+not.
+
+### 27 — Three Open Questions deleted without justification
+`docs/llds/local-storage.md:247`
+
+The PR removed all four Open Questions from the file. Only the first — nullable
+`Long` params in `getEvents` — has a recorded reason (the dispatch-pattern
+decision shipped). The `imagePaths` join table, pagination, and backup/export
+questions went with it silently. Backup/export is arguably resolved now that
+Auto Backup ships; the other two look like live deferrals swept up by an
+over-broad deletion. Restore what is still open.
+
+### 28 — Redundant hardcoded tint on the notification icon
+`app/src/main/res/drawable/ic_notification_reminder.xml:6`
+
+`android:tint="#FFFFFFFF"` is redundant: the system tints notification small
+icons itself, and hardcoding white can fight that treatment. The drawable
+itself is legitimate — `setSmallIcon` takes a resource id, so a Compose
+`ImageVector` cannot serve here.
 
 ## Dropped
 

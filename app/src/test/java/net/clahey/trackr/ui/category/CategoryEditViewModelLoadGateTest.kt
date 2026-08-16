@@ -3,6 +3,7 @@ package net.clahey.trackr.ui.category
 import androidx.lifecycle.SavedStateHandle
 import net.clahey.trackr.FakeTrackrRepository
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.ValueType
@@ -18,6 +19,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,6 +33,7 @@ import java.time.LocalTime
 class CategoryEditViewModelLoadGateTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
+    private val anchor: Instant = Instant.parse("2026-08-14T12:00:00Z")
     private lateinit var repo: FakeTrackrRepository
 
     @Before fun setUp() {
@@ -56,6 +59,11 @@ class CategoryEditViewModelLoadGateTest {
         daysActive = setOf(DayOfWeek.MONDAY),
         showCategoryInNotification = true,
         nextFireAt = nextFireAt,
+    )
+
+    private fun event(id: String, categoryId: String) = Event(
+        id = id, categoryId = categoryId, timestamp = anchor,
+        value = null, notes = null, imagePaths = emptyList(), createdAt = anchor,
     )
 
     private fun editVm(categoryId: String) = CategoryEditViewModel(
@@ -160,5 +168,64 @@ class CategoryEditViewModelLoadGateTest {
         val vm = CategoryEditViewModel(repo, testReminderScheduler(repo), SavedStateHandle())
         assertTrue(vm.isLoaded.value)
         assertNull(vm.parentCategory.value)
+    }
+
+    // The delete decision must not run against a placeholder count. A category with events reads as
+    // empty until its count query emits, and "empty" is exactly the condition for silent deletion
+    // (CAT-UI-004) — so a tap in that window would destroy the events with no dialog.
+    // @spec CAT-UI-019
+    @Test fun `delete requested before the counts load still shows the confirmation`() = runTest {
+        repo.saveCategory(category("c1"))
+        repo.saveEvent(event("e1", "c1"))
+        repo.saveEvent(event("e2", "c1"))
+        // Shut before construction: the counts are collected eagerly at init, so a gate installed
+        // afterwards would find them already emitted and cached.
+        val gate = CompletableDeferred<Unit>()
+        repo.countReadGate = gate
+
+        val vm = editVm("c1")
+        vm.requestDelete()
+        gate.complete(Unit)
+
+        val confirmation = vm.pendingDeleteConfirmation.value
+        assertNotNull("deletion should have waited for the real counts", confirmation)
+        assertEquals(2, confirmation!!.ownEventCount)
+        assertTrue(repo.getCategories().first().any { it.id == "c1" })
+    }
+
+    // @spec CAT-UI-019
+    @Test fun `delete requested before the counts load still counts subcategories`() = runTest {
+        val parent = category("parent")
+        repo.saveCategory(parent)
+        repo.saveCategory(
+            Category.SubCategory(
+                id = "child", name = "Child", emoji = null, color = null, valueType = null,
+                defaultValue = null, allowEmptyText = true, sortOrder = 0, parent = parent,
+            ),
+        )
+        val gate = CompletableDeferred<Unit>()
+        repo.countReadGate = gate
+
+        val vm = editVm("parent")
+        vm.requestDelete()
+        gate.complete(Unit)
+
+        val confirmation = vm.pendingDeleteConfirmation.value
+        assertNotNull("deletion should have waited for the real counts", confirmation)
+        assertEquals(1, confirmation!!.subCategoryCount)
+        assertTrue(repo.getCategories().first().any { it.id == "parent" })
+    }
+
+    // The counts genuinely being zero must still delete silently — the fix defers the decision, it
+    // does not add a confirmation where CAT-UI-004 says there shouldn't be one.
+    // @spec CAT-UI-019
+    @Test fun `delete of an empty category still skips the confirmation`() = runTest {
+        repo.saveCategory(category("c1"))
+        val vm = editVm("c1")
+
+        vm.requestDelete()
+
+        assertNull(vm.pendingDeleteConfirmation.value)
+        assertFalse(repo.getCategories().first().any { it.id == "c1" })
     }
 }

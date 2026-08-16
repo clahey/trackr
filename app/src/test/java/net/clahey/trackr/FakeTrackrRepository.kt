@@ -51,6 +51,10 @@ class FakeTrackrRepository : TrackrRepository {
     var categoryReadGate: CompletableDeferred<Unit>? = null
     var reminderReadGate: CompletableDeferred<Unit>? = null
 
+    // Gates the two counts the delete decision reads (CAT-UI-019), so a test can issue a delete request
+    // while they are still in flight — the window in which a placeholder count reads as "empty".
+    var countReadGate: CompletableDeferred<Unit>? = null
+
     override fun getCategoryById(id: String): Flow<Category?> =
         categories.map { list -> categoryReadGate?.await(); list.find { c -> c.id == id } }
     // @spec DM-DATA-028
@@ -180,7 +184,7 @@ class FakeTrackrRepository : TrackrRepository {
 
     override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> {
         return if (!includeSubCategoriesWithNullType) {
-            events.map { it.count { e -> e.categoryId == categoryId } }
+            events.map { countReadGate?.await(); it.count { e -> e.categoryId == categoryId } }
         } else {
             combine(categories, events) { cats, evts ->
                 val inheritingChildIds = cats
@@ -195,6 +199,7 @@ class FakeTrackrRepository : TrackrRepository {
 
     override fun getSubCategoryCount(categoryId: String): Flow<Int> =
         categories.map { cats ->
+            countReadGate?.await()
             cats.count { c -> c is Category.SubCategory && c.parent.id == categoryId }
         }
 

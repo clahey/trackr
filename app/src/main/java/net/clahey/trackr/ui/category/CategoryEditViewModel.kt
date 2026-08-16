@@ -271,17 +271,6 @@ class CategoryEditViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     } else MutableStateFlow(null)
 
-    // Live event counts in edit mode; zero in create mode.
-    val ownEventCount: StateFlow<Int> = if (categoryId != null) {
-        repository.getEventCountForCategory(categoryId, includeSubCategoriesWithNullType = false)
-            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
-    } else MutableStateFlow(0)
-
-    val subCategoryCount: StateFlow<Int> = if (categoryId != null) {
-        repository.getSubCategoryCount(categoryId)
-            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
-    } else MutableStateFlow(0)
-
     // @spec REM-UI-001..011
     private val _reminderUIState = MutableStateFlow(ReminderUIState())
     val reminderUIState: StateFlow<ReminderUIState> = _reminderUIState.asStateFlow()
@@ -479,30 +468,34 @@ class CategoryEditViewModel @Inject constructor(
         _saveResult.value = SaveResult.Success
     }
 
-    // @spec CAT-UI-004, CAT-UI-005, CAT-UI-007, CAT-NAV-005
+    // The counts are read here rather than held as state: a cached count seeds at 0, and 0/0 is exactly
+    // the condition for deleting without a dialog, so a tap arriving before the queries emitted would
+    // destroy a populated category silently.
+    // @spec CAT-UI-004, CAT-UI-005, CAT-UI-019, CAT-NAV-005
     fun requestDelete() {
         val id = categoryId ?: return
-        val confirmation = deletionConfirmationIfNeeded(id, ownEventCount.value, subCategoryCount.value)
-        if (confirmation == null) {
-            viewModelScope.launch {
-                repository.deleteCategory(id)
-                reminderScheduler.cancel(id)
-                _saveResult.value = SaveResult.Success
-            }
-        } else {
-            _pendingDeleteConfirmation.value = confirmation
+        viewModelScope.launch {
+            val ownEventCount =
+                repository.getEventCountForCategory(id, includeSubCategoriesWithNullType = false).first()
+            val subCategoryCount = repository.getSubCategoryCount(id).first()
+            val confirmation = deletionConfirmationIfNeeded(id, ownEventCount, subCategoryCount)
+            if (confirmation == null) performDelete(id) else _pendingDeleteConfirmation.value = confirmation
         }
     }
 
     // @spec CAT-UI-007
     fun confirmDelete() {
         val pending = _pendingDeleteConfirmation.value ?: return
-        viewModelScope.launch {
-            repository.deleteCategory(pending.categoryId)
-            reminderScheduler.cancel(pending.categoryId)
-            _pendingDeleteConfirmation.value = null
-            _saveResult.value = SaveResult.Success
-        }
+        viewModelScope.launch { performDelete(pending.categoryId) }
+    }
+
+    // Both delete paths end here so the alarm cancel can't be wired into one and forgotten on the other.
+    // @spec CAT-UI-006, CAT-UI-007
+    private suspend fun performDelete(id: String) {
+        repository.deleteCategory(id)
+        reminderScheduler.cancel(id)
+        _pendingDeleteConfirmation.value = null
+        _saveResult.value = SaveResult.Success
     }
 
     fun cancelDelete() {
