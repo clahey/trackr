@@ -36,12 +36,12 @@ not survive contact with the source.
 - [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, unverified
 - [ ] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
 - [ ] **22** — Localize the load flags to their `when` branches — *category-management*, PR comment
-- [ ] **23** — `HomeScreen` empty check should be a positive test — *event-logging*, PR comment
-- [ ] **24** — LLD should say the value is preserved — *local-storage*, PR comment
-- [ ] **25** — Conversation cruft belongs in the decision table — *local-storage*, PR comment
-- [ ] **26** — "Single row read" comment is confusing for a get-all — *local-storage*, PR comment
-- [ ] **27** — Three Open Questions deleted without justification — *local-storage*, PR comment
-- [ ] **28** — Redundant hardcoded tint on the notification icon — *reminders*, verified
+- [x] **23** — `HomeScreen` empty check should be a positive test — *event-logging*, PR comment
+- [x] **24** — LLD should say the value is preserved — *local-storage*, PR comment
+- [x] **25** — Conversation cruft belongs in the decision table — *local-storage*, PR comment
+- [x] **26** — "Single row read" comment is confusing for a get-all — *local-storage*, PR comment
+- [x] **27** — An Open Question deleted without justification — *local-storage*, PR comment
+- [x] **28** — Redundant hardcoded tint on the notification icon — *reminders*, verified
 
 ## Detail
 
@@ -294,15 +294,16 @@ The comment reasons about a single-row read, but the method fetches all rows.
 The conclusion (no transaction needed) stands; the reasoning as written does
 not.
 
-### 27 — Three Open Questions deleted without justification
+### 27 — An Open Question deleted without justification
 `docs/llds/local-storage.md:247`
 
-The PR removed all four Open Questions from the file. Only the first — nullable
-`Long` params in `getEvents` — has a recorded reason (the dispatch-pattern
-decision shipped). The `imagePaths` join table, pagination, and backup/export
-questions went with it silently. Backup/export is arguably resolved now that
-Auto Backup ships; the other two look like live deferrals swept up by an
-over-broad deletion. Restore what is still open.
+Only one question was actually removed — nullable `Long` params in `getEvents`.
+The other three were renumbered in place, which is what made the hunk look like
+a wholesale deletion. The removal is correct: the question's own fallback
+shipped (`LocalTrackrRepository.getEvents` dispatches to four fixed-shape DAO
+queries), so it is answered, not open. Nothing recorded that answer, though,
+which is why the deletion read as unexplained — the dispatch is now described
+in § Repository Contract.
 
 ### 28 — Redundant hardcoded tint on the notification icon
 `app/src/main/res/drawable/ic_notification_reminder.xml:6`

@@ -191,9 +191,10 @@ fun HomeScreen(
     val quickLogCategoryNotFound by homeVm.quickLogCategoryNotFound.collectAsState()
     val categoryNotFoundMessage = stringResource(R.string.category_not_found)
     LaunchedEffect(quickLogCategoryNotFound) {
-        if (!quickLogCategoryNotFound) return@LaunchedEffect
-        snackbarHostState.showSnackbar(categoryNotFoundMessage)
-        homeVm.consumeQuickLogCategoryNotFound()
+        if (quickLogCategoryNotFound) {
+            snackbarHostState.showSnackbar(categoryNotFoundMessage)
+            homeVm.consumeQuickLogCategoryNotFound()
+        }
     }
 
     val eventDeletedMessage = stringResource(R.string.event_deleted_snackbar)
