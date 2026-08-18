@@ -42,6 +42,10 @@ not survive contact with the source.
 - [x] **26** — "Single row read" comment is confusing for a get-all — *local-storage*, PR comment
 - [x] **27** — An Open Question deleted without justification — *local-storage*, PR comment
 - [x] **28** — Redundant hardcoded tint on the notification icon — *reminders*, verified
+- [ ] **29** — Permission prompt sends the user to the less severe problem first — *reminders*, verified on device
+- [ ] **30** — No prompt or recovery path when notifications are denied — *reminders*, verified on device
+- [ ] **31** — One message for two different failures — *reminders*, verified on device
+- [ ] **32** — A blocked notification channel is undetectable — *reminders*, verified
 
 ## Detail
 
@@ -342,6 +346,52 @@ in § Repository Contract.
 icons itself, and hardcoding white can fight that treatment. The drawable
 itself is legitimate — `setSmallIcon` takes a resource id, so a Compose
 `ImageVector` cannot serve here.
+
+### 29 — Permission prompt sends the user to the less severe problem first
+`CategoryListScreen.kt:171`
+
+The banner's tap handler checks exact alarms first and falls through to
+notification settings, so when both are missing it opens "Alarms & reminders" —
+the less damaging of the two. Notifications off means the reminder produces
+nothing visible at all; exact alarms off means it still fires, just imprecisely.
+The user fixes the timing, returns, and the banner is still there.
+
+### 30 — No prompt or recovery path when notifications are denied
+`CategoryEditScreen.kt:760`
+
+The Reminder section shows an inline card when exact alarms are unavailable but
+nothing at all when notifications are denied — only the one-shot system dialog,
+which Android will not show again after a denial. So denying leaves the edit
+screen with no indication anything is wrong and no way to fix it. REM-PERM-003's
+save-time dialog warns but only offers "Save anyway"; it does not link out.
+
+### 31 — One message for two different failures
+`strings.xml:162` (`reminder_banner_message`)
+
+The banner reads "Some reminders may not fire reliably" regardless of cause.
+That is timing language, and it is wrong for the notifications case, where
+reminders will not be shown at all rather than shown late.
+
+### 32 — A blocked notification channel is undetectable
+`PermissionState.kt:77`, `CategoryEditScreen.kt:154`, `:726`
+
+All three permission checks call `areNotificationsEnabled()`, which reports
+app-level state only. `AndroidReminderNotifier` posts to the `"reminders"`
+channel (`REMINDER_NOTIFICATION_CHANNEL_ID`), and nothing anywhere reads
+`getNotificationChannel("reminders")?.importance`. Blocking just that channel
+leaves `areNotificationsEnabled()` true, so no banner, no save-time warning, and
+`notify()` silently drops the notification.
+
+Long-pressing a notification and tapping "Turn off notifications" blocks the
+*channel*, not the app — the most common way a person mutes something is
+precisely the case the app cannot see.
+
+**Sequencing:** #32 adds a third state bit that #29–#31's shared decision
+function has to consume, so establish its detection first (or design the
+function for all three inputs from the start). #29–#31 are otherwise one change:
+a single function in `ui/components/PermissionState.kt` taking the state bits
+and returning what is wrong, what to say, and which settings screen to open,
+with the list banner and the edit card both rendering from it.
 
 ## Dropped
 
