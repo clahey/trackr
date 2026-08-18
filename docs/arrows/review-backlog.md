@@ -386,11 +386,36 @@ Long-pressing a notification and tapping "Turn off notifications" blocks the
 *channel*, not the app — the most common way a person mutes something is
 precisely the case the app cannot see.
 
-**Sequencing:** #29–#31 first, then #32. They are one change — a single function
-in `ui/components/PermissionState.kt` taking the state bits and returning what is
-wrong, what to say, and which settings screen to open, with the list banner and
-the edit card both rendering from it. #32 then adds its bit inside that one
-function.
+**Sequencing:** #29–#31 first, then #32. They are one change, and #32 then adds
+its bit inside the one function that change creates.
+
+**Shape (agreed):** a pure decision function with a thin composable wrapper, in
+`ui/components/PermissionState.kt`.
+
+```kotlin
+fun reminderPermissionProblem(
+    notificationsEnabled: Boolean,
+    channelEnabled: Boolean,
+    exactAlarmAvailable: Boolean,
+): ReminderPermissionProblem?          // what is wrong, what to say, where to send them
+
+@Composable
+fun rememberReminderPermissionProblem(): ReminderPermissionProblem?
+```
+
+Call sites take no arguments — they use the composable. The pure core exists
+because the decision is the part with the bugs in it: #29 is a wrong priority
+ordering and #31 is message selection, both unit-testable only if they sit
+outside composition, and this project has no Compose test infrastructure. Same
+pattern as `computeNextFireTime` / `reconcileSiblingOrder`. It also lets
+`doSave()` — which is not in composition and needs a point-in-time read — share
+the decision instead of reimplementing it.
+
+**Open question:** whether REM-PERM-003's save-time dialog message should also
+vary by cause. It currently hedges across both ("may not fire or may not be
+visible") precisely because it cannot tell them apart. Sharing the decision
+function would let it say which, extending #31 from two surfaces to three.
+Undecided.
 
 Doing #32 first would mean writing the channel check into both
 `PermissionState.kt:77` and `CategoryEditScreen.kt:154`, and then relocating
