@@ -1,15 +1,9 @@
 package net.clahey.trackr.ui.category
 
-import android.app.AlarmManager
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +19,6 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,8 +55,8 @@ import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.ui.components.DragListItem
 import net.clahey.trackr.ui.components.DragReorderList
-import net.clahey.trackr.ui.components.rememberExactAlarmAvailable
-import net.clahey.trackr.ui.components.rememberNotificationsEnabled
+import net.clahey.trackr.ui.components.ReminderPermissionNotice
+import net.clahey.trackr.ui.components.rememberReminderPermissionProblem
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -89,10 +82,7 @@ fun CategoryListScreen(
     // @spec REM-PERM-004
     val hasEnabledReminder by viewModel.hasEnabledReminder.collectAsState()
     val context = LocalContext.current
-    val notificationsEnabled = rememberNotificationsEnabled()
-    val exactAlarmAvailable = rememberExactAlarmAvailable()
-    val showReminderPermissionBanner =
-        hasEnabledReminder && (!notificationsEnabled || !exactAlarmAvailable)
+    val permissionProblem = rememberReminderPermissionProblem().takeIf { hasEnabledReminder }
 
     val snackbarMessage by pendingSnackbarMessage.collectAsState()
     LaunchedEffect(snackbarMessage) {
@@ -147,39 +137,7 @@ fun CategoryListScreen(
         }
         Column(modifier = Modifier.padding(innerPadding)) {
             // @spec REM-PERM-004
-            if (showReminderPermissionBanner) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                        .clickable {
-                            val settingsIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                                !context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
-                            ) {
-                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                                    .setData(Uri.parse("package:${context.packageName}"))
-                            } else {
-                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                            }
-                            context.startActivity(settingsIntent)
-                        }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                    Text(
-                        stringResource(R.string.reminder_banner_message),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
+            permissionProblem?.let { problem -> ReminderPermissionNotice(problem) }
         DragReorderList(
             items = dragItems,
             onMove = { result, onSettled -> viewModel.onDragMove(result, onSettled) },

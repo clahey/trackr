@@ -42,9 +42,9 @@ not survive contact with the source.
 - [x] **26** — "Single row read" comment is confusing for a get-all — *local-storage*, PR comment
 - [x] **27** — An Open Question deleted without justification — *local-storage*, PR comment
 - [x] **28** — Redundant hardcoded tint on the notification icon — *reminders*, verified
-- [ ] **29** — Permission prompt sends the user to the less severe problem first — *reminders*, verified on device
-- [ ] **30** — No prompt or recovery path when notifications are denied — *reminders*, verified on device
-- [ ] **31** — One message for two different failures — *reminders*, verified on device
+- [x] **29** — Permission prompt sends the user to the less severe problem first — *reminders*, verified on device
+- [x] **30** — No prompt or recovery path when notifications are denied — *reminders*, verified on device
+- [x] **31** — One message for two different failures — *reminders*, verified on device
 - [ ] **32** — A blocked notification channel is undetectable — *reminders*, verified
 - [ ] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, unverified
 - [ ] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, unverified
@@ -246,7 +246,7 @@ The same `rememberTimePickerState` + `AlertDialog` body appears three times in
 all four call it.
 
 ### 18 — Exact-alarm check hand-rolled instead of using the port
-`CategoryEditScreen.kt:154`, `CategoryListScreen.kt:171`
+`CategoryEditScreen.kt:159`
 
 `Build.VERSION.SDK_INT < S || canScheduleExactAlarms()` is written out in the
 UI while `AlarmScheduler.canScheduleExact()` (`AndroidAlarmScheduler.kt:22`) is
@@ -254,11 +254,11 @@ the injectable, fakeable form and goes uncalled. None of it is reachable from
 ViewModel tests — which is why `save()` grew three defaulted boolean
 parameters.
 
-Narrowed by the #9/#10 fix: the two sites that *displayed* this state now read
-through `rememberExactAlarmAvailable()`. The two left are point-in-time reads at
-a user action — `doSave`'s check, which REM-PERM-003 requires be read "at that
-moment", and the banner's tap handler picking a settings screen — so they want
-the port, not the composable.
+Down to one site. The two that *displayed* this state read through
+`rememberExactAlarmAvailable()` after #9/#10, and the banner's tap handler
+stopped reading it at all after #29–#31. What remains is `doSave`'s check, which
+REM-PERM-003 requires be read at the moment of the save — so it wants the port,
+not the composable.
 
 ### 19 — `onAlarmFired` scans the whole event table for a MAX
 `ReminderScheduler.kt:59`
@@ -375,9 +375,9 @@ That is timing language, and it is wrong for the notifications case, where
 reminders will not be shown at all rather than shown late.
 
 ### 32 — A blocked notification channel is undetectable
-`PermissionState.kt:77`, `CategoryEditScreen.kt:154`, `:726`
+`PermissionState.kt` (`rememberNotificationsEnabled`), `CategoryEditScreen.kt:158`
 
-All three permission checks call `areNotificationsEnabled()`, which reports
+Every notification check calls `areNotificationsEnabled()`, which reports
 app-level state only. `AndroidReminderNotifier` posts to the `"reminders"`
 channel (`REMINDER_NOTIFICATION_CHANNEL_ID`), and nothing anywhere reads
 `getNotificationChannel("reminders")?.importance`. Blocking just that channel
@@ -388,43 +388,10 @@ Long-pressing a notification and tapping "Turn off notifications" blocks the
 *channel*, not the app — the most common way a person mutes something is
 precisely the case the app cannot see.
 
-**Sequencing:** #29–#31 first, then #32. They are one change, and #32 then adds
-its bit inside the one function that change creates.
-
-**Shape (agreed):** a pure decision function with a thin composable wrapper, in
-`ui/components/PermissionState.kt`.
-
-```kotlin
-fun reminderPermissionProblem(
-    notificationsEnabled: Boolean,
-    channelEnabled: Boolean,
-    exactAlarmAvailable: Boolean,
-): ReminderPermissionProblem?          // what is wrong, what to say, where to send them
-
-@Composable
-fun rememberReminderPermissionProblem(): ReminderPermissionProblem?
-```
-
-Call sites take no arguments — they use the composable. The pure core exists
-because the decision is the part with the bugs in it: #29 is a wrong priority
-ordering and #31 is message selection, both unit-testable only if they sit
-outside composition, and this project has no Compose test infrastructure. Same
-pattern as `computeNextFireTime` / `reconcileSiblingOrder`. It also lets
-`doSave()` — which is not in composition and needs a point-in-time read — share
-the decision instead of reimplementing it.
-
-**Open question:** whether REM-PERM-003's save-time dialog message should also
-vary by cause. It currently hedges across both ("may not fire or may not be
-visible") precisely because it cannot tell them apart. Sharing the decision
-function would let it say which, extending #31 from two surfaces to three.
-Undecided.
-
-Doing #32 first would mean writing the channel check into both
-`PermissionState.kt:77` and `CategoryEditScreen.kt:154`, and then relocating
-both when the decision function absorbs them. Adding a third input to a function
-that already exists is the cheaper edit. Note that `CategoryEditScreen.kt:726`
-is *not* one of the sites: it gates the runtime permission request, and no
-permission dialog can fix a blocked channel, so it stays app-level.
+The fix is a third input to `reminderPermissionProblem()` (REM-PERM-006) and its
+two live reads, ranked alongside `NotificationsDisabled`. The runtime permission
+request at `CategoryEditScreen.kt:728` is *not* a site: it gates a system dialog,
+and no dialog can unblock a channel, so it stays app-level.
 
 ### 33 — Tapping an unexpanded multi-reminder row shows no reminders
 Reported from device use, not yet traced to code.

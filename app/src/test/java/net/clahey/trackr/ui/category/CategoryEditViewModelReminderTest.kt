@@ -11,6 +11,7 @@ import net.clahey.trackr.reminders.FakePreferencesDataStore
 import net.clahey.trackr.reminders.FakeReminderNotifier
 import net.clahey.trackr.reminders.ReminderScheduler
 import net.clahey.trackr.ui.SaveResult
+import net.clahey.trackr.ui.components.ReminderPermissionProblem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -106,9 +107,24 @@ class CategoryEditViewModelReminderTest {
         fillRequiredFields()
         vm.setReminderEnabled(true)
         vm.save(notificationPermissionGranted = false, exactAlarmAvailable = true)
-        assertTrue(vm.pendingPermissionConfirmation.value)
+        assertEquals(
+            ReminderPermissionProblem.NotificationsDisabled,
+            vm.pendingPermissionConfirmation.value,
+        )
         assertEquals(SaveResult.Idle, vm.saveResult.value)
         assertNull(repo.getCategories().first().find { it.name == "Category" })
+    }
+
+    // @spec REM-PERM-003, REM-PERM-006
+    @Test fun `the save confirmation names the exact-alarm problem when only that is missing`() = runTest {
+        fillRequiredFields()
+        vm.setReminderEnabled(true)
+        vm.save(notificationPermissionGranted = true, exactAlarmAvailable = false)
+        assertEquals(
+            ReminderPermissionProblem.ExactAlarmsUnavailable,
+            vm.pendingPermissionConfirmation.value,
+        )
+        assertEquals(SaveResult.Idle, vm.saveResult.value)
     }
 
     // @spec REM-PERM-003
@@ -116,7 +132,7 @@ class CategoryEditViewModelReminderTest {
         fillRequiredFields()
         vm.setReminderEnabled(true)
         vm.save(notificationPermissionGranted = false, exactAlarmAvailable = true, forceSaveDespitePermission = true)
-        assertFalse(vm.pendingPermissionConfirmation.value)
+        assertNull(vm.pendingPermissionConfirmation.value)
         assertEquals(SaveResult.Success, vm.saveResult.value)
     }
 

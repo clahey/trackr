@@ -20,6 +20,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.seconds
 import net.clahey.trackr.ui.SaveResult
+import net.clahey.trackr.ui.components.ReminderPermissionProblem
+import net.clahey.trackr.ui.components.reminderPermissionProblem
 import net.clahey.trackr.ui.theme.DEFAULT_CATEGORY_COLOR
 import net.clahey.trackr.ui.theme.categoryColorForIndex
 import net.clahey.trackr.ui.theme.categoryColorPalette
@@ -285,9 +287,10 @@ class CategoryEditViewModel @Inject constructor(
     fun setReminderShowCategoryInNotification(value: Boolean) = edit { _reminderUIState.value = _reminderUIState.value.copy(showCategoryInNotification = value) }
 
     // @spec REM-PERM-003
-    private val _pendingPermissionConfirmation = MutableStateFlow(false)
-    val pendingPermissionConfirmation: StateFlow<Boolean> = _pendingPermissionConfirmation.asStateFlow()
-    fun dismissPermissionConfirmation() { _pendingPermissionConfirmation.value = false }
+    private val _pendingPermissionConfirmation = MutableStateFlow<ReminderPermissionProblem?>(null)
+    val pendingPermissionConfirmation: StateFlow<ReminderPermissionProblem?> =
+        _pendingPermissionConfirmation.asStateFlow()
+    fun dismissPermissionConfirmation() { _pendingPermissionConfirmation.value = null }
 
     init {
         when {
@@ -397,13 +400,15 @@ class CategoryEditViewModel @Inject constructor(
         }
 
         // @spec REM-PERM-003
-        if (_reminderUIState.value.enabled && !forceSaveDespitePermission &&
-            (!notificationPermissionGranted || !exactAlarmAvailable)
-        ) {
-            _pendingPermissionConfirmation.value = true
+        val permissionProblem = reminderPermissionProblem(
+            notificationsEnabled = notificationPermissionGranted,
+            exactAlarmAvailable = exactAlarmAvailable,
+        )
+        if (_reminderUIState.value.enabled && !forceSaveDespitePermission && permissionProblem != null) {
+            _pendingPermissionConfirmation.value = permissionProblem
             return
         }
-        _pendingPermissionConfirmation.value = false
+        _pendingPermissionConfirmation.value = null
 
         val sortOrder = categoryId?.let { repository.getCategoryById(it).first()?.sortOrder }
             ?: (repository.getCategories().first().minOfOrNull { it.sortOrder }?.minus(1) ?: 0)

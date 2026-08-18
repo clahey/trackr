@@ -15,7 +15,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 - docs/llds/reminders.md
 
 ### EARS
-- docs/specs/reminders.md (49 specs: REM-DATA-* [8], REM-UI-* [11], REM-SCHED-* [20], REM-NOTIF-* [6], REM-PERM-* [4])
+- docs/specs/reminders.md (51 specs: REM-DATA-* [8], REM-UI-* [11], REM-SCHED-* [20], REM-NOTIF-* [6], REM-PERM-* [6])
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/domain/ReminderSchedulingTest.kt
@@ -66,9 +66,9 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 | Category Edit UI | REM-UI-* (11) | all | 0 | 0 |
 | Scheduling engine | REM-SCHED-* (20) | all | 0 | 0 |
 | Notifications | REM-NOTIF-* (6) | all | 0 | 0 |
-| Permissions | REM-PERM-* (5) | all | 0 | 0 |
+| Permissions | REM-PERM-* (6) | all | 0 | 0 |
 
-**Summary:** 50 of 50 active specs implemented; 0 active behavioral gaps. 18 specs have no test-file `@spec` citation, down from 22 (finding 2) — REM-DATA-003/004/005 and REM-SCHED-002 were closed 2026-08-14. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
+**Summary:** 51 of 51 active specs implemented; 0 active behavioral gaps. 19 specs have no test-file `@spec` citation (finding 2) — 18 after the 2026-08-14 backfill closed REM-DATA-003/004/005 and REM-SCHED-002, plus REM-PERM-005, which needs the same Compose UI infra. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
 
 ## Key Findings
 
@@ -90,7 +90,9 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 
 10. **Permission prompts read state that never refreshed (fixed 2026-08-18).** The Reminder section requested `POST_NOTIFICATIONS` twice for one toggle — once from the Switch's `onCheckedChange`, once from the `LaunchedEffect` in the block that toggle makes visible — where REM-PERM-001's two triggers are both covered by the latter. Separately, both the section's exact-alarm prompt and the list screen's REM-PERM-004 banner sampled permission state during composition with no way to learn it had changed: the prompt had no re-check at all, and the banner's `ON_RESUME` trigger does not fire in multi-window mode, where every visible activity stays `RESUMED` while the user grants the permission in an adjacent Settings pane. Both now read through `rememberExactAlarmAvailable()` / `rememberNotificationsEnabled()` (`ui/components/PermissionState.kt`), the first observing `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` — the only signal that arrives regardless of focus, and available on exactly the API levels where the prompt can appear. The notification half remains best-effort on window focus, since no equivalent broadcast exists. New spec REM-PERM-005 holds the mechanism so REM-PERM-002 and REM-PERM-004 cite it rather than each restating it. No tests: screen-level Compose UI testing has no infrastructure anywhere in this project (finding 2); verified manually, split-screen included.
 
-    This also narrows backlog #18. Its four hand-rolled `canScheduleExactAlarms()` sites split into two that *display* state — now behind the helpers — and two that read it at the moment of an action (`doSave`'s check, per REM-PERM-003's "at that moment", and the banner's tap handler choosing a settings screen), which are correct as direct calls. Only those two remain for #18 to re-point through `AlarmScheduler.canScheduleExact()`.
+    This also narrows backlog #18. Its four hand-rolled `canScheduleExactAlarms()` sites are down to one: two *display* state and now sit behind the helpers, the banner's tap handler stopped reading availability altogether (finding 11), and only `doSave`'s point-in-time check — correct as a direct call, per REM-PERM-003's "at that moment" — remains for #18 to re-point through `AlarmScheduler.canScheduleExact()`.
+
+11. **Three permission surfaces decided separately and disagreed (fixed 2026-08-18).** With both notifications and exact alarms off, the list banner opened "Alarms & reminders" — its tap handler tested exact alarms first and fell through to notification settings — sending the user to fix the problem that only delays a reminder while the one that stops it being shown at all went unmentioned. Its single message said reminders "may not fire reliably," which is timing language and simply wrong for the notifications case. The Reminder section had no prompt for denied notifications at all, and no recovery path either, since Android shows the runtime dialog once and ignores every later request. All three surfaces — inline prompt, banner, and the save-time dialog — now share one decision, `reminderPermissionProblem()` in `ui/components/PermissionState.kt` (REM-PERM-006), which returns the single most severe problem; message and settings destination both follow from it, so where a surface sends the user always matches what it says. `CategoryEditViewModel.pendingPermissionConfirmation` carries the problem rather than a `Boolean`, which is what puts the save path under test. The two display surfaces also render one `ReminderPermissionNotice` instead of a hand-built banner apiece, differing only in shape. 5 tests: 4 on the decision itself in `ReminderPermissionProblemTest.kt`, 1 on the save path in `CategoryEditViewModelReminderTest.kt`. The two display surfaces stay untested for the same reason as finding 10.
 
 ## Work Required
 

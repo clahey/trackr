@@ -5,7 +5,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +19,74 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import net.clahey.trackr.R
+
+/**
+ * The one thing worth telling the user about reminder permissions, or absent when nothing is wrong.
+ *
+ * Only ever one at a time: fixing the reported problem re-evaluates and reports whatever is next.
+ */
+enum class ReminderPermissionProblem {
+    /** The reminder is never seen. */
+    NotificationsDisabled,
+
+    /** The reminder still arrives, just not necessarily on time. */
+    ExactAlarmsUnavailable,
+}
+
+/**
+ * Notifications outrank exact alarms: turned-off notifications stop the reminder being seen at all,
+ * while unavailable exact alarms affect only when it lands.
+ */
+// @spec REM-PERM-006
+fun reminderPermissionProblem(
+    notificationsEnabled: Boolean,
+    exactAlarmAvailable: Boolean,
+): ReminderPermissionProblem? = when {
+    !notificationsEnabled -> ReminderPermissionProblem.NotificationsDisabled
+    !exactAlarmAvailable -> ReminderPermissionProblem.ExactAlarmsUnavailable
+    else -> null
+}
+
+/** [reminderPermissionProblem] over live permission state, for surfaces inside composition. */
+@Composable
+fun rememberReminderPermissionProblem(): ReminderPermissionProblem? =
+    reminderPermissionProblem(
+        notificationsEnabled = rememberNotificationsEnabled(),
+        exactAlarmAvailable = rememberExactAlarmAvailable(),
+    )
+
+/** What the list banner and the Reminder section's inline prompt say. */
+@StringRes
+fun ReminderPermissionProblem.messageRes(): Int = when (this) {
+    ReminderPermissionProblem.NotificationsDisabled -> R.string.reminder_problem_notifications
+    ReminderPermissionProblem.ExactAlarmsUnavailable -> R.string.reminder_problem_exact_alarms
+}
+
+/** What the save-time confirmation dialog is headed. */
+@StringRes
+fun ReminderPermissionProblem.dialogTitleRes(): Int = when (this) {
+    ReminderPermissionProblem.NotificationsDisabled -> R.string.reminder_problem_notifications_title
+    ReminderPermissionProblem.ExactAlarmsUnavailable -> R.string.reminder_problem_exact_alarms_title
+}
+
+/** What the save-time confirmation dialog says this reminder will do. */
+@StringRes
+fun ReminderPermissionProblem.dialogMessageRes(): Int = when (this) {
+    ReminderPermissionProblem.NotificationsDisabled -> R.string.reminder_problem_notifications_save
+    ReminderPermissionProblem.ExactAlarmsUnavailable -> R.string.reminder_problem_exact_alarms_save
+}
+
+/** The system settings screen that fixes this problem. */
+fun ReminderPermissionProblem.settingsIntent(context: Context): Intent = when (this) {
+    ReminderPermissionProblem.NotificationsDisabled ->
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+
+    ReminderPermissionProblem.ExactAlarmsUnavailable ->
+        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+            .setData(Uri.parse("package:${context.packageName}"))
+}
 
 /**
  * Exact-alarm availability as observable UI state, for surfaces that *display* it.

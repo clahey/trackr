@@ -154,12 +154,13 @@
     <string name="reminder_validation_no_active_day">Choose at least one active day.</string>
     <string name="reminder_validation_no_time">Add at least one time.</string>
     <string name="reminder_validation_window_invalid">End time must be after start time.</string>
-    <string name="reminder_permission_dialog_title">Notifications aren\'t fully enabled</string>
-    <string name="reminder_permission_dialog_message">This reminder may not fire or may not be visible. Save anyway?</string>
     <string name="reminder_permission_save_anyway">Save anyway</string>
-    <string name="reminder_exact_alarm_prompt">For reliable timing, allow Trackr to schedule exact alarms.</string>
-    <string name="reminder_exact_alarm_open_settings">Open settings</string>
-    <string name="reminder_banner_message">Some reminders may not fire reliably — tap to review</string>
+    <string name="reminder_problem_notifications">Notifications are turned off, so reminders won\'t be shown.</string>
+    <string name="reminder_problem_notifications_title">Notifications are turned off</string>
+    <string name="reminder_problem_notifications_save">This reminder won\'t be shown. Save anyway?</string>
+    <string name="reminder_problem_exact_alarms">Exact alarms are turned off, so reminders may not arrive on time.</string>
+    <string name="reminder_problem_exact_alarms_title">Exact alarms are turned off</string>
+    <string name="reminder_problem_exact_alarms_save">This reminder may not arrive on time. Save anyway?</string>
 
     <!-- Timeline empty states -->
     <string name="empty_no_categories_title">Welcome to Trackr</string>

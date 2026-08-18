@@ -2,10 +2,7 @@ package net.clahey.trackr.ui.category
 
 import android.annotation.SuppressLint
 import android.app.AlarmManager
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,7 +37,6 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -94,7 +90,10 @@ import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
 import net.clahey.trackr.ui.components.OutlinedFieldBox
-import net.clahey.trackr.ui.components.rememberExactAlarmAvailable
+import net.clahey.trackr.ui.components.ReminderPermissionNotice
+import net.clahey.trackr.ui.components.dialogMessageRes
+import net.clahey.trackr.ui.components.dialogTitleRes
+import net.clahey.trackr.ui.components.rememberReminderPermissionProblem
 import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.theme.categoryColorPalette
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
@@ -181,11 +180,11 @@ fun CategoryEditScreen(
     }
 
     // @spec REM-PERM-003
-    if (pendingPermissionConfirmation) {
+    pendingPermissionConfirmation?.let { problem ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissPermissionConfirmation() },
-            title = { Text(stringResource(R.string.reminder_permission_dialog_title)) },
-            text = { Text(stringResource(R.string.reminder_permission_dialog_message)) },
+            title = { Text(stringResource(problem.dialogTitleRes())) },
+            text = { Text(stringResource(problem.dialogMessageRes())) },
             confirmButton = {
                 TextButton(onClick = { doSave(force = true) }) {
                     Text(stringResource(R.string.reminder_permission_save_anyway))
@@ -717,14 +716,18 @@ private fun ReminderSection(
     onShowCategoryInNotificationChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    // The grant itself is live-checked elsewhere; this only tracks whether the dialog is up, so the
+    // inline prompt can keep quiet while it is.
+    var notificationRequestInFlight by remember { mutableStateOf(false) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { /* live-checked elsewhere via NotificationManagerCompat; nothing to store */ }
+    ) { notificationRequestInFlight = false }
 
     fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             !NotificationManagerCompat.from(context).areNotificationsEnabled()
         ) {
+            notificationRequestInFlight = true
             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -759,19 +762,13 @@ private fun ReminderSection(
             // @spec REM-PERM-001
             LaunchedEffect(Unit) { requestNotificationPermissionIfNeeded() }
 
+            // Read unconditionally so the permission-state receiver isn't torn down and
+            // re-registered every time the runtime dialog opens and closes.
             // @spec REM-PERM-002
-            val exactAlarmAvailable = rememberExactAlarmAvailable()
-            if (!exactAlarmAvailable) {
-                Card {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(R.string.reminder_exact_alarm_prompt), style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = {
-                            context.startActivity(
-                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                                    .setData(Uri.parse("package:${context.packageName}")),
-                            )
-                        }) { Text(stringResource(R.string.reminder_exact_alarm_open_settings)) }
-                    }
+            val permissionProblem = rememberReminderPermissionProblem()
+            if (!notificationRequestInFlight) {
+                permissionProblem?.let { problem ->
+                    ReminderPermissionNotice(problem, shape = MaterialTheme.shapes.medium)
                 }
             }
 
