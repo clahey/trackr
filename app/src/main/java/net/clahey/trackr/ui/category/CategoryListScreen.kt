@@ -41,7 +41,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,16 +56,14 @@ import net.clahey.trackr.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
 import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.ui.components.DragListItem
 import net.clahey.trackr.ui.components.DragReorderList
+import net.clahey.trackr.ui.components.rememberExactAlarmAvailable
+import net.clahey.trackr.ui.components.rememberNotificationsEnabled
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,22 +89,10 @@ fun CategoryListScreen(
     // @spec REM-PERM-004
     val hasEnabledReminder by viewModel.hasEnabledReminder.collectAsState()
     val context = LocalContext.current
-    var permissionRecheckTrigger by remember { mutableStateOf(0) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) permissionRecheckTrigger++
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    val showReminderPermissionBanner = remember(hasEnabledReminder, permissionRecheckTrigger) {
-        hasEnabledReminder && (
-            !NotificationManagerCompat.from(context).areNotificationsEnabled() ||
-                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                    !context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms())
-            )
-    }
+    val notificationsEnabled = rememberNotificationsEnabled()
+    val exactAlarmAvailable = rememberExactAlarmAvailable()
+    val showReminderPermissionBanner =
+        hasEnabledReminder && (!notificationsEnabled || !exactAlarmAvailable)
 
     val snackbarMessage by pendingSnackbarMessage.collectAsState()
     LaunchedEffect(snackbarMessage) {

@@ -22,8 +22,8 @@ not survive contact with the source.
 - [ ] **6** — Quick-log deep link re-fires on back-stack restore — *app-shell*, verified
 - [ ] **7** — Permission banner can go stale — *category-management*, verified
 - [ ] **8** — Occurrences-per-day field rejects most input — *reminders*, unverified
-- [ ] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
-- [ ] **10** — Duplicate notification-permission request — *reminders*, verified
+- [x] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
+- [x] **10** — Duplicate notification-permission request — *reminders*, verified
 - [ ] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
 - [ ] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
 - [ ] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified
@@ -240,14 +240,19 @@ The same `rememberTimePickerState` + `AlertDialog` body appears three times in
 all four call it.
 
 ### 18 — Exact-alarm check hand-rolled instead of using the port
-`CategoryEditScreen.kt:154`, `:764`, `CategoryListScreen.kt:107`, `:171`
+`CategoryEditScreen.kt:154`, `CategoryListScreen.kt:171`
 
-`Build.VERSION.SDK_INT < S || canScheduleExactAlarms()` is written out in four
-UI sites while `AlarmScheduler.canScheduleExact()`
-(`AndroidAlarmScheduler.kt:22`) is the injectable, fakeable form and goes
-uncalled. The copies have already drifted in shape, and none of it is reachable
-from ViewModel tests — which is why `save()` grew three defaulted boolean
+`Build.VERSION.SDK_INT < S || canScheduleExactAlarms()` is written out in the
+UI while `AlarmScheduler.canScheduleExact()` (`AndroidAlarmScheduler.kt:22`) is
+the injectable, fakeable form and goes uncalled. None of it is reachable from
+ViewModel tests — which is why `save()` grew three defaulted boolean
 parameters.
+
+Narrowed by the #9/#10 fix: the two sites that *displayed* this state now read
+through `rememberExactAlarmAvailable()`. The two left are point-in-time reads at
+a user action — `doSave`'s check, which REM-PERM-003 requires be read "at that
+moment", and the banner's tap handler picking a settings screen — so they want
+the port, not the composable.
 
 ### 19 — `onAlarmFired` scans the whole event table for a MAX
 `ReminderScheduler.kt:59`

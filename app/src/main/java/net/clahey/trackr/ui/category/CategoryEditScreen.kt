@@ -94,6 +94,7 @@ import net.clahey.trackr.domain.ValueTypeWarningTier
 import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
 import net.clahey.trackr.ui.components.OutlinedFieldBox
+import net.clahey.trackr.ui.components.rememberExactAlarmAvailable
 import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.theme.categoryColorPalette
 import net.clahey.trackr.ui.theme.foregroundColorForBackground
@@ -743,26 +744,23 @@ private fun ReminderSection(
                 Icon(Icons.Default.Notifications, contentDescription = null)
                 Text(stringResource(R.string.reminder_section_title))
             }
-            // @spec REM-PERM-001
             Switch(
                 checked = reminderOn,
                 enabled = enabled,
-                onCheckedChange = { checked ->
-                    onReminderOnChange(checked)
-                    if (checked) requestNotificationPermissionIfNeeded()
-                },
+                onCheckedChange = onReminderOnChange,
             )
         }
 
         // @spec REM-UI-003
         if (reminderOn) {
             // Fires once each time this content is entered — turning the section on, or
-            // reopening an already-on one — matching "entering/expanding the Reminder section".
+            // reopening an already-on one — which is both of the triggers REM-PERM-001 names, so
+            // the Switch itself doesn't request as well.
+            // @spec REM-PERM-001
             LaunchedEffect(Unit) { requestNotificationPermissionIfNeeded() }
 
             // @spec REM-PERM-002
-            val exactAlarmAvailable = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+            val exactAlarmAvailable = rememberExactAlarmAvailable()
             if (!exactAlarmAvailable) {
                 Card {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
