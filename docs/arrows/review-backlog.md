@@ -386,12 +386,18 @@ Long-pressing a notification and tapping "Turn off notifications" blocks the
 *channel*, not the app — the most common way a person mutes something is
 precisely the case the app cannot see.
 
-**Sequencing:** #32 adds a third state bit that #29–#31's shared decision
-function has to consume, so establish its detection first (or design the
-function for all three inputs from the start). #29–#31 are otherwise one change:
-a single function in `ui/components/PermissionState.kt` taking the state bits
-and returning what is wrong, what to say, and which settings screen to open,
-with the list banner and the edit card both rendering from it.
+**Sequencing:** #29–#31 first, then #32. They are one change — a single function
+in `ui/components/PermissionState.kt` taking the state bits and returning what is
+wrong, what to say, and which settings screen to open, with the list banner and
+the edit card both rendering from it. #32 then adds its bit inside that one
+function.
+
+Doing #32 first would mean writing the channel check into both
+`PermissionState.kt:77` and `CategoryEditScreen.kt:154`, and then relocating
+both when the decision function absorbs them. Adding a third input to a function
+that already exists is the cheaper edit. Note that `CategoryEditScreen.kt:726`
+is *not* one of the sites: it gates the runtime permission request, and no
+permission dialog can fix a blocked channel, so it stays app-level.
 
 ## Dropped
 
