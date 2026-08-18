@@ -46,6 +46,8 @@ not survive contact with the source.
 - [ ] **30** — No prompt or recovery path when notifications are denied — *reminders*, verified on device
 - [ ] **31** — One message for two different failures — *reminders*, verified on device
 - [ ] **32** — A blocked notification channel is undetectable — *reminders*, verified
+- [ ] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, unverified
+- [ ] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, unverified
 
 ## Detail
 
@@ -423,6 +425,17 @@ both when the decision function absorbs them. Adding a third input to a function
 that already exists is the cheaper edit. Note that `CategoryEditScreen.kt:726`
 is *not* one of the sites: it gates the runtime permission request, and no
 permission dialog can fix a blocked channel, so it stays app-level.
+
+### 33 — Tapping an unexpanded multi-reminder row shows no reminders
+Reported from device use, not yet traced to code.
+
+A category with several reminders, shown collapsed, does not reveal them when
+tapped — nothing appears.
+
+### 34 — Tapping the yellow-dot icon shows no reminders
+Reported from device use, not yet traced to code.
+
+Tapping the icon carrying the yellow dot shows no reminders.
 
 ## Dropped
 
