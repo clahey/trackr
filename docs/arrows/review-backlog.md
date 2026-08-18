@@ -19,21 +19,21 @@ not survive contact with the source.
 - [x] **3** — FIXED-mode notification suppression never suppresses — *reminders*, verified
 - [x] **4** — `enableReminder` returns without arming — *reminders*, verified
 - [x] **5** — Suppression ignores child-category events — *reminders*, verified
-- [ ] **6** — Quick-log deep link re-fires on back-stack restore — *app-shell*, unverified
-- [ ] **7** — Permission banner can go stale — *category-management*, unverified
+- [ ] **6** — Quick-log deep link re-fires on back-stack restore — *app-shell*, verified
+- [ ] **7** — Permission banner can go stale — *category-management*, verified
 - [ ] **8** — Occurrences-per-day field rejects most input — *reminders*, unverified
-- [ ] **9** — Exact-alarm prompt never re-checks — *reminders*, unverified
-- [ ] **10** — Duplicate notification-permission request — *reminders*, unverified
+- [ ] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
+- [ ] **10** — Duplicate notification-permission request — *reminders*, verified
 - [ ] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
 - [ ] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
 - [ ] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified
-- [ ] **14** — Fake repository does not cascade reminder deletion — *local-storage*, unverified
+- [ ] **14** — Fake repository does not cascade reminder deletion — *local-storage*, verified
 - [ ] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
 - [ ] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
 - [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
 - [ ] **18** — Exact-alarm check hand-rolled instead of using the port — *reminders*, verified
 - [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
-- [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, unverified
+- [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, verified
 - [ ] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
 - [ ] **22** — Localize the load flags to their `when` branches — *category-management*, PR comment
 - [x] **23** — `HomeScreen` empty check should be a positive test — *event-logging*, PR comment
@@ -110,25 +110,37 @@ rows and is never suppressed. Spec-affecting: REM-SCHED-020 is silent on
 hierarchy.
 
 ### 6 — Quick-log deep link re-fires on back-stack restore
-`MainActivity.kt:23-34` (approximate — unverified)
+`MainActivity.kt:23`, `AppNavHost.kt:130`, `HomeViewModel.kt:151`
 
 The notification's `EXTRA_CATEGORY_ID` is read but never cleared (no
 `removeExtra`/`setIntent`), and the cold-start path bakes the id into the
-NavHost `startDestination`. After process death the timeline entry is restored
-with `quickLogCategoryId` still set, a fresh `HomeViewModel` consumes it, and
-the sheet opens unprompted with `ActiveFilter.TopLevel` silently reapplied.
-Rotation is not the trigger — ViewModels survive it.
+NavHost `startDestination`. `HomeViewModel`'s init reads
+`savedStateHandle["quickLogCategoryId"]` and fires from it;
+`consumePendingQuickLogTarget()` clears only the in-memory `StateFlow`, never
+the SavedStateHandle entry. After process death the timeline entry is restored
+with the argument still set, a fresh `HomeViewModel` reads it, and the sheet
+opens unprompted with `ActiveFilter.TopLevel` silently reapplied
+(`HomeViewModel.kt:163`). Rotation is not the trigger — ViewModels survive it.
+
+Fix: clear the SavedStateHandle entry when the target is consumed.
 
 ### 7 — Permission banner can go stale
-`CategoryListViewModel.kt:78` (approximate — unverified)
+`CategoryListViewModel.kt:78`
 
 `hasEnabledReminder` hangs a one-shot `getAllEnabledRemindersOnce()` off the
-`categories` StateFlow via `mapLatest`. Room invalidation is per-table and
-StateFlow conflates equal emissions, so a save touching only the reminder row
-may never re-trigger it and the REM-PERM-004 banner stays hidden. It also
-re-decodes every enabled reminder on every unrelated category write. Fix is a
-reactive `Flow<Boolean>` EXISTS query on `ReminderDao`, which addresses the
-staleness and the waste together.
+`categories` StateFlow via `mapLatest`, so it only recomputes when `categories`
+emits. The operative mechanism is StateFlow conflation, not per-table Room
+invalidation: `saveCategoryWithReminder` does touch the categories table, but
+enabling a reminder without editing a category field re-emits an *equal*
+`List<Category>`, which the StateFlow drops — so `mapLatest` never runs and the
+REM-PERM-004 banner stays hidden. It self-heals whenever
+`WhileSubscribed(5000)` lapses and re-subscribes, so the failure needs a
+list→edit→list round trip faster than 5s. It also re-decodes every enabled
+reminder on every unrelated category write.
+
+Fix: a reactive `Flow<Boolean>` EXISTS query on `ReminderDao`, which addresses
+the staleness and the waste together. Cross-segment — a new read on
+local-storage, like LS-BE-014 was.
 
 ### 8 — Occurrences-per-day field rejects most input
 `CategoryEditScreen.kt:826` (approximate — unverified)
@@ -145,20 +157,23 @@ division, so a non-positive value is an arithmetic hazard downstream. The bound
 needs an explicit spec line rather than inheriting the sets/reps precedent.
 
 ### 9 — Exact-alarm prompt never re-checks
-`CategoryEditScreen.kt:764` (approximate — unverified)
+`CategoryEditScreen.kt:764`
 
 Reads `canScheduleExactAlarms()` inline during composition. Returning from
 Settings changes no observed state, so nothing recomposes and the card keeps
 asking for a permission the user just granted. `CategoryListScreen` already
 solves this with a `LifecycleEventObserver` + `permissionRecheckTrigger` +
-`remember(trigger)`. Fixing it also removes a binder IPC per recomposition.
+`remember(trigger)` (`CategoryListScreen.kt:95-108`) — the fix is to port that
+pattern, not to invent one. It also removes a binder IPC per recomposition.
 
 ### 10 — Duplicate notification-permission request
-`CategoryEditScreen.kt:761` (approximate — unverified)
+`CategoryEditScreen.kt:752`, `:761`
 
-The Switch's `onCheckedChange` requests POST_NOTIFICATIONS, and the
-`LaunchedEffect(Unit)` inside the newly-visible `if (reminderOn)` block requests
-it again as that block enters composition.
+The Switch's `onCheckedChange` calls `requestNotificationPermissionIfNeeded()`,
+and the `LaunchedEffect(Unit)` inside the newly-visible `if (reminderOn)` block
+calls it again as that block enters composition. The line-752 call is fully
+subsumed: toggling on always enters that block. REM-PERM-001 is annotated on
+the Switch, so check the spec's wording before deleting the call.
 
 ### 11 — `ReminderMode.valueOf` throws on an unrecognized mode
 `Mappers.kt:113`
@@ -190,12 +205,14 @@ implies a reachable state that is not reachable. Either delete it or write the
 migration; the current state is a trap for a future reader.
 
 ### 14 — Fake repository does not cascade reminder deletion
-`FakeTrackrRepository.kt:101` (approximate — unverified)
+`FakeTrackrRepository.kt:105`
 
-`deleteCategory` removes the category and its events but leaves the reminders
-entry, while the real schema drops it via `ON DELETE CASCADE`. The test double
-models the opposite of production, so an orphan-reminder regression in
-`LocalTrackrRepository` would not be caught by the unit suite.
+`deleteCategory` updates `categories` and `events` and never touches the
+`reminders` map, while the real `ReminderEntity` drops the row via
+`onDelete = ForeignKey.CASCADE`. The test double models the opposite of
+production, so an orphan-reminder regression in `LocalTrackrRepository` would
+not be caught by the unit suite. Promoted children keep their own reminders —
+they are reparented, not deleted.
 
 ### 15 — `@spec` range shorthand is not greppable per ID
 `CategoryEditViewModel.kt:285`, `CategoryEditScreen.kt:148`, `CategoryEditScreen.kt:358`
@@ -242,15 +259,23 @@ inside a `goAsync()` budget, and discards all of it for RANDOM reminders where
 aggregate (`SELECT MAX(timestamp) ...`) behind the FIXED-mode branch.
 
 ### 20 — App-startup work runs on every alarm-triggered process wake
-`TrackrApplication.kt:36` (unverified)
+`TrackrApplication.kt:34-36`
 
 The receivers declare no `android:process`, so an alarm delivered to a dead
 process runs `TrackrApplication.onCreate` first — `repository.onStartup()`
 (event-table read plus image-directory GC) and `reconcileOnStartup()` (DataStore
 read, all enabled reminders, an arm per reminder). Before reminders existed this
-ran only on user launch. Needs checking for a write race between
-`reconcileOnStartup` and the `onAlarmFired` the wake exists to serve, both
-touching the same `nextFireAt`.
+ran only on user launch.
+
+The write race is narrower than first thought: `reconcileOnStartup` only
+recomputes a `nextFireAt` that is null or stale past its 10/30-minute buffer,
+and the reminder being delivered normally has a fresh one, so it is left
+untouched. The two writers collide only when delivery ran later than the buffer
+— reachable on the inexact `setAndAllowWhileIdle` path in Doze. The cost on
+every alarm wake is unconditional regardless.
+
+The least severe of the cluster and the only one needing a design decision
+rather than a fix.
 
 ### 21 — Collapse the eight reminder setters into one `setReminderUIState`
 `CategoryEditViewModel.kt:265`, `CategoryEditScreen.kt:359-378`
