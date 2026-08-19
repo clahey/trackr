@@ -370,6 +370,7 @@ class CategoryEditViewModel @Inject constructor(
     // @spec REM-UI-009, REM-UI-010, REM-PERM-003
     suspend fun save(
         notificationPermissionGranted: Boolean = true,
+        reminderChannelEnabled: Boolean = true,
         exactAlarmAvailable: Boolean = true,
         forceSaveDespitePermission: Boolean = false,
     ) {
@@ -402,6 +403,7 @@ class CategoryEditViewModel @Inject constructor(
         // @spec REM-PERM-003
         val permissionProblem = reminderPermissionProblem(
             notificationsEnabled = notificationPermissionGranted,
+            reminderChannelEnabled = reminderChannelEnabled,
             exactAlarmAvailable = exactAlarmAvailable,
         )
         if (_reminderUIState.value.enabled && !forceSaveDespitePermission && permissionProblem != null) {

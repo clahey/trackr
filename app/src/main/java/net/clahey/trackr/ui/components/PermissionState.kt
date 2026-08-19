@@ -1,6 +1,7 @@
 package net.clahey.trackr.ui.components
 
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import net.clahey.trackr.R
+import net.clahey.trackr.data.local.REMINDER_NOTIFICATION_CHANNEL_ID
 
 /**
  * The one thing worth telling the user about reminder permissions, or absent when nothing is wrong.
@@ -27,23 +29,29 @@ import net.clahey.trackr.R
  * Only ever one at a time: fixing the reported problem re-evaluates and reports whatever is next.
  */
 enum class ReminderPermissionProblem {
-    /** The reminder is never seen. */
+    /** Notifications are off for the whole app, so the reminder is never seen. */
     NotificationsDisabled,
+
+    /** The app can notify, but reminders specifically are muted, so the reminder is never seen. */
+    ReminderChannelDisabled,
 
     /** The reminder still arrives, just not necessarily on time. */
     ExactAlarmsUnavailable,
 }
 
 /**
- * Notifications outrank exact alarms: turned-off notifications stop the reminder being seen at all,
- * while unavailable exact alarms affect only when it lands.
+ * The two notification problems outrank exact alarms, which affect only when a reminder lands rather
+ * than whether it is seen. App-level outranks the channel because unblocking the channel while the
+ * app is muted changes nothing.
  */
 // @spec REM-PERM-006
 fun reminderPermissionProblem(
     notificationsEnabled: Boolean,
+    reminderChannelEnabled: Boolean,
     exactAlarmAvailable: Boolean,
 ): ReminderPermissionProblem? = when {
     !notificationsEnabled -> ReminderPermissionProblem.NotificationsDisabled
+    !reminderChannelEnabled -> ReminderPermissionProblem.ReminderChannelDisabled
     !exactAlarmAvailable -> ReminderPermissionProblem.ExactAlarmsUnavailable
     else -> null
 }
@@ -53,6 +61,7 @@ fun reminderPermissionProblem(
 fun rememberReminderPermissionProblem(): ReminderPermissionProblem? =
     reminderPermissionProblem(
         notificationsEnabled = rememberNotificationsEnabled(),
+        reminderChannelEnabled = rememberReminderChannelEnabled(),
         exactAlarmAvailable = rememberExactAlarmAvailable(),
     )
 
@@ -60,6 +69,7 @@ fun rememberReminderPermissionProblem(): ReminderPermissionProblem? =
 @StringRes
 fun ReminderPermissionProblem.messageRes(): Int = when (this) {
     ReminderPermissionProblem.NotificationsDisabled -> R.string.reminder_problem_notifications
+    ReminderPermissionProblem.ReminderChannelDisabled -> R.string.reminder_problem_channel
     ReminderPermissionProblem.ExactAlarmsUnavailable -> R.string.reminder_problem_exact_alarms
 }
 
@@ -67,13 +77,18 @@ fun ReminderPermissionProblem.messageRes(): Int = when (this) {
 @StringRes
 fun ReminderPermissionProblem.dialogTitleRes(): Int = when (this) {
     ReminderPermissionProblem.NotificationsDisabled -> R.string.reminder_problem_notifications_title
+    ReminderPermissionProblem.ReminderChannelDisabled -> R.string.reminder_problem_channel_title
     ReminderPermissionProblem.ExactAlarmsUnavailable -> R.string.reminder_problem_exact_alarms_title
 }
 
 /** What the save-time confirmation dialog says this reminder will do. */
 @StringRes
 fun ReminderPermissionProblem.dialogMessageRes(): Int = when (this) {
-    ReminderPermissionProblem.NotificationsDisabled -> R.string.reminder_problem_notifications_save
+    // A muted channel and a muted app have the same consequence; only the fix differs, and the
+    // dialog's title is what names that.
+    ReminderPermissionProblem.NotificationsDisabled,
+    ReminderPermissionProblem.ReminderChannelDisabled -> R.string.reminder_problem_notifications_save
+
     ReminderPermissionProblem.ExactAlarmsUnavailable -> R.string.reminder_problem_exact_alarms_save
 }
 
@@ -82,6 +97,11 @@ fun ReminderPermissionProblem.settingsIntent(context: Context): Intent = when (t
     ReminderPermissionProblem.NotificationsDisabled ->
         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+
+    ReminderPermissionProblem.ReminderChannelDisabled ->
+        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, REMINDER_NOTIFICATION_CHANNEL_ID)
 
     ReminderPermissionProblem.ExactAlarmsUnavailable ->
         Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
@@ -147,4 +167,32 @@ fun rememberNotificationsEnabled(): Boolean {
     return remember(context, isWindowFocused) {
         NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
+}
+
+/**
+ * Whether the reminders channel itself is unmuted, as observable UI state.
+ *
+ * [rememberNotificationsEnabled] cannot see this: blocking a single channel leaves the app enabled,
+ * and long-pressing a notification to turn it off is exactly that gesture. Re-read on window focus
+ * for the same reason and with the same best-effort caveat.
+ */
+// @spec REM-PERM-005
+@Composable
+fun rememberReminderChannelEnabled(): Boolean {
+    val context = LocalContext.current
+    val isWindowFocused = LocalWindowInfo.current.isWindowFocused
+    return remember(context, isWindowFocused) { reminderChannelEnabled(context) }
+}
+
+/**
+ * Point-in-time read of the reminders channel, for code acting on the state rather than showing it.
+ *
+ * A channel absent from the system counts as enabled: `TrackrApplication` creates it before any of
+ * this runs, so its absence would mean something ordered surprisingly, not that a user muted it —
+ * and reporting a problem no settings screen can fix would leave the notice up permanently.
+ */
+fun reminderChannelEnabled(context: Context): Boolean {
+    val channel = NotificationManagerCompat.from(context)
+        .getNotificationChannel(REMINDER_NOTIFICATION_CHANNEL_ID)
+    return channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
 }

@@ -45,7 +45,7 @@ not survive contact with the source.
 - [x] **29** — Permission prompt sends the user to the less severe problem first — *reminders*, verified on device
 - [x] **30** — No prompt or recovery path when notifications are denied — *reminders*, verified on device
 - [x] **31** — One message for two different failures — *reminders*, verified on device
-- [ ] **32** — A blocked notification channel is undetectable — *reminders*, verified
+- [x] **32** — A blocked notification channel is undetectable — *reminders*, verified
 - [ ] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, unverified
 - [ ] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, unverified
 

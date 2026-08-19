@@ -93,6 +93,7 @@ import net.clahey.trackr.ui.components.OutlinedFieldBox
 import net.clahey.trackr.ui.components.ReminderPermissionNotice
 import net.clahey.trackr.ui.components.dialogMessageRes
 import net.clahey.trackr.ui.components.dialogTitleRes
+import net.clahey.trackr.ui.components.reminderChannelEnabled
 import net.clahey.trackr.ui.components.rememberReminderPermissionProblem
 import net.clahey.trackr.ui.components.UnsavedChangesDialog
 import net.clahey.trackr.ui.theme.categoryColorPalette
@@ -158,6 +159,7 @@ fun CategoryEditScreen(
         scope.launch {
             viewModel.save(
                 notificationPermissionGranted = notificationsGranted(),
+                reminderChannelEnabled = reminderChannelEnabled(context),
                 exactAlarmAvailable = exactAlarmAvailable(),
                 forceSaveDespitePermission = force,
             )

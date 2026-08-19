@@ -33,6 +33,13 @@ import java.time.LocalTime
 @OptIn(ExperimentalCoroutinesApi::class)
 class CategoryEditViewModelReminderTest {
 
+    private data class PermissionCase(
+        val notifications: Boolean,
+        val channel: Boolean,
+        val exactAlarms: Boolean,
+        val expected: ReminderPermissionProblem,
+    )
+
     private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var repo: FakeTrackrRepository
     private lateinit var alarms: FakeAlarmScheduler
@@ -102,29 +109,29 @@ class CategoryEditViewModelReminderTest {
         assertEquals(SaveResult.Success, vm.saveResult.value)
     }
 
-    // @spec REM-PERM-003
-    @Test fun `enabling a reminder without notification permission blocks save and requests confirmation`() = runTest {
-        fillRequiredFields()
-        vm.setReminderEnabled(true)
-        vm.save(notificationPermissionGranted = false, exactAlarmAvailable = true)
-        assertEquals(
-            ReminderPermissionProblem.NotificationsDisabled,
-            vm.pendingPermissionConfirmation.value,
-        )
-        assertEquals(SaveResult.Idle, vm.saveResult.value)
-        assertNull(repo.getCategories().first().find { it.name == "Category" })
-    }
-
+    // A blocked save leaves the ViewModel untouched, so every case runs against the one instance.
     // @spec REM-PERM-003, REM-PERM-006
-    @Test fun `the save confirmation names the exact-alarm problem when only that is missing`() = runTest {
+    @Test fun `each permission problem blocks the save and is named in the confirmation`() = runTest {
+        val cases = listOf(
+            PermissionCase(notifications = false, channel = true, exactAlarms = true,
+                expected = ReminderPermissionProblem.NotificationsDisabled),
+            PermissionCase(notifications = true, channel = false, exactAlarms = true,
+                expected = ReminderPermissionProblem.ReminderChannelDisabled),
+            PermissionCase(notifications = true, channel = true, exactAlarms = false,
+                expected = ReminderPermissionProblem.ExactAlarmsUnavailable),
+        )
         fillRequiredFields()
         vm.setReminderEnabled(true)
-        vm.save(notificationPermissionGranted = true, exactAlarmAvailable = false)
-        assertEquals(
-            ReminderPermissionProblem.ExactAlarmsUnavailable,
-            vm.pendingPermissionConfirmation.value,
-        )
-        assertEquals(SaveResult.Idle, vm.saveResult.value)
+        for (case in cases) {
+            vm.save(
+                notificationPermissionGranted = case.notifications,
+                reminderChannelEnabled = case.channel,
+                exactAlarmAvailable = case.exactAlarms,
+            )
+            assertEquals(case.toString(), case.expected, vm.pendingPermissionConfirmation.value)
+            assertEquals(case.toString(), SaveResult.Idle, vm.saveResult.value)
+        }
+        assertNull(repo.getCategories().first().find { it.name == "Category" })
     }
 
     // @spec REM-PERM-003
@@ -132,6 +139,19 @@ class CategoryEditViewModelReminderTest {
         fillRequiredFields()
         vm.setReminderEnabled(true)
         vm.save(notificationPermissionGranted = false, exactAlarmAvailable = true, forceSaveDespitePermission = true)
+        assertNull(vm.pendingPermissionConfirmation.value)
+        assertEquals(SaveResult.Success, vm.saveResult.value)
+    }
+
+    // @spec REM-PERM-003
+    @Test fun `missing permissions do not block a save with the reminder off`() = runTest {
+        fillRequiredFields()
+        vm.setReminderEnabled(false)
+        vm.save(
+            notificationPermissionGranted = false,
+            reminderChannelEnabled = false,
+            exactAlarmAvailable = false,
+        )
         assertNull(vm.pendingPermissionConfirmation.value)
         assertEquals(SaveResult.Success, vm.saveResult.value)
     }
