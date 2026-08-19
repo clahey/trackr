@@ -121,6 +121,10 @@ class FakeTrackrRepository : TrackrRepository {
             list.filter { it.id != id && !(it is Category.SubCategory && it.parent.id == id) } + promoted
         }
         events.update { it.filter { e -> e.categoryId != id } }
+        // The real ReminderEntity drops this row via ON DELETE CASCADE (REM-DATA-001). Promoted
+        // SubCategories are reparented rather than deleted, so their own reminders survive.
+        // @spec REM-DATA-001
+        reminders.update { it - id }
     }
 
     override suspend fun reorderCategories(orderedIds: List<String>) {
@@ -289,6 +293,10 @@ class FakeTrackrRepository : TrackrRepository {
     // @spec REM-DATA-007
     override suspend fun getAllEnabledRemindersOnce(): List<Reminder> =
         reminders.value.values.filter { it.enabled }
+
+    // @spec REM-DATA-009
+    override fun hasEnabledReminder(): Flow<Boolean> =
+        reminders.map { map -> map.values.any { it.enabled } }
 
     fun setReminders(vararg r: Reminder) { reminders.value = r.associateBy { it.categoryId } }
 }

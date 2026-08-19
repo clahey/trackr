@@ -162,10 +162,11 @@ Sort order is `timestamp DESC, createdAt DESC, id ASC` (LS-BE-020/021). The `id 
 | Method | Return | Notes |
 |---|---|---|
 | `getByCategoryId(categoryId)` | `Flow<ReminderEntity?>` | |
+| `getByCategoryIdOnce(categoryId)` | `ReminderEntity?` | suspend |
 | `getAllEnabledOnce()` | `List<ReminderEntity>` | suspend; boot / time-change re-arm and startup reconciliation |
+| `hasEnabled()` | `Flow<Boolean>` | `SELECT EXISTS(...)` over `enabled = 1`; Room re-emits on any write to the table |
 | `upsert(entity)` | `Unit` | suspend |
-
-No explicit `deleteByCategoryId` — removal happens via the `categories` row's CASCADE DELETE, not a direct call.
+| `deleteByCategoryId(categoryId)` | `Unit` | suspend; clearing a reminder while its category survives. Deleting the category itself takes the `categories` row's CASCADE DELETE instead |
 
 ## Entity ↔ Domain Mappers
 

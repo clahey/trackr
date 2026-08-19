@@ -265,4 +265,10 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         // daysActive forces enabled = false on decode); re-filtering here keeps that guarantee
         // meaningful for this method's callers, which trust every item in the result is armable.
         reminderDao.getAllEnabledOnce().map { it.toDomain() }.filter { it.enabled }
+
+    // @spec REM-DATA-009
+    // Asks storage, not the decoder: unlike getAllEnabledRemindersOnce above, this reports a row
+    // that toDomain() would demote to disabled. The banner it drives is a warning, so erring toward
+    // showing one costs less than the whole-table read that matching the decode would require.
+    override fun hasEnabledReminder(): Flow<Boolean> = reminderDao.hasEnabled()
 }

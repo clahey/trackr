@@ -99,7 +99,7 @@ private val hhMm = DateTimeFormatter.ofPattern("HH:mm")
 private fun LocalTime.toHHmm(): String = format(hhMm)
 private fun String.toLocalTimeHHmm(): LocalTime = LocalTime.parse(this, hhMm)
 
-// @spec REM-DATA-002
+// @spec REM-DATA-002, REM-DATA-010
 fun ReminderEntity.toDomain(): Reminder {
     val decodedDaysActive = StringListConverter.decode(daysActive).map { DayOfWeek.valueOf(it) }.toSet()
     return Reminder(

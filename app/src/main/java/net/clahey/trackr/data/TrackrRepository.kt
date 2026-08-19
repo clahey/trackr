@@ -52,4 +52,6 @@ interface TrackrRepository {
     suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType? = null)
     // @spec REM-DATA-007
     suspend fun getAllEnabledRemindersOnce(): List<Reminder>
+
+    fun hasEnabledReminder(): Flow<Boolean>
 }

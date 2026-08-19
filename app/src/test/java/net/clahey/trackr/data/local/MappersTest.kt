@@ -78,7 +78,7 @@ class MappersTest {
         nextFireAt = null,
     )
 
-    // @spec REM-DATA-002
+    // @spec REM-DATA-010
     @Test fun `toDomain preserves an enabled reminder with a non-empty daysActive`() {
         val entity = reminderEntity(enabled = true, daysActive = listOf("MONDAY", "WEDNESDAY"))
         val reminder = entity.toDomain()
@@ -86,7 +86,7 @@ class MappersTest {
         assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), reminder.daysActive)
     }
 
-    // @spec REM-DATA-002
+    // @spec REM-DATA-010
     @Test fun `toDomain decodes an empty daysActive as disabled with all days set`() {
         val entity = reminderEntity(enabled = true, daysActive = emptyList())
         val reminder = entity.toDomain()
@@ -94,7 +94,7 @@ class MappersTest {
         assertEquals(DayOfWeek.entries.toSet(), reminder.daysActive)
     }
 
-    // @spec REM-DATA-002
+    // @spec REM-DATA-010
     @Test fun `toDomain normalizes daysActive to all days even when already disabled`() {
         val entity = reminderEntity(enabled = false, daysActive = emptyList())
         val reminder = entity.toDomain()

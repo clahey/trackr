@@ -1,5 +1,6 @@
 package net.clahey.trackr.ui.category
 
+import app.cash.turbine.test
 import net.clahey.trackr.FakeTrackrRepository
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.ValueType
@@ -134,6 +135,39 @@ class CategoryListViewModelTest {
         val seededVm = CategoryListViewModel(seededRepo, testReminderScheduler(seededRepo))
         assertTrue(seededVm.hasEnabledReminder.first())
     }
+
+    // Enabling a reminder leaves the category's own fields untouched, so the category list
+    // re-emits an equal value that conflation drops. One collector stays open across the save,
+    // because re-subscribing re-reads and would hide exactly that.
+    // @spec REM-PERM-004, REM-DATA-009
+    @Test fun `hasEnabledReminder turns true when a reminder is enabled without any category edit`() = runTest {
+        val category = makeCategory("c1")
+        repo.setCategories(category)
+        vm.hasEnabledReminder.test {
+            assertFalse(awaitItem())
+            repo.saveCategoryWithReminder(category, makeReminder("c1"))
+            assertTrue(awaitItem())
+        }
+    }
+
+    // @spec REM-PERM-004, REM-DATA-009
+    @Test fun `hasEnabledReminder turns false when the last category holding one is deleted`() = runTest {
+        repo.setCategories(makeCategory("c1"))
+        repo.setReminders(makeReminder("c1"))
+        vm.hasEnabledReminder.test {
+            assertTrue(awaitItem())
+            vm.deleteCategory("c1")
+            assertFalse(awaitItem())
+        }
+    }
+
+    private fun makeReminder(categoryId: String) = net.clahey.trackr.domain.Reminder(
+        categoryId = categoryId, enabled = true, mode = net.clahey.trackr.domain.ReminderMode.FIXED,
+        times = listOf(java.time.LocalTime.of(9, 0)),
+        windowStart = java.time.LocalTime.MIDNIGHT, windowEnd = java.time.LocalTime.MIDNIGHT,
+        occurrencesPerDay = 1, daysActive = java.time.DayOfWeek.entries.toSet(),
+        showCategoryInNotification = false, nextFireAt = null,
+    )
 
     private fun makeCategory(id: String, sortOrder: Int = 0) = Category.MetaCategory(
         id = id, name = id, emoji = "📌", color = 0xFFE53935L,

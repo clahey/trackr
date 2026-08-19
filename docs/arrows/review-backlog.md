@@ -20,14 +20,14 @@ not survive contact with the source.
 - [x] **4** — `enableReminder` returns without arming — *reminders*, verified
 - [x] **5** — Suppression ignores child-category events — *reminders*, verified
 - [ ] **6** — Quick-log deep link re-fires on back-stack restore — *app-shell*, verified
-- [ ] **7** — Permission banner can go stale — *category-management*, verified
+- [x] **7** — Permission banner can go stale — *category-management*, verified
 - [ ] **8** — Occurrences-per-day field rejects most input — *reminders*, unverified
 - [x] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
 - [x] **10** — Duplicate notification-permission request — *reminders*, verified
 - [ ] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
 - [ ] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
 - [ ] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified
-- [ ] **14** — Fake repository does not cascade reminder deletion — *local-storage*, verified
+- [x] **14** — Fake repository does not cascade reminder deletion — *local-storage*, verified
 - [ ] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
 - [ ] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
 - [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
@@ -48,6 +48,7 @@ not survive contact with the source.
 - [x] **32** — A blocked notification channel is undetectable — *reminders*, verified
 - [ ] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, unverified
 - [ ] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, unverified
+- [ ] **35** — Storage detail sits in the reminders segment — *local-storage*, verified
 
 ## Detail
 
@@ -403,6 +404,30 @@ tapped — nothing appears.
 Reported from device use, not yet traced to code.
 
 Tapping the icon carrying the yellow dot shows no reminders.
+
+### 35 — Storage detail sits in the reminders segment
+`docs/specs/reminders.md` (REM-DATA-001/006/008), `docs/llds/reminders.md § Data Model`,
+`docs/llds/local-storage.md:82,97,160`
+
+`local-storage.md:97` draws the boundary as "this segment owns the mechanical
+storage, not the design intent behind it," which is too fuzzy to decide cases
+with — so implementation detail ended up on both sides. REM-DATA-001 states "at
+most one Reminder per category" (true of any backend) and "foreign key declared
+`CASCADE DELETE`" (only true of SQL) in one sentence; REM-DATA-006 says "in a
+single database transaction" where the intent is just *atomically*. The
+`ReminderEntity` field table is written out in full in both LLDs, and that
+already drifted — the 2026-08-12 audit found stale lowercase `mode` casing and
+had to correct two copies.
+
+Better test for the boundary: **would this be different on a document store or
+behind a server API?** If yes it is implementation and belongs to local-storage;
+if no it is the feature's intent and stays with the feature. Decidable, unlike
+"mechanical."
+
+Two directions, and it is not yet settled which: move reminders' storage detail
+down into local-storage so `ReminderDao` is documented like the other DAOs, or
+conclude the other DAOs are the under-documented ones and level up instead.
+Either way the `ReminderEntity` table wants one canonical copy and a pointer.
 
 ## Dropped
 

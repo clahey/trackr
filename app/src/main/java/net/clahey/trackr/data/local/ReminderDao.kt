@@ -18,6 +18,10 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE enabled = 1")
     suspend fun getAllEnabledOnce(): List<ReminderEntity>
 
+    // @spec REM-DATA-009
+    @Query("SELECT EXISTS(SELECT 1 FROM reminders WHERE enabled = 1)")
+    fun hasEnabled(): Flow<Boolean>
+
     @Upsert
     suspend fun upsert(entity: ReminderEntity)
 

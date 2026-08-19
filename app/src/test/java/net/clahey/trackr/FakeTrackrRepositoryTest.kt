@@ -1,5 +1,6 @@
 package net.clahey.trackr
 
+import app.cash.turbine.test
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.CategoryHasChildrenException
 import net.clahey.trackr.domain.Event
@@ -265,6 +266,68 @@ class FakeTrackrRepositoryTest {
         val result = repo.getAllEnabledRemindersOnce()
         assertEquals(listOf("enabled1"), result.map { it.categoryId })
     }
+
+    // The double has to model REM-DATA-001's CASCADE, or code that assumes a reminder cannot
+    // outlive its category passes here while failing against the real database.
+    // @spec REM-DATA-001
+    @Test fun `deleting a category deletes its reminder`() = runTest {
+        val repo = FakeTrackrRepository()
+        repo.setCategories(makeCategory("cat1"))
+        repo.setReminders(makeReminder("cat1"))
+        repo.deleteCategory("cat1")
+        assertNull(repo.getReminderForCategory("cat1").first())
+        assertTrue(repo.getAllEnabledRemindersOnce().isEmpty())
+    }
+
+    // Promotion is a reparent, not a delete, so the child keeps its own reminder.
+    // @spec REM-DATA-001
+    @Test fun `deleting a MetaCategory keeps the reminders of the SubCategories it promotes`() = runTest {
+        val repo = FakeTrackrRepository()
+        val parent = makeCategory("parent")
+        repo.setCategories(parent, makeSubCategory("child", parent))
+        repo.setReminders(makeReminder("parent"), makeReminder("child"))
+        repo.deleteCategory("parent")
+        assertNull(repo.getReminderForCategory("parent").first())
+        assertNotNull(repo.getReminderForCategory("child").first())
+    }
+
+    // One collector held open across the write: re-subscribing would re-read and mask the
+    // failure this pins, which is the answer going stale while someone is watching.
+    // @spec REM-DATA-009
+    @Test fun `hasEnabledReminder re-emits when a reminder is enabled without any category change`() = runTest {
+        val repo = FakeTrackrRepository()
+        val category = makeCategory("cat1")
+        repo.setCategories(category)
+        repo.hasEnabledReminder().test {
+            assertFalse(awaitItem())
+            repo.saveCategoryWithReminder(category, makeReminder("cat1"))
+            assertTrue(awaitItem())
+        }
+    }
+
+    // @spec REM-DATA-009
+    @Test fun `hasEnabledReminder ignores a disabled reminder`() = runTest {
+        val repo = FakeTrackrRepository()
+        repo.setReminders(makeReminder("cat1", enabled = false))
+        assertFalse(repo.hasEnabledReminder().first())
+    }
+
+    // @spec REM-DATA-009, REM-DATA-001
+    @Test fun `hasEnabledReminder goes false when the last category holding one is deleted`() = runTest {
+        val repo = FakeTrackrRepository()
+        repo.setCategories(makeCategory("cat1"))
+        repo.setReminders(makeReminder("cat1"))
+        repo.hasEnabledReminder().test {
+            assertTrue(awaitItem())
+            repo.deleteCategory("cat1")
+            assertFalse(awaitItem())
+        }
+    }
+
+    private fun makeSubCategory(id: String, parent: Category.MetaCategory) = Category.SubCategory(
+        id = id, name = id, emoji = null, color = null,
+        valueType = null, defaultValue = null, allowEmptyText = true, sortOrder = 0, parent = parent,
+    )
 
     private fun makeReminder(
         categoryId: String,
