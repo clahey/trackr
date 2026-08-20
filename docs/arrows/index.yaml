@@ -91,7 +91,7 @@ arrows:
     blockedBy: [data-model, local-storage, theme, category-management]
     detail: event-logging.md
     next: "EL-UI-077 (post-save scroll) implemented and split into EL-UI-077/077a/077b/077c. 2 minor gaps remain, none MVP-blocking: EL-UI-056 (error kind missing from display), EL-UI-057b (no field-level error highlighting)."
-    drift: null
+    drift: "EL-UI-080 reworded 2026-08-19: the quick-log deep-link argument was read from the SavedStateHandle and left there, so restoring a killed task handed it to a fresh HomeViewModel, which reopened the quick-log sheet unprompted and reapplied ActiveFilter.TopLevel; now removed at the read (see event-logging.md finding 8). The old wording, 'consumed exactly once on init', described the buggy behavior rather than the intent. Reproduced on device; app-shell's APP-NAV-005/006 deliberately untouched."
 
   reminders:
     status: PARTIAL

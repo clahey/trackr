@@ -148,7 +148,9 @@ class HomeViewModel @Inject constructor(
         }
 
         // @spec EL-UI-080, EL-UI-081, EL-UI-082, EL-UI-083
-        val quickLogCategoryId: String? = savedStateHandle["quickLogCategoryId"]
+        // Removed as it is read: the handle is saved and restored with its back stack entry, so an
+        // argument left in place is handed to a fresh HomeViewModel after the task is restored.
+        val quickLogCategoryId: String? = savedStateHandle.remove("quickLogCategoryId")
         if (quickLogCategoryId != null) {
             viewModelScope.launch {
                 val categories = repository.getCategories().first()

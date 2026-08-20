@@ -19,7 +19,7 @@ not survive contact with the source.
 - [x] **3** — FIXED-mode notification suppression never suppresses — *reminders*, verified
 - [x] **4** — `enableReminder` returns without arming — *reminders*, verified
 - [x] **5** — Suppression ignores child-category events — *reminders*, verified
-- [ ] **6** — Quick-log deep link re-fires on back-stack restore — *app-shell*, verified
+- [x] **6** — Quick-log deep link re-fires on back-stack restore — *event-logging*, verified on device
 - [x] **7** — Permission banner can go stale — *category-management*, verified
 - [ ] **8** — Occurrences-per-day field rejects most input — *reminders*, unverified
 - [x] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
@@ -129,7 +129,11 @@ with the argument still set, a fresh `HomeViewModel` reads it, and the sheet
 opens unprompted with `ActiveFilter.TopLevel` silently reapplied
 (`HomeViewModel.kt:163`). Rotation is not the trigger — ViewModels survive it.
 
-Fix: clear the SavedStateHandle entry when the target is consumed.
+Fixed by reading with `SavedStateHandle.remove` — at the read, not when the target is
+consumed, since EL-UI-083's unresolvable-category path opens no sheet and so
+never reaches a consume call. `MainActivity`'s extra was left alone: it feeds
+only `startDestination`, which is ignored whenever a back stack restores, and
+`removeExtra` does not survive process death anyway.
 
 ### 7 — Permission banner can go stale
 `CategoryListViewModel.kt:78`

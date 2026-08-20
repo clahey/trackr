@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -576,5 +577,33 @@ class HomeViewModelTest {
         val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
         target.consumePendingQuickLogTarget()
         assertEquals(null, target.pendingQuickLogTarget.value)
+    }
+
+    // Restoring a killed task hands the back stack entry's saved SavedStateHandle to a fresh
+    // HomeViewModel. The second construction against the same handle is that restore.
+    // @spec EL-UI-080
+    @Test fun `a HomeViewModel built later on the same entry does not reopen the sheet`() = runTest {
+        repo.setCategories(makeMeta("meta1"))
+        val handle = SavedStateHandle(mapOf("quickLogCategoryId" to "meta1"))
+
+        val first = HomeViewModel(repo, handle)
+        assertNotNull(first.pendingQuickLogTarget.value)
+        assertNull(handle.get<String>("quickLogCategoryId"))
+
+        val restored = HomeViewModel(repo, handle)
+        assertNull(restored.pendingQuickLogTarget.value)
+    }
+
+    // EL-UI-083's path opens no sheet, so no consume call ever runs — the argument still must not
+    // outlive the read that discarded it.
+    // @spec EL-UI-080, EL-UI-083
+    @Test fun `an unresolvable quickLogCategoryId is not redelivered either`() = runTest {
+        val handle = SavedStateHandle(mapOf("quickLogCategoryId" to "missing"))
+
+        val first = HomeViewModel(repo, handle)
+        assertTrue(first.quickLogCategoryNotFound.value)
+
+        val restored = HomeViewModel(repo, handle)
+        assertFalse(restored.quickLogCategoryNotFound.value)
     }
 }
