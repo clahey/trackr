@@ -57,6 +57,7 @@ graph TD
     Alarm --> Rcv[ReminderReceiver]
     Rcv --> Repo
     Rcv --> Notif[(NotificationManager)]
+    VM --> Notif
 ```
 
 **Major components:**
@@ -68,13 +69,21 @@ graph TD
 - **Room Database** — three tables: `categories`, `events`, `reminders`. `Category` supports a two-level hierarchy via `parentId: String?` (null = top-level). Subcategories store null for any field they inherit from their parent (color, emoji, valueType); top-level categories always carry explicit values. The UI layer resolves effective values by falling back to the parent when a field is null.
 - **Image storage** — image files written to app-private storage (`context.filesDir`); paths stored as a JSON list in the `events` table; never stored as blobs
 - **App Shell** — `TrackrApplication` (`@HiltAndroidApp`), `MainActivity` (`@AndroidEntryPoint`), Hilt modules, and the Compose `NavHost`. ViewModel arguments pass via `SavedStateHandle` (compatible with process-death restoration). The app's permanent Play Store identity is `applicationId = "net.clahey.trackr"`; this value is immutable once published.
-- **Reminder Scheduler** — computes and arms per-category reminder alarms via `AlarmManager`, one per category with reminders enabled. A `BroadcastReceiver` handles the fired alarm: it posts the notification (tapping it deep-links into quick-log for that category) and immediately re-arms the next occurrence, since alarms are one-shot. A separate `BOOT_COMPLETED` receiver re-arms every pending reminder after device restart, since alarms do not survive reboot. Reminder configuration (enabled state, availability window) is edited from the category edit screen, owned by category management; the scheduler itself is a standalone component the rest of the app does not otherwise depend on.
+- **Reminder Scheduler** — computes and arms per-category reminder alarms via `AlarmManager`, one per category with reminders enabled. A `BroadcastReceiver` handles the fired alarm: it posts the notification (tapping it deep-links into quick-log for that category) and immediately re-arms the next occurrence, since alarms are one-shot. A separate `BOOT_COMPLETED` receiver re-arms every pending reminder after device restart, since alarms do not survive reboot. Reminder configuration (enabled state, availability window) is edited from the category edit screen, owned by category management; the scheduler itself is a standalone component the rest of the app does not otherwise depend on. Reminders that have fired and not yet been dealt with are also listed at the top of the timeline, read from the notification shade rather than stored (see *Outstanding reminders live in the notification shade* below).
 
 ## Key Design Decisions
 
 **Repository interface as the only seam.** All ViewModel code depends on `TrackrRepository`, not on Room directly. When a GraphQL backend is added, only a new implementation is needed — no ViewModel changes.
 
 *Alternatives considered:* direct Room DAO injection into ViewModels (faster to write, impossible to swap); UseCase layer (extra indirection not justified at this scale).
+
+**Outstanding reminders live in the notification shade, not in a table.** The timeline lists reminders that have fired and not yet been acted on, read live from `getActiveNotifications()`. A reminder is outstanding exactly as long as its notification is; swiping it away, or tapping it and not logging, ends it in both places at once because there is only one place. Acting on a row does what tapping its notification does — opens quick-log and cancels the notification. The list is empty after a reboot, since Android clears the shade and nothing re-posts.
+
+This is a deliberate exception to *Repository interface as the only seam* above: a ViewModel reads state that is not behind `TrackrRepository`. It is bounded to state the OS already owns and that the app has no interest in outliving the shade — a backend swap has nothing to say about which of this device's notifications are currently showing.
+
+The shade is read into an in-memory `StateFlow` that lives as long as the process, so screens observe a value rather than remembering to ask for one. That is a view, not a second store: it holds nothing across a process restart, and every change that produces it — the app posting, the app cancelling, the user dismissing — updates it as it happens. `setDeleteIntent` is what makes the third of those an event rather than something discovered later.
+
+*Alternatives considered:* a persisted fired-reminders table, which survives reboot but makes the app's record and the shade two stores that can disagree, and forces every dismissal path to write to it; re-reading the shade on demand at each display, which needs no mirror but leaves every surface responsible for knowing when to look, and leaves a list stale whenever the trigger to look does not fire. The persisted table becomes the right answer if outstanding reminders should ever survive a reboot.
 
 **Flexible value model: JSON storage + kotlinx.serialization TypeConverters.** Each category declares a `ValueType`; the stored value is JSON `String?` (null for `NONE`). A Room `TypeConverter` using kotlinx.serialization converts between the raw string and a typed `EventValue` sealed class. ViewModels and UI always work with the typed sealed class — never raw strings. This avoids a polymorphic table schema while keeping the entire stack above Room fully type-safe.
 

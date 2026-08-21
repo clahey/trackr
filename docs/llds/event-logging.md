@@ -28,6 +28,16 @@ Supports:
 
 Day headers show the date (e.g., "Today", "Yesterday", full date for older).
 
+**Outstanding reminders.** Above the timeline sits a list of reminders that have fired and not yet been dealt with, under a bell icon and the words "Time to log" — the notification's own title, reused so the row and the notification read as one thing seen twice rather than two features that happen to overlap. Each row shows the category's emoji, its name, and the time the reminder fired.
+
+The two gestures mirror the two the notification supports. Tapping a row does what tapping the notification does: opens the quick-log sheet at that category's `QuickLogTarget` and cancels the notification. Swiping it away does what swiping the notification does: cancels it, logging nothing, with haptic feedback as it goes. Neither offers an undo, unlike the event-row swipe next to it, and the swipe works in both directions where an event row's works in one — deleting an event destroys something and should take a deliberate gesture, while dismissing a reminder discards a nudge that returns at its next occurrence, so there is nothing to protect against.
+
+When nothing is outstanding the list is absent entirely, not an empty container: on the ordinary day where no reminder is waiting the timeline looks exactly as it did before this existed.
+
+The rows are not this segment's state. `reminders.md § Notifications` owns what "outstanding" means and where the answer comes from — the notification shade, read live, one row per showing notification — and this screen only renders the answer and reports taps. It follows that the list changes when the shade does: dismissing a notification from the shade removes its row, and the row's own tap removes the notification. The two are the same fact seen twice, not two things kept in step.
+
+The tap path is the one the reminder deep link already uses (below): the same `QuickLogTarget` resolution, including `ActiveFilter.TopLevel(meta)` for a MetaCategory with SubCategories. A row tap and a notification tap differ only in that the row tap never leaves the app.
+
 A horizontally scrollable row of category chips sits below the app bar. **Only `MetaCategory` (top-level) chips appear in this row**, plus an "All" chip first.
 
 **Chip color:** each chip uses the category's `resolvedColor` — colored border when unselected; filled background with the category color when active.
@@ -366,6 +376,7 @@ System back and edge swipe are intercepted by `BackHandler` within the sheet: st
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
+| Outstanding-reminder rows reuse the deep-link path | A row tap resolves the same `QuickLogTarget` the notification tap resolves, filter side effect included | Give in-app rows their own simpler opening path; route the tap through the notification's `PendingIntent` | A row and its notification are the same reminder, so opening them differently would be a difference with no reason a user could name — including the `ActiveFilter.TopLevel` side effect, whose absence would make the timeline end up in a different state depending on where you tapped. Firing the `PendingIntent` from inside the app would work but takes a trip out through the OS to re-enter the activity we are already in |
 | Where the quick-log deep-link argument is cleared | Removed from the `SavedStateHandle` at the moment it is read | Clear it when the sheet is dismissed; leave it and rely on the ViewModel being created once | The handle is saved and restored along with its back stack entry, so an argument left in place is handed to a fresh `HomeViewModel` after the process is killed and the task restored — reopening a sheet the user already dealt with, and reapplying a filter they did not ask for. Clearing on dismissal would not cover the unresolvable-category path, which shows a snackbar and never opens a sheet to dismiss |
 | Quick-log flow | Two-step: category picker → value form | Single combined form; category pre-selected | Two-step keeps step 2 focused; pre-selection requires knowing the category in advance |
 | Timeline grouping | ViewModel groups by `LocalDate` of `timestamp` | Repository returns pre-grouped; group in UI | ViewModel is the right layer — grouping is presentation logic, not storage logic; keeps the repository general |

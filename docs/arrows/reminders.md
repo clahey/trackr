@@ -15,7 +15,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 - docs/llds/reminders.md
 
 ### EARS
-- docs/specs/reminders.md (53 specs: REM-DATA-* [10], REM-UI-* [11], REM-SCHED-* [20], REM-NOTIF-* [6], REM-PERM-* [6])
+- docs/specs/reminders.md (59 specs: REM-DATA-* [10], REM-UI-* [11], REM-SCHED-* [20], REM-NOTIF-* [12], REM-PERM-* [6])
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/domain/ReminderSchedulingTest.kt
@@ -65,10 +65,10 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 | Data model | REM-DATA-* (10) | all | 0 | 0 |
 | Category Edit UI | REM-UI-* (11) | all | 0 | 0 |
 | Scheduling engine | REM-SCHED-* (20) | all | 0 | 0 |
-| Notifications | REM-NOTIF-* (6) | all | 0 | 0 |
+| Notifications | REM-NOTIF-* (12) | all | 0 | 0 |
 | Permissions | REM-PERM-* (6) | all | 0 | 0 |
 
-**Summary:** 53 of 53 active specs implemented; 0 active behavioral gaps. 19 specs have no test-file `@spec` citation (finding 2) — 18 after the 2026-08-14 backfill closed REM-DATA-003/004/005 and REM-SCHED-002, plus REM-PERM-005, which needs the same Compose UI infra. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
+**Summary:** 59 of 59 active specs implemented; 0 active behavioral gaps. 19 specs have no test-file `@spec` citation (finding 2) — 18 after the 2026-08-14 backfill closed REM-DATA-003/004/005 and REM-SCHED-002, plus REM-PERM-005, which needs the same Compose UI infra. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
 
 ## Key Findings
 
@@ -99,6 +99,12 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 13. **The banner's precondition was derived from the wrong source (fixed 2026-08-19).** `hasEnabledReminder` hung a one-shot read of every enabled reminder off the category-list `StateFlow`, so it only recomputed when that list emitted — and enabling a reminder without editing a category field re-emits an equal `List<Category>` that conflation drops, leaving the banner hidden. It self-healed whenever `WhileSubscribed(5000)` lapsed and re-subscribed, so the failure needed a round trip faster than 5s, which is why it survived review. Replaced by `hasEnabledReminder()` (REM-DATA-009), an observable read of the reminder store asked as its own question, which also stops loading every enabled reminder on every unrelated category write. The tests hold one collector open across the write rather than calling `first()` twice, since re-subscription is exactly the self-heal that would mask this. Alongside it, `FakeTrackrRepository.deleteCategory` never cleared the `reminders` map while the real schema drops the row via `ON DELETE CASCADE` — the double modelled the opposite of production, and the new query depends on that invariant, so a stale fake would have made its delete-path test pass for the wrong reason. 7 tests across `FakeTrackrRepositoryTest.kt` and `CategoryListViewModelTest.kt`.
 
     Two adjacent gaps closed in the same pass. `Mappers.kt` decodes a row with empty `daysActive` as disabled and substitutes every weekday, because `computeNextFireTime`'s day-walking search does not terminate against an empty set — real behavior with three tests behind it, but stated in no spec, and both code and tests cited REM-DATA-002, which describes the flat schema and says nothing about it. Now REM-DATA-010, with those citations re-pointed. And `local-storage.md § ReminderDao` claimed `deleteByCategoryId` did not exist when the DAO has it and that file's own § LocalTrackrRepository describes it being called — corrected, along with a missing `getByCategoryIdOnce` row.
+
+14. **Outstanding reminders became observable state (added 2026-08-21).** Six new specs, REM-NOTIF-004 reversed. The shade is now the store for "which reminders have fired and not been dealt with," read into a `StateFlow` on the notifier that screens observe rather than poll (REM-NOTIF-008/009). Three things change it and each announces itself: the app posting, the app cancelling, and the user dismissing — the last via `setDeleteIntent` and a new `ReminderDismissReceiver` (REM-NOTIF-012). The receiver re-reads the shade rather than removing the notification the intent names, which is what makes dismissing the collapsed group settle correctly whether Android fires the children's delete intents or only the summary's — the one platform behavior the design would otherwise have rested on unverified.
+
+    REM-NOTIF-004 previously mandated *no* summary, relying on OS default stacking; that was the cause of backlog #33, since the bundle Android generates without one has no content intent and tapping it does nothing. A real summary with `setAutoCancel(false)` fixes it and is load-bearing besides: the tap leads to a list built from those notifications, so cancelling them on the way in would empty the destination. Confirmed on device. Notification identity moved from `categoryId.hashCode()` to a string tag (REM-NOTIF-007), retiring the collision risk the old Decisions row recorded as accepted and giving the shade read a way back to a category; `Notification.extras` would have served that second purpose but the tag was wanted for the first regardless. `ReminderScheduler.cancel` now cancels the notification too (REM-NOTIF-010), and one operation owns cancel-plus-summary-cleanup so three call sites cannot each forget it (REM-NOTIF-011).
+
+    No window-focus re-read, deliberately: a backstop that silently repairs the list would hide a failure in the event path, showing up as staleness that heals whenever the user glances away. Tests: 7 on the pure `outstandingReminders` mapping, plus the ViewModel-level ones in `HomeViewModelTest.kt`. The notification plumbing itself — summary suppression, auto-cancel behavior, delete-intent delivery — is device-verified, not unit-tested, for the usual reason.
 
 ## Work Required
 

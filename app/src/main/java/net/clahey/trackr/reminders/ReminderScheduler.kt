@@ -57,8 +57,13 @@ class ReminderScheduler @Inject constructor(
     }
 
     // @spec REM-SCHED-012
+    // A notification already posted is not dismissed by anything else, so disabling a reminder or
+    // deleting its category would otherwise leave the shade advertising a reminder that no longer
+    // exists — and the timeline listing it as outstanding.
+    // @spec REM-NOTIF-010
     fun cancel(categoryId: String) {
         alarmScheduler.cancel(categoryId)
+        notifier.cancelReminderNotification(categoryId)
     }
 
     // @spec REM-SCHED-003, REM-SCHED-008, REM-SCHED-011, REM-SCHED-020

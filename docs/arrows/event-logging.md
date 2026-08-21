@@ -15,7 +15,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 - docs/llds/event-logging.md
 
 ### EARS
-- docs/specs/event-logging.md (103 specs: EL-NAV-*, EL-PROC-*, EL-UI-*)
+- docs/specs/event-logging.md (118 specs: EL-NAV-*, EL-PROC-*, EL-UI-*)
 
 ### Tests
 - app/src/androidTest/java/net/clahey/trackr/ui/components/ValueInputFieldFocusTest.kt
@@ -61,7 +61,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 | Navigation | EL-NAV-* | all | 0 | 0 |
 | Process (image cleanup) | EL-PROC-* | all | 0 | 0 |
 
-**Summary:** 101 of 103 active specs confirmed implemented; 2 genuine active gaps; 0 deferred. Fully reconciled — no more unverified `[ ]` markers in this segment.
+**Summary:** 116 of 118 active specs confirmed implemented; 2 genuine active gaps; 0 deferred. The count was recorded as 103 by the 2026-07-27 audit and had drifted as specs were added since — corrected 2026-08-21, not a new gap.
 
 ## Key Findings
 
@@ -92,6 +92,8 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 8. **The quick-log deep-link argument outlived its own consumption (fixed 2026-08-19).** `HomeViewModel` read `quickLogCategoryId` from the `SavedStateHandle` and left it there. The handle is saved and restored along with its back stack entry, so killing the process and reopening the task from Recents handed the same argument to a fresh `HomeViewModel`, which reopened the quick-log sheet unprompted and, for a MetaCategory with SubCategories, reapplied `ActiveFilter.TopLevel` (EL-UI-082) that the user had not asked for. Reproduced on device with `am kill`, and both branches verified fixed the same way — note that `force-stop` cannot reproduce it, since it discards the saved state there is nothing left to restore. Now read with `SavedStateHandle.remove`, which clears it at the read rather than on consumption: EL-UI-083's unresolvable-category path shows a snackbar and opens no sheet, so a dismissal-time clear would have left that case leaking. EL-UI-080 reworded — "consumed exactly once on init" described the bug, since the buggy code did exactly that, once per `HomeViewModel`. 2 tests in `HomeViewModelTest.kt`, each constructing a second ViewModel against the same handle to model the restore.
 
     `MainActivity`'s notification extra is deliberately *not* cleared. It feeds only the nav graph's `startDestination`, which `NavController` ignores whenever there is a back stack to restore — and `removeExtra` would not survive process death anyway, since the system redelivers its own copy of the intent. So APP-NAV-005/006 are untouched and this stayed inside one segment.
+
+9. **Outstanding reminders listed on the timeline (added 2026-08-21).** Tapping a bundled reminder notification landed in the app with nothing to show for it, and tapping the launcher icon's notification dot never could — the launcher opens the app through its own intent, carrying no deep link, so that half was never fixable app-side. The timeline now lists reminders that have fired and not been dealt with, under the notification's own "Time to log" title (EL-UI-096..099). A row tap resolves the same `QuickLogTarget` a notification tap resolves, filter side effect included, by way of an `openQuickLogFor` extracted from the deep-link path so the two genuinely share one route rather than resembling each other. A swipe dismisses in either direction with threshold haptics and no undo, unlike the event row directly below it — deleting an event destroys something, dismissing a nudge that returns does not. The rows sit above the empty state as well as the event list, since a reminder can be outstanding for a category with no events yet. What "outstanding" means and where the answer comes from belongs to the reminders segment (REM-NOTIF-008); this screen renders it and reports taps. Header and row styling are known-rough and deliberately left for a later pass.
 
 ## Work Required
 

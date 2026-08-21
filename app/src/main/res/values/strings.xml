@@ -154,6 +154,7 @@
     <string name="reminder_validation_no_active_day">Choose at least one active day.</string>
     <string name="reminder_validation_no_time">Add at least one time.</string>
     <string name="reminder_validation_window_invalid">End time must be after start time.</string>
+    <string name="cd_dismiss_reminder">Dismiss reminder</string>
     <string name="reminder_permission_save_anyway">Save anyway</string>
     <string name="reminder_problem_notifications">Notifications are turned off, so reminders won\'t be shown.</string>
     <string name="reminder_problem_notifications_title">Notifications are turned off</string>

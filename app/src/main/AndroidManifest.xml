@@ -30,6 +30,10 @@
         <receiver
             android:name="net.clahey.trackr.reminders.ReminderReceiver"
             android:exported="false" />
+        <!-- @spec REM-NOTIF-012 -->
+        <receiver
+            android:name="net.clahey.trackr.reminders.ReminderDismissReceiver"
+            android:exported="false" />
         <receiver
             android:name="net.clahey.trackr.reminders.ReminderRearmReceiver"
             android:exported="false">

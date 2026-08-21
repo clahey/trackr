@@ -3,6 +3,7 @@ package net.clahey.trackr.ui.home
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import net.clahey.trackr.FakeTrackrRepository
+import net.clahey.trackr.reminders.FakeReminderNotifier
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.ErrorKind
@@ -30,6 +31,7 @@ class HomeViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var repo: FakeTrackrRepository
+    private lateinit var notifier: FakeReminderNotifier
     private lateinit var vm: HomeViewModel
 
     companion object {
@@ -59,7 +61,8 @@ class HomeViewModelTest {
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
         repo = FakeTrackrRepository()
-        vm = HomeViewModel(repo, SavedStateHandle())
+        notifier = FakeReminderNotifier()
+        vm = HomeViewModel(repo, notifier, SavedStateHandle())
     }
 
     @After fun tearDown() { Dispatchers.resetMain() }
@@ -529,7 +532,7 @@ class HomeViewModelTest {
     @Test fun `quickLogCategoryId for a MetaCategory with no SubCategories resolves to DirectEntry`() = runTest {
         val meta = makeMeta("meta1")
         repo.setCategories(meta)
-        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
+        val target = HomeViewModel(repo, notifier, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
         target.pendingQuickLogTarget.test {
             val result = awaitItem() as QuickLogTarget.DirectEntry
             assertEquals("meta1", result.category.id)
@@ -541,7 +544,7 @@ class HomeViewModelTest {
         val meta = makeMeta("meta1")
         val sub = makeSub("sub1", meta)
         repo.setCategories(meta, sub)
-        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "sub1")))
+        val target = HomeViewModel(repo, notifier, SavedStateHandle(mapOf("quickLogCategoryId" to "sub1")))
         target.pendingQuickLogTarget.test {
             val result = awaitItem() as QuickLogTarget.DirectEntry
             assertEquals("sub1", result.category.id)
@@ -553,7 +556,7 @@ class HomeViewModelTest {
         val meta = makeMeta("meta1")
         val sub = makeSub("sub1", meta)
         repo.setCategories(meta, sub)
-        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
+        val target = HomeViewModel(repo, notifier, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
         target.pendingQuickLogTarget.test {
             val result = awaitItem() as QuickLogTarget.DrillDown
             assertEquals("meta1", result.meta.id)
@@ -563,7 +566,7 @@ class HomeViewModelTest {
 
     // @spec EL-UI-083
     @Test fun `quickLogCategoryId that cannot be resolved sets the not-found signal, not a target`() = runTest {
-        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "missing")))
+        val target = HomeViewModel(repo, notifier, SavedStateHandle(mapOf("quickLogCategoryId" to "missing")))
         target.quickLogCategoryNotFound.test {
             assertTrue(awaitItem())
         }
@@ -574,7 +577,7 @@ class HomeViewModelTest {
     @Test fun `consumePendingQuickLogTarget clears the pending target`() = runTest {
         val meta = makeMeta("meta1")
         repo.setCategories(meta)
-        val target = HomeViewModel(repo, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
+        val target = HomeViewModel(repo, notifier, SavedStateHandle(mapOf("quickLogCategoryId" to "meta1")))
         target.consumePendingQuickLogTarget()
         assertEquals(null, target.pendingQuickLogTarget.value)
     }
@@ -586,13 +589,92 @@ class HomeViewModelTest {
         repo.setCategories(makeMeta("meta1"))
         val handle = SavedStateHandle(mapOf("quickLogCategoryId" to "meta1"))
 
-        val first = HomeViewModel(repo, handle)
+        val first = HomeViewModel(repo, notifier, handle)
         assertNotNull(first.pendingQuickLogTarget.value)
         assertNull(handle.get<String>("quickLogCategoryId"))
 
-        val restored = HomeViewModel(repo, handle)
+        val restored = HomeViewModel(repo, notifier, handle)
         assertNull(restored.pendingQuickLogTarget.value)
     }
+
+    // ---------- outstanding reminders (EL-UI-096, EL-UI-097, EL-UI-098) ----------
+
+    // @spec EL-UI-097
+    @Test fun `no showing notifications means no outstanding reminder rows`() = runTest {
+        repo.setCategories(makeMeta("meta1"))
+        assertTrue(vm.outstandingReminders.value.isEmpty())
+    }
+
+    // @spec EL-UI-096
+    @Test fun `an outstanding reminder row carries its category's emoji and name`() = runTest {
+        val meta = makeMeta("meta1", name = "Exercise")
+        repo.setCategories(meta)
+        notifier.postReminderNotification(makeReminder("meta1"))
+        val row = vm.outstandingReminders.value.single()
+        assertEquals("meta1", row.categoryId)
+        assertEquals("Exercise", row.name)
+        assertEquals(meta.resolvedEmoji, row.emoji)
+    }
+
+    // Posting does not move window focus, so without the notifier announcing it, a reminder that
+    // fires while the timeline is being looked at would not appear until the user left and returned.
+    // @spec REM-NOTIF-009
+    @Test fun `a reminder firing while the timeline is open appears without a refresh call`() = runTest {
+        repo.setCategories(makeMeta("meta1"))
+        assertTrue(vm.outstandingReminders.value.isEmpty())
+
+        notifier.postReminderNotification(makeReminder("meta1"))
+
+        assertEquals(listOf("meta1"), vm.outstandingReminders.value.map { it.categoryId })
+    }
+
+    // @spec EL-UI-098
+    @Test fun `tapping an outstanding reminder opens quick-log and stops it being outstanding`() = runTest {
+        repo.setCategories(makeMeta("meta1"))
+        notifier.postReminderNotification(makeReminder("meta1"))
+        assertEquals(1, vm.outstandingReminders.value.size)
+
+        vm.onOutstandingReminderClick("meta1")
+
+        assertNotNull(vm.pendingQuickLogTarget.value)
+        assertTrue(vm.outstandingReminders.value.isEmpty())
+    }
+
+    // Swiping the row is the in-app equivalent of swiping the notification: it clears the reminder
+    // and logs nothing.
+    // @spec EL-UI-099
+    @Test fun `swiping an outstanding reminder clears it without opening quick-log`() = runTest {
+        repo.setCategories(makeMeta("meta1"))
+        notifier.postReminderNotification(makeReminder("meta1"))
+        assertEquals(1, vm.outstandingReminders.value.size)
+
+        vm.onOutstandingReminderDismiss("meta1")
+
+        assertTrue(vm.outstandingReminders.value.isEmpty())
+        assertNull(vm.pendingQuickLogTarget.value)
+    }
+
+    // The row and the notification resolve the same target, filter side effect included
+    // (EL-UI-082), so where you tapped cannot change where the timeline ends up.
+    // @spec EL-UI-098
+    @Test fun `tapping an outstanding reminder for a meta with subcategories drills down and filters`() = runTest {
+        val meta = makeMeta("meta1")
+        repo.setCategories(meta, makeSub("sub1", meta))
+        notifier.postReminderNotification(makeReminder("meta1"))
+
+        vm.onOutstandingReminderClick("meta1")
+
+        assertTrue(vm.pendingQuickLogTarget.value is QuickLogTarget.DrillDown)
+        assertEquals(ActiveFilter.TopLevel(meta), vm.activeFilter.value)
+    }
+
+    private fun makeReminder(categoryId: String) = net.clahey.trackr.domain.Reminder(
+        categoryId = categoryId, enabled = true, mode = net.clahey.trackr.domain.ReminderMode.FIXED,
+        times = listOf(java.time.LocalTime.of(9, 0)),
+        windowStart = java.time.LocalTime.MIDNIGHT, windowEnd = java.time.LocalTime.MIDNIGHT,
+        occurrencesPerDay = 1, daysActive = java.time.DayOfWeek.entries.toSet(),
+        showCategoryInNotification = false, nextFireAt = null,
+    )
 
     // EL-UI-083's path opens no sheet, so no consume call ever runs — the argument still must not
     // outlive the read that discarded it.
@@ -600,10 +682,10 @@ class HomeViewModelTest {
     @Test fun `an unresolvable quickLogCategoryId is not redelivered either`() = runTest {
         val handle = SavedStateHandle(mapOf("quickLogCategoryId" to "missing"))
 
-        val first = HomeViewModel(repo, handle)
+        val first = HomeViewModel(repo, notifier, handle)
         assertTrue(first.quickLogCategoryNotFound.value)
 
-        val restored = HomeViewModel(repo, handle)
+        val restored = HomeViewModel(repo, notifier, handle)
         assertFalse(restored.quickLogCategoryNotFound.value)
     }
 }

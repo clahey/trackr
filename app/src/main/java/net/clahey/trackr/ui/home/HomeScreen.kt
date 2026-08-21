@@ -1,6 +1,9 @@
 package net.clahey.trackr.ui.home
 
+import android.os.Build
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +22,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
@@ -38,6 +43,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -56,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -98,6 +106,10 @@ fun HomeScreen(
 ) {
     val dayGroups by homeVm.dayGroups.collectAsState()
     val emptyState by homeVm.emptyState.collectAsState()
+
+    // Observed, not re-read on a trigger: the notifier updates this on every change, including
+    // dismissals reported by delete intents (REM-NOTIF-009).
+    val outstandingReminders by homeVm.outstandingReminders.collectAsState()
     val activeFilter by homeVm.activeFilter.collectAsState()
     val pendingDelete by homeVm.pendingDelete.collectAsState()
     val preFilterTopDay by homeVm.preFilterTopDay.collectAsState()
@@ -306,6 +318,22 @@ fun HomeScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+
+            // @spec EL-UI-096, EL-UI-097, EL-UI-098, EL-UI-099
+            // Sits above the empty state too: a reminder can be outstanding for a category that has
+            // no events yet, which is exactly when the nudge is worth acting on.
+            if (outstandingReminders.isNotEmpty()) {
+                OutstandingRemindersHeader()
+                outstandingReminders.forEach { row ->
+                    key(row.categoryId) {
+                        SwipeableOutstandingReminder(
+                            row = row,
+                            onClick = { homeVm.onOutstandingReminderClick(row.categoryId) },
+                            onDismiss = { homeVm.onOutstandingReminderDismiss(row.categoryId) },
+                        )
                     }
                 }
             }
@@ -566,5 +594,127 @@ private fun CategoryFilterChip(category: Category, selected: Boolean, onClick: (
             selectedBorderColor = color,
         ),
     )
+}
+
+// The notification's own title, so the row and the notification read as one thing seen twice.
+// @spec EL-UI-096
+@Composable
+private fun OutstandingRemindersHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            Icons.Default.Notifications,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        Text(
+            stringResource(R.string.reminder_notification_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
+}
+
+// @spec EL-UI-099
+@Composable
+private fun SwipeableOutstandingReminder(
+    row: OutstandingReminderRow,
+    onClick: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val view = LocalView.current
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) {
+                onDismiss()
+                true
+            } else false
+        },
+    )
+
+    // targetValue is where the row would land if released now, so it flips exactly as the drag
+    // crosses the dismissal distance — which is when the user needs to be told, not on release.
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(dismissState.targetValue) {
+        val nowArmed = dismissState.targetValue != SwipeToDismissBoxValue.Settled
+        if (nowArmed != armed) {
+            armed = nowArmed
+            // Compose 1.7's HapticFeedbackType offers only LongPress and TextHandleMove; the
+            // platform constants that actually mean "a gesture crossed its threshold" arrived in
+            // API 30, so ask the View for them and fall back below that. An unsupported constant,
+            // or haptics turned off system-wide, makes this a silent no-op rather than an error.
+            view.performHapticFeedback(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    if (nowArmed) HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE
+                    else HapticFeedbackConstants.GESTURE_THRESHOLD_DEACTIVATE
+                } else {
+                    HapticFeedbackConstants.LONG_PRESS
+                },
+            )
+        }
+    }
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                // Both ends, since the row dismisses either way. Not the red trash of an event
+                // swipe: this discards a nudge that returns, rather than destroying anything.
+                repeat(2) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.cd_dismiss_reminder),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+    ) {
+        OutstandingReminderRowItem(row = row, onClick = onClick)
+    }
+}
+
+// @spec EL-UI-096, EL-UI-098
+@Composable
+private fun OutstandingReminderRowItem(
+    row: OutstandingReminderRow,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(row.emoji, style = MaterialTheme.typography.titleMedium)
+            Text(
+                row.name,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                row.firedAt.atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm")),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
 }
 

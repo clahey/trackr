@@ -3,11 +3,13 @@ package net.clahey.trackr.ui.home
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import net.clahey.trackr.data.ReminderNotifier
 import net.clahey.trackr.data.TrackrRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import net.clahey.trackr.domain.Category
 import net.clahey.trackr.domain.Event
 import net.clahey.trackr.domain.matchesValueType
+import net.clahey.trackr.domain.outstandingReminders as computeOutstanding
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
@@ -16,7 +18,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -33,6 +39,14 @@ sealed class QuickLogTarget {
 }
 
 data class DayGroup(val date: LocalDate, val events: List<DayEntry>)
+
+/** A reminder that fired and hasn't been dealt with, resolved for display. */
+data class OutstandingReminderRow(
+    val categoryId: String,
+    val emoji: String,
+    val name: String,
+    val firedAt: Instant,
+)
 
 // @spec EL-UI-092, EL-UI-093, EL-UI-094
 sealed class TimelineEmptyState {
@@ -56,6 +70,7 @@ sealed class DayEntry {
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: TrackrRepository,
+    private val notifier: ReminderNotifier,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val _activeFilter = MutableStateFlow<ActiveFilter>(ActiveFilter.All)
@@ -66,6 +81,23 @@ class HomeViewModel @Inject constructor(
 
     private val _quickLogCategoryNotFound = MutableStateFlow(false)
     val quickLogCategoryNotFound: StateFlow<Boolean> = _quickLogCategoryNotFound.asStateFlow()
+
+    // Observed, not polled: the notifier updates its own state on every change, so this screen
+    // never decides when to look (REM-NOTIF-009).
+    // @spec EL-UI-096
+    val outstandingReminders: StateFlow<List<OutstandingReminderRow>> =
+        combine(notifier.outstanding, repository.getCategories()) { outstanding, categories ->
+            outstanding.mapNotNull { reminder ->
+                val category = categories.find { it.id == reminder.categoryId }
+                    ?: return@mapNotNull null
+                OutstandingReminderRow(
+                    categoryId = reminder.categoryId,
+                    emoji = category.resolvedEmoji,
+                    name = category.name,
+                    firedAt = reminder.firedAt,
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _dayGroups = MutableStateFlow<List<DayGroup>>(emptyList())
     val dayGroups: StateFlow<List<DayGroup>> = _dayGroups.asStateFlow()
@@ -152,23 +184,46 @@ class HomeViewModel @Inject constructor(
         // argument left in place is handed to a fresh HomeViewModel after the task is restored.
         val quickLogCategoryId: String? = savedStateHandle.remove("quickLogCategoryId")
         if (quickLogCategoryId != null) {
-            viewModelScope.launch {
-                val categories = repository.getCategories().first()
-                val category = categories.find { it.id == quickLogCategoryId }
-                if (category == null) {
-                    _quickLogCategoryNotFound.value = true
-                    return@launch
-                }
-                val hasSubCategories = category is Category.MetaCategory &&
-                    categories.any { it is Category.SubCategory && it.parent.id == category.id }
-                if (category is Category.MetaCategory && hasSubCategories) {
-                    setFilter(ActiveFilter.TopLevel(category))
-                    _pendingQuickLogTarget.value = QuickLogTarget.DrillDown(category)
-                } else {
-                    _pendingQuickLogTarget.value = QuickLogTarget.DirectEntry(category)
-                }
-            }
+            viewModelScope.launch { openQuickLogFor(quickLogCategoryId) }
         }
+
+    }
+
+    /**
+     * Opens the quick-log sheet at [categoryId]'s target, or reports the category missing.
+     *
+     * Shared by the notification deep link and by a tap on an outstanding-reminder row: both are
+     * the same reminder, so they resolve the same target and carry the same filter side effect
+     * (EL-UI-098).
+     */
+    // @spec EL-UI-081, EL-UI-082, EL-UI-083
+    private suspend fun openQuickLogFor(categoryId: String) {
+        val categories = repository.getCategories().first()
+        val category = categories.find { it.id == categoryId }
+        if (category == null) {
+            _quickLogCategoryNotFound.value = true
+            return
+        }
+        val hasSubCategories = category is Category.MetaCategory &&
+            categories.any { it is Category.SubCategory && it.parent.id == category.id }
+        if (category is Category.MetaCategory && hasSubCategories) {
+            setFilter(ActiveFilter.TopLevel(category))
+            _pendingQuickLogTarget.value = QuickLogTarget.DrillDown(category)
+        } else {
+            _pendingQuickLogTarget.value = QuickLogTarget.DirectEntry(category)
+        }
+    }
+
+    // @spec EL-UI-098
+    fun onOutstandingReminderClick(categoryId: String) {
+        notifier.cancelReminderNotification(categoryId)
+        viewModelScope.launch { openQuickLogFor(categoryId) }
+    }
+
+    // The in-app equivalent of swiping the notification away: clears it, logs nothing.
+    // @spec EL-UI-099
+    fun onOutstandingReminderDismiss(categoryId: String) {
+        notifier.cancelReminderNotification(categoryId)
     }
 
     fun consumePendingQuickLogTarget() {
