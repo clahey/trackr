@@ -46,8 +46,8 @@ not survive contact with the source.
 - [x] **30** — No prompt or recovery path when notifications are denied — *reminders*, verified on device
 - [x] **31** — One message for two different failures — *reminders*, verified on device
 - [x] **32** — A blocked notification channel is undetectable — *reminders*, verified
-- [ ] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, unverified
-- [ ] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, unverified
+- [x] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, verified on device
+- [x] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, not a defect; superseded
 - [ ] **35** — Storage detail sits in the reminders segment — *local-storage*, verified
 - [ ] **36** — Compose BOM is ~19 months behind — *cross-cutting*, verified
 
@@ -400,15 +400,27 @@ request at `CategoryEditScreen.kt:728` is *not* a site: it gates a system dialog
 and no dialog can unblock a channel, so it stays app-level.
 
 ### 33 — Tapping an unexpanded multi-reminder row shows no reminders
-Reported from device use, not yet traced to code.
+`AndroidReminderNotifier` (grouping)
 
-A category with several reminders, shown collapsed, does not reveal them when
-tapped — nothing appears.
+Not an in-app row: the collapsed *notification bundle*. Every reminder
+notification set `setGroup("reminders")` with no group summary posted, which
+REM-NOTIF-004 mandated outright. The bundle Android generates for two or more
+notifications in that situation carries no content intent, so tapping the
+collapsed group does nothing — and only ever with multiple reminders, which is
+why it read as being about "multiple".
+
+Fixed by posting a real summary (`setGroupSummary(true)`, `setAutoCancel(false)`)
+that opens the timeline. REM-NOTIF-004 reversed. Confirmed on device.
 
 ### 34 — Tapping the yellow-dot icon shows no reminders
-Reported from device use, not yet traced to code.
+Not a defect. Tapping a launcher icon that carries a notification dot opens the
+app through the launcher's own intent; it does not deliver the notification's
+`PendingIntent`, so there is no category extra and no deep link. The dot only
+signals that notifications exist, and the long-press menu is the launcher's UI,
+not ours. No app-side change makes that tap open a quick-log.
 
-Tapping the icon carrying the yellow dot shows no reminders.
+Superseded by the outstanding-reminders list: landing in the app now shows what
+is waiting, which is the outcome the report was after.
 
 ### 35 — Storage detail sits in the reminders segment
 `docs/specs/reminders.md` (REM-DATA-001/006/008), `docs/llds/reminders.md § Data Model`,
