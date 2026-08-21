@@ -143,6 +143,14 @@ The intended full-sync and sharing backend. Chosen because the team is already i
 
 **Alternatives considered:** Firebase (Firestore + Cloud Functions) — managed but higher Google lock-in and Firestore's document model is less natural for the relational sharing graph. Supabase (Postgres + Edge Functions) — better relational fit, open source, but unfamiliar AWS tooling is not available. Custom server — maximum control but adds hosting and operational burden.
 
+## Open Questions & Future Decisions
+
+**Compose dependency currency, and the UI test gap behind it.** The Compose BOM is pinned at `2025.01.01` — roughly nineteen months behind as of 2026-08-21. Kotlin 2.1.0 and AGP 8.13.2 are recent enough that the bump itself is likely uneventful; the Compose compiler ships with Kotlin 2.x, so there is no separate compiler version to reconcile.
+
+What it costs is verification rather than build breakage. Compose minor versions move visual defaults — ripple and indication, text metrics, gesture thresholds, Material3 component styling — and this project has no Compose UI tests at all, so every screen would need checking by hand. Most of that movement is Material improving rather than regressing, which is a reason to want it, but it still has to be looked at.
+
+The two are worth doing together: the missing UI test infrastructure is what would make the *next* upgrade cheap, and it is the same gap that leaves REM-UI-\*, REM-PERM-\*, and EL-UI-096..099 without test citations today. Until then, one visible consequence: Compose 1.7's `HapticFeedbackType` offers only `LongPress` and `TextHandleMove`, so the swipe-threshold haptics in `HomeScreen.kt` go through `LocalView.performHapticFeedback` with platform constants and an explicit API-30 fallback. Compose 1.8's expanded type covers those directly and should let that block collapse.
+
 ## Success Metrics
 
 - Cold launch to log-entry in ≤ 3 taps

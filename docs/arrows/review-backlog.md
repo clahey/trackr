@@ -49,7 +49,7 @@ not survive contact with the source.
 - [x] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, verified on device
 - [x] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, not a defect; superseded
 - [ ] **35** — Storage detail sits in the reminders segment — *local-storage*, verified
-- [ ] **36** — Compose BOM is ~19 months behind — *cross-cutting*, verified
+- [—] **36** — Compose BOM is ~19 months behind — moved to the HLD, see Dropped
 
 ## Detail
 
@@ -446,31 +446,14 @@ down into local-storage so `ReminderDao` is documented like the other DAOs, or
 conclude the other DAOs are the under-documented ones and level up instead.
 Either way the `ReminderEntity` table wants one canonical copy and a pointer.
 
-### 36 — Compose BOM is ~19 months behind
-`gradle/libs.versions.toml` (`compose-bom = "2025.01.01"`),
-`HomeScreen.kt` (`SwipeableOutstandingReminder`'s haptics)
-
-Kotlin 2.1.0 and AGP 8.13.2 are new enough that the bump itself is likely
-uneventful — the Compose compiler ships with Kotlin 2.x, so there is no
-separate compiler version to reconcile.
-
-What it costs is verification, not build breakage. Compose minor versions move
-visual defaults (ripple and indication, text metrics, gesture thresholds,
-Material3 component styling), and this project has no Compose UI tests at all,
-so every screen would need checking by hand. Most of that movement is Material
-improving rather than regressing, which makes it worth having; it still has to
-be looked at. Worth doing together with standing up Compose UI test
-infrastructure — the thing that makes the *next* upgrade cheap, and the gap
-behind several other items here (REM-UI-*, REM-PERM-*, EL-UI-096..099 all lack
-test citations for exactly this reason).
-
-Revisit the swipe haptics when it lands. Compose 1.7's `HapticFeedbackType`
-offers only `LongPress` and `TextHandleMove`, so the threshold feedback goes
-through `LocalView.performHapticFeedback` with platform constants and an
-explicit API-30 fallback. Compose 1.8's expanded type covers those directly and
-should let the whole block collapse.
-
 ## Dropped
+
+### 36 — Compose BOM is ~19 months behind
+Moved to `docs/high-level-design.md § Open Questions & Future Decisions`. It is
+not a finding from the PR #4 review, and this file is meant to be deleted once
+the review is burned down — a project-level dependency-currency question, and
+the UI test gap tied to it, outlive that. The HLD had no Open Questions section
+before this; it does now.
 
 ### 1 — Receivers skip `super.onReceive`, so Hilt never injects
 Retracted. Reminders have been observed firing on a real device, and
