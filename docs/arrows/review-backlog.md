@@ -24,8 +24,8 @@ not survive contact with the source.
 - [x] **8** — Occurrences-per-day field rejects most input — *reminders*, verified; fix confirmed on device
 - [x] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
 - [x] **10** — Duplicate notification-permission request — *reminders*, verified
-- [ ] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
-- [ ] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
+- [x] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
+- [x] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
 - [ ] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified
 - [x] **14** — Fake repository does not cascade reminder deletion — *local-storage*, verified
 - [ ] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
@@ -215,16 +215,18 @@ path as #11. Not writable today: `CategoryEditViewModel.kt:57` rejects the save,
 `CategoryEditScreen.kt:895` hides the delete affordance below two entries, and
 reopening refills a default.
 
-A third case belongs with these two, found while verifying #8:
+A third case belonged with these two, found while verifying #8:
 `ReminderScheduling.kt:113` computes `totalNanos / reminder.occurrencesPerDay`,
-so a stored `0` is an `ArithmeticException` on the same path, and
-`:137` divides by the `subNanos` that produces, which is itself `0` for a
-zero-length window. Also not writable today — REM-UI-006a refuses the save —
-but that is the UI enforcing a domain invariant, which is the arrangement
-REM-DATA-010 deliberately rejected for `daysActive`: the edit screen never
-saved an empty set either, and the decoder was still made to refuse one rather
-than trust that no writer ever would. Fix all three together and decide once
-what a malformed row decodes to.
+so a stored `0` is an `ArithmeticException` on the same path.
+
+Fixed together, along with three more the same audit turned up — `DayOfWeek.valueOf`
+on an unrecognized weekday name, and `LocalTime.parse` on a `times` entry or a
+window bound that is not `HH:mm`. `toDomain()` is now total: one `try` around
+the whole decode falling back to `Reminder.default(categoryId)`, with the
+parseable-but-unusable cases as `require` calls inside it, so a column added
+later is covered without anyone remembering to guard it. Enumerating repairs
+per field would have been correct only until the next column. REM-DATA-010
+carries the rule.
 
 ### 13 — Schema `4.json` describes an unreachable version
 `app/schemas/net.clahey.trackr.data.local.TrackrDatabase/4.json`

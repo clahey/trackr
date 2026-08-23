@@ -2,12 +2,15 @@ package net.clahey.trackr.data.local
 
 import net.clahey.trackr.data.local.converters.StringListConverter
 import net.clahey.trackr.domain.Category
+import net.clahey.trackr.domain.Reminder
+import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.ValueType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.DayOfWeek
+import java.time.LocalTime
 
 class MappersTest {
 
@@ -65,40 +68,68 @@ class MappersTest {
         assertEquals("parent", sub.parent.id)
     }
 
-    private fun reminderEntity(enabled: Boolean, daysActive: List<String>) = ReminderEntity(
+    // A row that decodes cleanly. Every field differs from Reminder.default's, so an equality check
+    // against the default proves nothing from the row survived.
+    private fun reminderEntity(
+        enabled: Boolean = true,
+        mode: String = "random",
+        times: String? = StringListConverter.encode(listOf("08:00")),
+        windowStart: String = "09:00",
+        windowEnd: String = "21:00",
+        occurrencesPerDay: Int = 4,
+        daysActive: List<String> = listOf("MONDAY", "WEDNESDAY"),
+    ) = ReminderEntity(
         categoryId = "cat1",
         enabled = enabled,
-        mode = "fixed",
-        times = StringListConverter.encode(listOf("08:00")),
-        windowStart = "00:00",
-        windowEnd = "00:00",
-        occurrencesPerDay = 1,
+        mode = mode,
+        times = times,
+        windowStart = windowStart,
+        windowEnd = windowEnd,
+        occurrencesPerDay = occurrencesPerDay,
         daysActive = StringListConverter.encode(daysActive),
         showCategoryInNotification = false,
         nextFireAt = null,
     )
 
     // @spec REM-DATA-010
-    @Test fun `toDomain preserves an enabled reminder with a non-empty daysActive`() {
-        val entity = reminderEntity(enabled = true, daysActive = listOf("MONDAY", "WEDNESDAY"))
-        val reminder = entity.toDomain()
-        assertTrue(reminder.enabled)
-        assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), reminder.daysActive)
+    @Test fun `a row that cannot produce a schedulable reminder decodes as the default`() {
+        val cases = mapOf(
+            "unrecognized mode" to reminderEntity(mode = "weekly"),
+            "unrecognized weekday" to reminderEntity(daysActive = listOf("FUNDAY")),
+            "time that is not HH:mm" to reminderEntity(times = StringListConverter.encode(listOf("25:00"))),
+            "empty windowStart" to reminderEntity(windowStart = ""),
+            "unparseable windowEnd" to reminderEntity(windowEnd = "nope"),
+            "no active days" to reminderEntity(daysActive = emptyList()),
+            "no active days on an already-disabled row" to reminderEntity(enabled = false, daysActive = emptyList()),
+            "FIXED with no times" to reminderEntity(mode = "fixed", times = null),
+            "occurrencesPerDay below 1" to reminderEntity(occurrencesPerDay = 0),
+        )
+        for ((name, entity) in cases) {
+            assertEquals(name, Reminder.default("cat1"), entity.toDomain())
+        }
+    }
+
+    // @spec REM-DATA-002, REM-DATA-010
+    @Test fun `a row that can produce a schedulable reminder decodes unchanged`() {
+        val random = reminderEntity().toDomain()
+        assertTrue(random.enabled)
+        assertEquals(ReminderMode.RANDOM, random.mode)
+        assertEquals(LocalTime.of(9, 0), random.windowStart)
+        assertEquals(LocalTime.of(21, 0), random.windowEnd)
+        assertEquals(4, random.occurrencesPerDay)
+        assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), random.daysActive)
+
+        // Lowercase is the legacy encoding, accepted on decode.
+        val fixed = reminderEntity(mode = "fixed").toDomain()
+        assertEquals(ReminderMode.FIXED, fixed.mode)
+        assertEquals(listOf(LocalTime.of(8, 0)), fixed.times)
     }
 
     // @spec REM-DATA-010
-    @Test fun `toDomain decodes an empty daysActive as disabled with all days set`() {
-        val entity = reminderEntity(enabled = true, daysActive = emptyList())
-        val reminder = entity.toDomain()
-        assertFalse("a malformed empty daysActive should decode as disabled", reminder.enabled)
-        assertEquals(DayOfWeek.entries.toSet(), reminder.daysActive)
-    }
-
-    // @spec REM-DATA-010
-    @Test fun `toDomain normalizes daysActive to all days even when already disabled`() {
-        val entity = reminderEntity(enabled = false, daysActive = emptyList())
-        val reminder = entity.toDomain()
+    @Test fun `a valid but disabled row keeps its own values`() {
+        val reminder = reminderEntity(enabled = false).toDomain()
         assertFalse(reminder.enabled)
-        assertEquals(DayOfWeek.entries.toSet(), reminder.daysActive)
+        assertEquals(ReminderMode.RANDOM, reminder.mode)
+        assertEquals(4, reminder.occurrencesPerDay)
     }
 }

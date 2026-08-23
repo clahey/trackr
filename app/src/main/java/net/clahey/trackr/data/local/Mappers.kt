@@ -100,25 +100,28 @@ private fun LocalTime.toHHmm(): String = format(hhMm)
 private fun String.toLocalTimeHHmm(): LocalTime = LocalTime.parse(this, hhMm)
 
 // @spec REM-DATA-002, REM-DATA-010
-fun ReminderEntity.toDomain(): Reminder {
+fun ReminderEntity.toDomain(): Reminder = try {
     val decodedDaysActive = StringListConverter.decode(daysActive).map { DayOfWeek.valueOf(it) }.toSet()
-    return Reminder(
+    val decodedTimes = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList()
+    // Lowercase is the legacy encoding, accepted on decode only.
+    val decodedMode = ReminderMode.valueOf(mode.uppercase())
+    require(decodedDaysActive.isNotEmpty())
+    require(decodedMode != ReminderMode.FIXED || decodedTimes.isNotEmpty())
+    require(occurrencesPerDay >= 1)
+    Reminder(
         categoryId = categoryId,
-        // An empty daysActive is malformed — the UI never saves one (REM-UI-009) — but
-        // ReminderScheduling.kt's day-walking loops spin forever against it, so a row that
-        // somehow has one is decoded as disabled rather than risking a hang.
-        enabled = enabled && decodedDaysActive.isNotEmpty(),
-        // .uppercase() accepts rows saved by earlier test builds under the old lowercase
-        // "fixed"/"random" encoding, since that test data made it onto a live device.
-        mode = ReminderMode.valueOf(mode.uppercase()),
-        times = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList(),
+        enabled = enabled,
+        mode = decodedMode,
+        times = decodedTimes,
         windowStart = windowStart.toLocalTimeHHmm(),
         windowEnd = windowEnd.toLocalTimeHHmm(),
         occurrencesPerDay = occurrencesPerDay,
-        daysActive = decodedDaysActive.ifEmpty { DayOfWeek.entries.toSet() },
+        daysActive = decodedDaysActive,
         showCategoryInNotification = showCategoryInNotification,
         nextFireAt = nextFireAt?.let { InstantConverter.decode(it) },
     )
+} catch (e: RuntimeException) {
+    Reminder.default(categoryId)
 }
 
 fun Reminder.toEntity(): ReminderEntity = ReminderEntity(

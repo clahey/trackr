@@ -42,14 +42,14 @@ enum class EmojiMode { INHERIT, CUSTOM }
 data class EmojiUIState(val mode: EmojiMode, val customValue: String)
 
 data class ReminderUIState(
-    val enabled: Boolean = false,
-    val mode: ReminderMode = ReminderMode.FIXED,
-    val times: List<LocalTime> = listOf(LocalTime.of(9, 0)),
-    val windowStart: LocalTime = LocalTime.MIDNIGHT,
-    val windowEnd: LocalTime = LocalTime.MIDNIGHT,
-    val occurrencesPerDay: String = "1",
-    val daysActive: Set<DayOfWeek> = DayOfWeek.entries.toSet(),
-    val showCategoryInNotification: Boolean = false,
+    val enabled: Boolean,
+    val mode: ReminderMode,
+    val times: List<LocalTime>,
+    val windowStart: LocalTime,
+    val windowEnd: LocalTime,
+    val occurrencesPerDay: String,
+    val daysActive: Set<DayOfWeek>,
+    val showCategoryInNotification: Boolean,
 ) {
     // @spec REM-UI-006a, REM-UI-009, REM-UI-010
     fun validationError(): String? {
@@ -279,7 +279,7 @@ class CategoryEditViewModel @Inject constructor(
     } else MutableStateFlow(null)
 
     // @spec REM-UI-001..011
-    private val _reminderUIState = MutableStateFlow(ReminderUIState())
+    private val _reminderUIState = MutableStateFlow(ReminderUIState.fromStored(Reminder.default("")))
     val reminderUIState: StateFlow<ReminderUIState> = _reminderUIState.asStateFlow()
 
     fun setReminderEnabled(value: Boolean) = edit { _reminderUIState.value = _reminderUIState.value.copy(enabled = value) }
