@@ -21,7 +21,7 @@ not survive contact with the source.
 - [x] **5** — Suppression ignores child-category events — *reminders*, verified
 - [x] **6** — Quick-log deep link re-fires on back-stack restore — *event-logging*, verified on device
 - [x] **7** — Permission banner can go stale — *category-management*, verified
-- [x] **8** — Occurrences-per-day field rejects most input — *reminders*, verified
+- [x] **8** — Occurrences-per-day field rejects most input — *reminders*, verified; fix confirmed on device
 - [x] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
 - [x] **10** — Duplicate notification-permission request — *reminders*, verified
 - [ ] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
@@ -162,7 +162,8 @@ in state, so a rejected keystroke left the state unchanged and the field sprang
 back. Clearing it was impossible — an empty box parses to nothing — and with the
 box unclearable the only way to change the number was to append to it. From the
 default of `1` that reaches `11` and `12`; every value from 2 to 10 was
-unreachable. Verified by reading the code, not reproduced on device.
+unreachable. Verified by reading the code rather than reproduced; the fix is
+confirmed on device.
 
 Fixed by holding the field as text so it can be emptied and retyped, with a
 two-digit character check (1–99) in the ViewModel rather than in the screen's
