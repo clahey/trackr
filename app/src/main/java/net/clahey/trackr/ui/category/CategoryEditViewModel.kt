@@ -47,11 +47,11 @@ data class ReminderUIState(
     val times: List<LocalTime> = listOf(LocalTime.of(9, 0)),
     val windowStart: LocalTime = LocalTime.MIDNIGHT,
     val windowEnd: LocalTime = LocalTime.MIDNIGHT,
-    val occurrencesPerDay: Int = 1,
+    val occurrencesPerDay: String = "1",
     val daysActive: Set<DayOfWeek> = DayOfWeek.entries.toSet(),
     val showCategoryInNotification: Boolean = false,
 ) {
-    // @spec REM-UI-009, REM-UI-010
+    // @spec REM-UI-006a, REM-UI-009, REM-UI-010
     fun validationError(): String? {
         if (!enabled) return null
         if (daysActive.isEmpty()) return "reminder_days"
@@ -59,7 +59,12 @@ data class ReminderUIState(
             ReminderMode.FIXED -> if (times.isEmpty()) "reminder_times" else null
             ReminderMode.RANDOM -> {
                 val validWindow = windowEnd == LocalTime.MIDNIGHT || windowEnd.isAfter(windowStart)
-                if (occurrencesPerDay < 1 || !validWindow) "reminder_window" else null
+                val occurrences = occurrencesPerDay.toIntOrNull() ?: 0
+                when {
+                    !validWindow -> "reminder_window"
+                    occurrences < 1 -> "reminder_occurrences"
+                    else -> null
+                }
             }
         }
     }
@@ -72,7 +77,7 @@ data class ReminderUIState(
         times = times,
         windowStart = windowStart,
         windowEnd = windowEnd,
-        occurrencesPerDay = occurrencesPerDay,
+        occurrencesPerDay = occurrencesPerDay.toIntOrNull()?.coerceAtLeast(1) ?: 1,
         daysActive = daysActive,
         showCategoryInNotification = showCategoryInNotification,
         nextFireAt = null, // ignored by saveCategoryWithReminder; the DB's current value survives (REM-DATA-008)
@@ -86,7 +91,7 @@ data class ReminderUIState(
             times = reminder.times.ifEmpty { listOf(LocalTime.of(9, 0)) },
             windowStart = reminder.windowStart,
             windowEnd = reminder.windowEnd,
-            occurrencesPerDay = reminder.occurrencesPerDay,
+            occurrencesPerDay = reminder.occurrencesPerDay.toString(),
             daysActive = reminder.daysActive.ifEmpty { DayOfWeek.entries.toSet() },
             showCategoryInNotification = reminder.showCategoryInNotification,
         )
@@ -282,7 +287,14 @@ class CategoryEditViewModel @Inject constructor(
     fun setReminderTimes(value: List<LocalTime>) = edit { _reminderUIState.value = _reminderUIState.value.copy(times = value) }
     fun setReminderWindowStart(value: LocalTime) = edit { _reminderUIState.value = _reminderUIState.value.copy(windowStart = value) }
     fun setReminderWindowEnd(value: LocalTime) = edit { _reminderUIState.value = _reminderUIState.value.copy(windowEnd = value) }
-    fun setReminderOccurrencesPerDay(value: Int) = edit { _reminderUIState.value = _reminderUIState.value.copy(occurrencesPerDay = value) }
+    // The check wraps `edit` rather than sitting inside it: `edit` marks the form dirty, and a
+    // declined keystroke changed nothing.
+    // @spec REM-UI-006
+    fun setReminderOccurrencesPerDay(value: String) {
+        if (value.length <= 2 && value.all { it.isDigit() }) {
+            edit { _reminderUIState.value = _reminderUIState.value.copy(occurrencesPerDay = value) }
+        }
+    }
     fun setReminderDaysActive(value: Set<DayOfWeek>) = edit { _reminderUIState.value = _reminderUIState.value.copy(daysActive = value) }
     fun setReminderShowCategoryInNotification(value: Boolean) = edit { _reminderUIState.value = _reminderUIState.value.copy(showCategoryInNotification = value) }
 

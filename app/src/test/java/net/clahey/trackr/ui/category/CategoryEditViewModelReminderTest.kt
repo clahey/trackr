@@ -29,7 +29,7 @@ import org.junit.Test
 import java.time.DayOfWeek
 import java.time.LocalTime
 
-// @spec REM-UI-009, REM-UI-010, REM-UI-011, REM-PERM-003, REM-SCHED-013, REM-SCHED-014
+// @spec REM-UI-006, REM-UI-006a, REM-UI-009, REM-UI-010, REM-UI-011, REM-PERM-003, REM-SCHED-013, REM-SCHED-014
 @OptIn(ExperimentalCoroutinesApi::class)
 class CategoryEditViewModelReminderTest {
 
@@ -39,6 +39,8 @@ class CategoryEditViewModelReminderTest {
         val exactAlarms: Boolean,
         val expected: ReminderPermissionProblem,
     )
+
+    private data class OccurrencesCase(val start: String, val typed: String, val expected: String)
 
     private val dispatcher = UnconfinedTestDispatcher()
     private lateinit var repo: FakeTrackrRepository
@@ -107,6 +109,98 @@ class CategoryEditViewModelReminderTest {
         // windowStart/windowEnd default to LocalTime.MIDNIGHT; occurrencesPerDay defaults to 1.
         vm.save()
         assertEquals(SaveResult.Success, vm.saveResult.value)
+    }
+
+    // A rejected keystroke leaves the field on its previous text, so each case names where the
+    // field started as well as what was typed into it.
+    // @spec REM-UI-006
+    @Test fun `the times-per-day field accepts only empty or one or two digits`() = runTest {
+        val cases = listOf(
+            OccurrencesCase(start = "1", typed = "", expected = ""),
+            OccurrencesCase(start = "", typed = "4", expected = "4"),
+            OccurrencesCase(start = "1", typed = "12", expected = "12"),
+            OccurrencesCase(start = "1", typed = "99", expected = "99"),
+            // A digit, so the field takes it; REM-UI-006a is what refuses it, at save.
+            OccurrencesCase(start = "1", typed = "0", expected = "0"),
+            OccurrencesCase(start = "12", typed = "123", expected = "12"),
+            OccurrencesCase(start = "1", typed = "1a", expected = "1"),
+            OccurrencesCase(start = "1", typed = "a", expected = "1"),
+            OccurrencesCase(start = "1", typed = "-1", expected = "1"),
+            OccurrencesCase(start = "1", typed = "1.5", expected = "1"),
+            OccurrencesCase(start = "1", typed = " ", expected = "1"),
+            // Arabic-Indic four. A numeric keypad on an Arabic locale emits these, and they parse,
+            // so the check is "is a digit" rather than "is between ASCII 0 and 9".
+            OccurrencesCase(start = "1", typed = "٤", expected = "٤"),
+        )
+        for (case in cases) {
+            vm.setReminderOccurrencesPerDay(case.start)
+            assertEquals(case.toString(), case.start, vm.reminderUIState.value.occurrencesPerDay)
+            vm.setReminderOccurrencesPerDay(case.typed)
+            assertEquals(case.toString(), case.expected, vm.reminderUIState.value.occurrencesPerDay)
+        }
+    }
+
+    // A blocked save leaves the ViewModel untouched, so both cases run against the one instance.
+    // @spec REM-UI-006a
+    @Test fun `an empty or zero times-per-day blocks a RANDOM save`() = runTest {
+        fillRequiredFields()
+        vm.setReminderEnabled(true)
+        vm.setReminderMode(ReminderMode.RANDOM)
+        for (value in listOf("", "0")) {
+            vm.setReminderOccurrencesPerDay(value)
+            vm.save()
+            assertEquals(value, SaveResult.ValidationError("reminder_occurrences"), vm.saveResult.value)
+        }
+    }
+
+    // @spec REM-UI-006a
+    @Test fun `an empty times-per-day does not block a FIXED save`() = runTest {
+        fillRequiredFields()
+        vm.setReminderEnabled(true)
+        vm.setReminderMode(ReminderMode.FIXED)
+        vm.setReminderTimes(listOf(LocalTime.of(9, 0)))
+        vm.setReminderOccurrencesPerDay("")
+        vm.save()
+        assertEquals(SaveResult.Success, vm.saveResult.value)
+        val saved = repo.getCategories().first().single { it.name == "Category" }
+        // The field is not shown in FIXED mode and the domain type has no room for "unset", so an
+        // emptied field stores 1 rather than propagating a value RANDOM would divide by.
+        assertEquals(1, repo.getReminderForCategory(saved.id).first()!!.occurrencesPerDay)
+    }
+
+    // @spec REM-UI-006
+    @Test fun `the times-per-day text is stored as the number it spells`() = runTest {
+        fillRequiredFields()
+        vm.setReminderEnabled(true)
+        vm.setReminderMode(ReminderMode.RANDOM)
+        vm.setReminderOccurrencesPerDay("99")
+        vm.save()
+        assertEquals(SaveResult.Success, vm.saveResult.value)
+        val saved = repo.getCategories().first().single { it.name == "Category" }
+        assertEquals(99, repo.getReminderForCategory(saved.id).first()!!.occurrencesPerDay)
+    }
+
+    // @spec REM-UI-006
+    @Test fun `a stored times-per-day seeds the field as text`() = runTest {
+        val category = Category.MetaCategory(
+            id = "cat1", name = "Category", emoji = "📌", color = 0xFFE53935L,
+            valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = 0,
+        )
+        repo.setCategories(category)
+        repo.saveReminder(
+            Reminder(
+                categoryId = "cat1", enabled = true, mode = ReminderMode.RANDOM,
+                times = emptyList(), windowStart = LocalTime.MIDNIGHT, windowEnd = LocalTime.MIDNIGHT,
+                occurrencesPerDay = 7, daysActive = DayOfWeek.entries.toSet(),
+                showCategoryInNotification = false, nextFireAt = null,
+            ),
+        )
+        vm = CategoryEditViewModel(
+            repo,
+            ReminderScheduler(repo, alarms, FakeReminderNotifier(), FakePreferencesDataStore()),
+            SavedStateHandle(mapOf("categoryId" to "cat1")),
+        )
+        assertEquals("7", vm.reminderUIState.value.occurrencesPerDay)
     }
 
     // A blocked save leaves the ViewModel untouched, so every case runs against the one instance.

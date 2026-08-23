@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -76,6 +77,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -704,7 +706,7 @@ private fun ReminderSection(
     times: List<LocalTime>,
     windowStart: LocalTime,
     windowEnd: LocalTime,
-    occurrencesPerDay: Int,
+    occurrencesPerDay: String,
     daysActive: Set<DayOfWeek>,
     showCategoryInNotification: Boolean,
     validationField: String?,
@@ -713,7 +715,7 @@ private fun ReminderSection(
     onTimesChange: (List<LocalTime>) -> Unit,
     onWindowStartChange: (LocalTime) -> Unit,
     onWindowEndChange: (LocalTime) -> Unit,
-    onOccurrencesPerDayChange: (Int) -> Unit,
+    onOccurrencesPerDayChange: (String) -> Unit,
     onDaysActiveChange: (Set<DayOfWeek>) -> Unit,
     onShowCategoryInNotificationChange: (Boolean) -> Unit,
 ) {
@@ -817,18 +819,32 @@ private fun ReminderSection(
                         modifier = Modifier.weight(1f),
                     )
                 }
+                // @spec REM-UI-009
+                if (validationField == "reminder_window") {
+                    Text(
+                        stringResource(R.string.reminder_validation_window_invalid),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                // The field takes every keystroke to the ViewModel and lets it decide; the range is
+                // enforced there, where a test can reach it.
                 // @spec REM-UI-006
                 OutlinedTextField(
-                    value = occurrencesPerDay.toString(),
-                    onValueChange = { v -> v.toIntOrNull()?.let { if (it in 1..12) onOccurrencesPerDayChange(it) } },
+                    value = occurrencesPerDay,
+                    onValueChange = onOccurrencesPerDayChange,
                     label = { Text(stringResource(R.string.reminder_occurrences_per_day)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    isError = validationField == "reminder_occurrences",
                     modifier = Modifier.fillMaxWidth(),
                     // @spec CAT-UI-018
                     enabled = enabled,
                 )
-                if (validationField == "reminder_window") {
+                // @spec REM-UI-006a
+                if (validationField == "reminder_occurrences") {
                     Text(
-                        stringResource(R.string.reminder_validation_window_invalid),
+                        stringResource(R.string.reminder_validation_occurrences_invalid),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )

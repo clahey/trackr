@@ -15,7 +15,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 - docs/llds/reminders.md
 
 ### EARS
-- docs/specs/reminders.md (59 specs: REM-DATA-* [10], REM-UI-* [11], REM-SCHED-* [20], REM-NOTIF-* [12], REM-PERM-* [6])
+- docs/specs/reminders.md (60 specs: REM-DATA-* [10], REM-UI-* [12], REM-SCHED-* [20], REM-NOTIF-* [12], REM-PERM-* [6])
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/domain/ReminderSchedulingTest.kt
@@ -63,12 +63,12 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
 | Data model | REM-DATA-* (10) | all | 0 | 0 |
-| Category Edit UI | REM-UI-* (11) | all | 0 | 0 |
+| Category Edit UI | REM-UI-* (12) | all | 0 | 0 |
 | Scheduling engine | REM-SCHED-* (20) | all | 0 | 0 |
 | Notifications | REM-NOTIF-* (12) | all | 0 | 0 |
 | Permissions | REM-PERM-* (6) | all | 0 | 0 |
 
-**Summary:** 59 of 59 active specs implemented; 0 active behavioral gaps. 19 specs have no test-file `@spec` citation (finding 2) — 18 after the 2026-08-14 backfill closed REM-DATA-003/004/005 and REM-SCHED-002, plus REM-PERM-005, which needs the same Compose UI infra. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
+**Summary:** 60 of 60 active specs implemented; 0 active behavioral gaps. 18 specs have no test-file `@spec` citation (finding 2), one fewer than before finding 15 covered REM-UI-006. REM-PERM-005 is among them and needs Compose UI infrastructure, as do most of the rest. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
 
 ## Key Findings
 
@@ -105,6 +105,8 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
     REM-NOTIF-004 previously mandated *no* summary, relying on OS default stacking; that was the cause of backlog #33, since the bundle Android generates without one has no content intent and tapping it does nothing. A real summary with `setAutoCancel(false)` fixes it and is load-bearing besides: the tap leads to a list built from those notifications, so cancelling them on the way in would empty the destination. Confirmed on device. Notification identity moved from `categoryId.hashCode()` to a string tag (REM-NOTIF-007), retiring the collision risk the old Decisions row recorded as accepted and giving the shade read a way back to a category; `Notification.extras` would have served that second purpose but the tag was wanted for the first regardless. `ReminderScheduler.cancel` now cancels the notification too (REM-NOTIF-010), and one operation owns cancel-plus-summary-cleanup so three call sites cannot each forget it (REM-NOTIF-011).
 
     No window-focus re-read, deliberately: a backstop that silently repairs the list would hide a failure in the event path, showing up as staleness that heals whenever the user glances away. Tests: 7 on the pure `outstandingReminders` mapping, plus the ViewModel-level ones in `HomeViewModelTest.kt`. The notification plumbing itself — summary suppression, auto-cancel behavior, delete-intent delivery — is device-verified, not unit-tested, for the usual reason.
+
+15. **Times per day admitted three of its twelve values (fixed 2026-08-23).** The field derived its text from an `Int` and applied a `1..12` guard to each proposed edit, so any keystroke the guard rejected left the state unchanged and the field sprang back. Clearing it was therefore impossible — an empty box parses to nothing — and with the box unclearable the only way to change the number was to append to it, which from the default of `1` reaches `11` and `12` and nothing else. Every value from 2 to 10 was unreachable. The field now holds text, so it can be emptied and retyped; the range is a two-digit character check (1–99, up from 12) that runs in the ViewModel rather than in a lambda in the screen, which is what puts it under test at all. Empty and `0` are typeable and refused at save with their own message and their own key, `reminder_occurrences` — previously a bad count reported "End time must be after start time." under the Window fields, which were not what was wrong. The window error also moved up to sit under the window row it describes rather than below the count field. New spec REM-UI-006a; REM-UI-006 rewritten off "stepper," which no Compose Material 3 component has ever provided outside Wear. 5 tests in `CategoryEditViewModelReminderTest.kt`. A stored `0` would still divide the RANDOM window into nothing (`ReminderScheduling.kt:113`), which is now guarded only in the UI — the same shape as backlog #11/#12 and folded in with them there.
 
 ## Work Required
 

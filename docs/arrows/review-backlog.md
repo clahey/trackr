@@ -21,7 +21,7 @@ not survive contact with the source.
 - [x] **5** — Suppression ignores child-category events — *reminders*, verified
 - [x] **6** — Quick-log deep link re-fires on back-stack restore — *event-logging*, verified on device
 - [x] **7** — Permission banner can go stale — *category-management*, verified
-- [ ] **8** — Occurrences-per-day field rejects most input — *reminders*, unverified
+- [x] **8** — Occurrences-per-day field rejects most input — *reminders*, verified
 - [x] **9** — Exact-alarm prompt never re-checks — *reminders*, verified
 - [x] **10** — Duplicate notification-permission request — *reminders*, verified
 - [ ] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
@@ -155,18 +155,25 @@ the staleness and the waste together. Cross-segment — a new read on
 local-storage, like LS-BE-014 was.
 
 ### 8 — Occurrences-per-day field rejects most input
-`CategoryEditScreen.kt:826` (approximate — unverified)
+`CategoryEditScreen.kt:823`
 
-`onValueChange` drops anything outside 1..12 while `value` comes from state, so
-clearing the digit reverts and reachable values may be limited to those typable
-by appending. Accepted approach: back the field with a string in the UI model,
-matching `exerciseDefaultSets`/`exerciseDefaultReps`, and validate on save
-through the existing `SaveResult.ValidationError` path.
+`onValueChange` dropped anything outside 1..12 while `value` came from an `Int`
+in state, so a rejected keystroke left the state unchanged and the field sprang
+back. Clearing it was impossible — an empty box parses to nothing — and with the
+box unclearable the only way to change the number was to append to it. From the
+default of `1` that reaches `11` and `12`; every value from 2 to 10 was
+unreachable. Verified by reading the code, not reproduced on device.
+
+Fixed by holding the field as text so it can be emptied and retyped, with a
+two-digit character check (1–99) in the ViewModel rather than in the screen's
+lambda, where nothing could test it. Empty and `0` are typeable and refused at
+save under their own validation key.
 
 Unlike CAT-UI-011a — where bounds enforcement was descoped because a bad value
 only stores a bad default — `occurrencesPerDay` feeds the RANDOM sub-window
-division, so a non-positive value is an arithmetic hazard downstream. The bound
-needs an explicit spec line rather than inheriting the sets/reps precedent.
+division, so a non-positive value is an arithmetic hazard downstream. That is
+why the bound got its own spec line (REM-UI-006a) rather than inheriting the
+sets/reps precedent, which accepts any text and falls back on parse.
 
 ### 9 — Exact-alarm prompt never re-checks
 `CategoryEditScreen.kt:764`
@@ -206,6 +213,17 @@ empty times throws `NoSuchElementException` on the same unsupervised startup
 path as #11. Not writable today: `CategoryEditViewModel.kt:57` rejects the save,
 `CategoryEditScreen.kt:895` hides the delete affordance below two entries, and
 reopening refills a default.
+
+A third case belongs with these two, found while verifying #8:
+`ReminderScheduling.kt:113` computes `totalNanos / reminder.occurrencesPerDay`,
+so a stored `0` is an `ArithmeticException` on the same path, and
+`:137` divides by the `subNanos` that produces, which is itself `0` for a
+zero-length window. Also not writable today — REM-UI-006a refuses the save —
+but that is the UI enforcing a domain invariant, which is the arrangement
+REM-DATA-010 deliberately rejected for `daysActive`: the edit screen never
+saved an empty set either, and the decoder was still made to refuse one rather
+than trust that no writer ever would. Fix all three together and decide once
+what a malformed row decodes to.
 
 ### 13 — Schema `4.json` describes an unreachable version
 `app/schemas/net.clahey.trackr.data.local.TrackrDatabase/4.json`
