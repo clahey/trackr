@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.StateFlow
 import net.clahey.trackr.domain.OutstandingReminder
 import net.clahey.trackr.domain.Reminder
 
-// @spec REM-NOTIF-001, REM-NOTIF-002, REM-NOTIF-003, REM-NOTIF-004, REM-NOTIF-005
+// @spec REM-NOTIF-001, REM-NOTIF-002, REM-NOTIF-003, REM-NOTIF-004, REM-NOTIF-005, REM-NOTIF-013
 interface ReminderNotifier {
     suspend fun postReminderNotification(reminder: Reminder)
 

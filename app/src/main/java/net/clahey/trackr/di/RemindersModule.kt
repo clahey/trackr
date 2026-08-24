@@ -15,7 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-// @spec APP-REM-001
+// @spec REM-SCHED-021, REM-NOTIF-013
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RemindersModule {

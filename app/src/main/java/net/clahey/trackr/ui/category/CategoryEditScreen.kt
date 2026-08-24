@@ -148,7 +148,6 @@ fun CategoryEditScreen(
     val scope = rememberCoroutineScope()
     var showBackDiscardDialog by remember { mutableStateOf(false) }
 
-    // @spec REM-UI-001..011, REM-PERM-001..004
     val reminderUIState by viewModel.reminderUIState.collectAsState()
     val pendingPermissionConfirmation by viewModel.pendingPermissionConfirmation.collectAsState()
 
@@ -359,7 +358,6 @@ fun CategoryEditScreen(
                 }
             }
 
-            // @spec REM-UI-001..011, REM-PERM-001, REM-PERM-002
             ReminderSection(
                 enabled = isLoaded,
                 reminderOn = reminderUIState.enabled,

@@ -119,7 +119,7 @@ This applies only to the two surfaces that *display* permission state. The save-
 
 ## Scheduling Engine
 
-`ReminderScheduler` (new `@Singleton`, injected with `TrackrRepository`, `AlarmManager`, `Context`, `DataStore<Preferences>`) owns all `AlarmManager` interaction. `LocalTrackrRepository` and Room never talk to `AlarmManager` directly — persistence and OS scheduling stay separated, matching the HLD's System Design diagram.
+`ReminderScheduler` (`@Singleton`, injected with `TrackrRepository`, `AlarmScheduler`, `ReminderNotifier`, `DataStore<Preferences>`) decides when and whether to arm, and reaches the OS through two ports rather than touching it: `AlarmScheduler` wraps `AlarmManager`, `ReminderNotifier` wraps `NotificationManager`. `AndroidAlarmScheduler` and `AndroidReminderNotifier` are their only production implementations, bound in `di/RemindersModule` along with the two system services they need. Every scheduling decision is therefore reachable from a plain unit test with no Android runtime, standing `FakeAlarmScheduler` and `FakeReminderNotifier` in their place — which is what `ReminderSchedulerTest` runs against. `LocalTrackrRepository` and Room never talk to `AlarmManager` at all; persistence and OS scheduling stay separated, matching the HLD's System Design diagram.
 
 **`computeNextFireTime(reminder: Reminder, after: Instant, zone: ZoneId, random: Random = Random.Default): Instant`** — domain function (lives in `domain/ReminderScheduling.kt`, unit-testable via an injected `Random` for determinism), finds the next fire instant strictly after `after`. Every call site's `after` value:
 

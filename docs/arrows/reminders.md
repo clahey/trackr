@@ -15,7 +15,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 - docs/llds/reminders.md
 
 ### EARS
-- docs/specs/reminders.md (60 specs: REM-DATA-* [10], REM-UI-* [12], REM-SCHED-* [20], REM-NOTIF-* [12], REM-PERM-* [6])
+- docs/specs/reminders.md (62 specs: REM-DATA-* [10], REM-UI-* [12], REM-SCHED-* [21], REM-NOTIF-* [13], REM-PERM-* [6])
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/domain/ReminderSchedulingTest.kt
@@ -64,11 +64,11 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 |----------|----------|-------------|----------|------|
 | Data model | REM-DATA-* (10) | all | 0 | 0 |
 | Category Edit UI | REM-UI-* (12) | all | 0 | 0 |
-| Scheduling engine | REM-SCHED-* (20) | all | 0 | 0 |
-| Notifications | REM-NOTIF-* (12) | all | 0 | 0 |
+| Scheduling engine | REM-SCHED-* (21) | 20 | 0 | 1 |
+| Notifications | REM-NOTIF-* (13) | all | 0 | 0 |
 | Permissions | REM-PERM-* (6) | all | 0 | 0 |
 
-**Summary:** 60 of 60 active specs implemented; 0 active behavioral gaps. 18 specs have no test-file `@spec` citation (finding 2), one fewer than before finding 15 covered REM-UI-006. REM-PERM-005 is among them and needs Compose UI infrastructure, as do most of the rest. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
+**Summary:** 61 of 62 active specs implemented; 1 active gap — REM-SCHED-021's second clause, the exact-alarm check `CategoryEditViewModel.doSave` still hand-rolls instead of asking the port (backlog #18). 18 specs have no test-file `@spec` citation (finding 2), one fewer than before finding 15 covered REM-UI-006. REM-PERM-005 is among them and needs Compose UI infrastructure, as do most of the rest. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
 
 ## Key Findings
 
@@ -110,13 +110,16 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 
 16. **The decoder trusted the rows it read (fixed 2026-08-23).** `ReminderEntity.toDomain()` was partial in six places: `ReminderMode.valueOf` and `DayOfWeek.valueOf` threw on an unrecognized name, `LocalTime.parse` threw on a `times` entry or a window bound that was not `HH:mm`, and two rows that parsed perfectly well were unusable downstream — a FIXED reminder with no times reaches `first()` on an empty list, and an `occurrencesPerDay` of 0 is the divisor for RANDOM's sub-windows. The decode runs in `reconcileOnStartup`, launched into a scope whose `SupervisorJob` stops a sibling being cancelled but catches nothing, so any of them would have ended the process — on every launch, since the bad row is read again each time. None is reachable from the edit screen; this is a row the app did not write, from a restored backup or a downgraded build. Now one `try` around the whole decode falling back to `Reminder.default(categoryId)`, with the three parseable-but-unusable cases as `require` calls inside it — total by construction rather than by enumeration, so a column added later is covered without anyone remembering. REM-DATA-010 was rewritten from the `daysActive` rule it used to state into the whole-decoder rule, keeping its ID since `daysActive` is still one of the cases. The default values moved out of `ReminderUIState`'s constructor into `Reminder.default()`, which both the form and the fallback now read, chosen over constructor defaults on `Reminder` precisely so the compiler still catches a field a construction site forgot — `ReminderUIState.toReminder()` builds the row that gets persisted, where a silent default would reset a field on every save. 3 tests in `MappersTest.kt` replacing 3 narrower ones, the malformed cases table-driven against a fixture whose every field differs from the default's, so the equality assertion proves the whole bad row was discarded. Decoding does not write: the row stays on disk and is replaced the first time the user saves that category for any reason.
 
+17. **The DI module cited a spec it did not implement, and four annotations named no spec at all (fixed 2026-08-23).** `RemindersModule` carried `@spec APP-REM-001`, which owns the manifest declaring the two receivers and is already annotated there; the module's actual content — binding `AlarmScheduler` and `ReminderNotifier` to their Android implementations — was covered by nothing. That gap traced back to the LLD, which still described `ReminderScheduler` as injected with `AlarmManager` and `Context` when it has taken the two ports for some time, so there was no intent for the module to cite. The LLD now describes the ports and what they buy, REM-SCHED-021 and REM-NOTIF-013 state it, and the module cites those. Separately, four annotations used a `REM-UI-001..011` range form that is not an EARS ID and matches nothing under `grep` — `grep REM-UI-006` did not find the ViewModel implementing it. Three were duplicates at call sites of owners already carrying literal lists and were deleted rather than expanded; the fourth, `CategoryEditViewModel`'s class annotation, became the two specs the ViewModel actually owns. A fifth range sat on a comment continuation line with no `@spec` on it, which is why earlier greps found three.
+
 ## Work Required
 
 ### Must Fix
 _None._
 
 ### Should Fix
-1. Add a Room instrumented test for `REM-DATA-001` (CASCADE DELETE + PK uniqueness on `reminders`), mirroring `MigrationTest.kt`'s approach. Written and passing on 2026-08-14, then removed at the user's request — deferred, not abandoned.
+1. Close REM-SCHED-021's second clause: `CategoryEditViewModel.doSave` reads `canScheduleExactAlarms()` through a defaulted boolean parameter the UI computes, rather than asking `AlarmScheduler.canScheduleExact()` (backlog #18).
+2. Add a Room instrumented test for `REM-DATA-001` (CASCADE DELETE + PK uniqueness on `reminders`), mirroring `MigrationTest.kt`'s approach. Written and passing on 2026-08-14, then removed at the user's request — deferred, not abandoned.
 
 ### Nice to Have
 1. Screen-level Compose UI test for `CategoryEditScreen`'s Reminder section (`REM-UI-*`, `REM-PERM-001`/`002`) — no precedent yet anywhere in the project; would be a first, not a small addition.

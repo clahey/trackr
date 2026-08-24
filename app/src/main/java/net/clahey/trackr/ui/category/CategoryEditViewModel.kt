@@ -102,7 +102,7 @@ data class ReminderUIState(
 // CAT-UI-020, CAT-UI-021, CAT-UI-022, CAT-UI-030, CAT-UI-031,
 // CAT-UI-036, CAT-UI-037, CAT-UI-038, CAT-UI-040, CAT-UI-041, CAT-UI-042, CAT-UI-043,
 // CAT-UI-054, CAT-UI-062, CAT-NAV-005, CAT-NAV-006, CAT-UI-067, DM-PROC-021, APP-NAV-004,
-// REM-UI-001..011, REM-PERM-003, REM-DATA-006
+// REM-UI-001, REM-UI-011, REM-PERM-003, REM-DATA-006
 @HiltViewModel
 class CategoryEditViewModel @Inject constructor(
     private val repository: TrackrRepository,
@@ -278,7 +278,6 @@ class CategoryEditViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     } else MutableStateFlow(null)
 
-    // @spec REM-UI-001..011
     private val _reminderUIState = MutableStateFlow(ReminderUIState.fromStored(Reminder.default("")))
     val reminderUIState: StateFlow<ReminderUIState> = _reminderUIState.asStateFlow()
 

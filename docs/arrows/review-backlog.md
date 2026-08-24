@@ -28,8 +28,8 @@ not survive contact with the source.
 - [x] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
 - [ ] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified
 - [x] **14** — Fake repository does not cascade reminder deletion — *local-storage*, verified
-- [ ] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
-- [ ] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
+- [x] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
+- [x] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
 - [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
 - [ ] **18** — Exact-alarm check hand-rolled instead of using the port — *reminders*, verified
 - [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
@@ -255,6 +255,14 @@ they are reparented, not deleted.
 defeats the traceability the annotation exists for. CLAUDE.md's format is a
 comma-separated list of literal IDs.
 
+Four sites, not three: `CategoryEditViewModel.kt:105` carries one on a comment
+continuation line that has no `@spec` on it, so a grep for `@spec.*\.\.` misses
+it. Three of the four were duplicates at call sites of owners that already
+carried literal lists — `ReminderSection`'s own definition, and the ViewModel's
+class annotation — and were deleted rather than expanded. The fourth became the
+two specs the ViewModel actually owns, REM-UI-001 and REM-UI-011; everything
+else it used to claim is annotated on the member that implements it.
+
 ### 16 — `RemindersModule` cites a spec it does not implement
 `RemindersModule.kt:18`
 
@@ -263,6 +271,13 @@ two receivers — already annotated at its real entry point in the manifest. The
 module's actual bindings (`AlarmScheduler`, `ReminderNotifier`, `AlarmManager`,
 `NotificationManager`) are covered by no spec, so this is code with no correct
 intent linkage plus a polluted citation.
+
+The missing intent traced upstream: the LLD still described `ReminderScheduler`
+as injected with `AlarmManager` and `Context`, so there was nothing for the
+module to cite. REM-SCHED-021 and REM-NOTIF-013 now state what the ports are
+for — every scheduling decision reachable from a unit test with no Android
+runtime — and the module cites those. REM-SCHED-021 also carries the
+requirement #18 is about, and stays open until it lands.
 
 ### 17 — Four copies of the time-picker dialog
 `CategoryEditScreen.kt:917`, `:932`, `:966`, and `ui/components/TimestampField.kt:144`
@@ -286,6 +301,9 @@ Down to one site. The two that *displayed* this state read through
 stopped reading it at all after #29–#31. What remains is `doSave`'s check, which
 REM-PERM-003 requires be read at the moment of the save — so it wants the port,
 not the composable.
+
+Now has a spec: REM-SCHED-021's second clause, added by #16, is the segment's
+one open gap.
 
 ### 19 — `onAlarmFired` scans the whole event table for a MAX
 `ReminderScheduler.kt:59`

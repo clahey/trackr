@@ -3,6 +3,7 @@ package net.clahey.trackr.reminders
 import net.clahey.trackr.data.AlarmScheduler
 import java.time.Instant
 
+// @spec REM-SCHED-021
 class FakeAlarmScheduler(private var exactAvailable: Boolean = true) : AlarmScheduler {
     val armed = mutableMapOf<String, Instant>()
     val armCalls = mutableListOf<Pair<String, Instant>>()
