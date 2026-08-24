@@ -101,7 +101,7 @@ arrows:
     blocks: []
     blockedBy: [local-storage, category-management]
     detail: reminders.md
-    # 2026-08-23: REM-SCHED-021 and REM-NOTIF-013 added (62 specs, was 60) for the two ports the DI
+    # 2026-08-23: REM-SCHED-021 and REM-NOTIF-013 added (62 specs, was 60) for the two interfaces the DI
     # module binds, which no spec covered while the module cited APP-REM-001, a spec it does not
     # implement. REM-SCHED-021's second clause is the segment's one active gap (backlog #18). Four
     # REM-UI-001..011 range annotations, which match nothing under grep, are gone: three were

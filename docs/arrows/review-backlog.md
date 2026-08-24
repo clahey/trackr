@@ -31,7 +31,7 @@ not survive contact with the source.
 - [x] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
 - [x] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
 - [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
-- [ ] **18** — Exact-alarm check hand-rolled instead of using the port — *reminders*, verified
+- [ ] **18** — Exact-alarm check hand-rolled instead of asking `AlarmScheduler` — *reminders*, verified
 - [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
 - [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, verified
 - [ ] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
@@ -274,9 +274,9 @@ intent linkage plus a polluted citation.
 
 The missing intent traced upstream: the LLD still described `ReminderScheduler`
 as injected with `AlarmManager` and `Context`, so there was nothing for the
-module to cite. REM-SCHED-021 and REM-NOTIF-013 now state what the ports are
-for — every scheduling decision reachable from a unit test with no Android
-runtime — and the module cites those. REM-SCHED-021 also carries the
+module to cite. REM-SCHED-021 and REM-NOTIF-013 now state what the two
+interfaces are for — every scheduling decision reachable from a unit test with
+no Android runtime — and the module cites those. REM-SCHED-021 also carries the
 requirement #18 is about, and stays open until it lands.
 
 ### 17 — Four copies of the time-picker dialog
@@ -287,7 +287,7 @@ The same `rememberTimePickerState` + `AlertDialog` body appears three times in
 `TimePickerDialog(initial, onConfirm, onDismiss)` into `ui/components/` and have
 all four call it.
 
-### 18 — Exact-alarm check hand-rolled instead of using the port
+### 18 — Exact-alarm check hand-rolled instead of asking `AlarmScheduler`
 `CategoryEditScreen.kt:159`
 
 `Build.VERSION.SDK_INT < S || canScheduleExactAlarms()` is written out in the
@@ -299,8 +299,8 @@ parameters.
 Down to one site. The two that *displayed* this state read through
 `rememberExactAlarmAvailable()` after #9/#10, and the banner's tap handler
 stopped reading it at all after #29–#31. What remains is `doSave`'s check, which
-REM-PERM-003 requires be read at the moment of the save — so it wants the port,
-not the composable.
+REM-PERM-003 requires be read at the moment of the save — so it wants
+`AlarmScheduler`, not the composable.
 
 Now has a spec: REM-SCHED-021's second clause, added by #16, is the segment's
 one open gap.
