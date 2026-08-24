@@ -204,7 +204,8 @@ class CategoryEditViewModelReminderTest {
     }
 
     // A blocked save leaves the ViewModel untouched, so every case runs against the one instance.
-    // @spec REM-PERM-003, REM-PERM-006
+    // Exact-alarm availability is set on the fake, not passed to save — REM-SCHED-021.
+    // @spec REM-PERM-003, REM-PERM-006, REM-SCHED-021
     @Test fun `each permission problem blocks the save and is named in the confirmation`() = runTest {
         val cases = listOf(
             PermissionCase(notifications = false, channel = true, exactAlarms = true,
@@ -217,10 +218,10 @@ class CategoryEditViewModelReminderTest {
         fillRequiredFields()
         vm.setReminderEnabled(true)
         for (case in cases) {
+            alarms.setExactAvailable(case.exactAlarms)
             vm.save(
                 notificationPermissionGranted = case.notifications,
                 reminderChannelEnabled = case.channel,
-                exactAlarmAvailable = case.exactAlarms,
             )
             assertEquals(case.toString(), case.expected, vm.pendingPermissionConfirmation.value)
             assertEquals(case.toString(), SaveResult.Idle, vm.saveResult.value)
@@ -232,7 +233,7 @@ class CategoryEditViewModelReminderTest {
     @Test fun `forceSaveDespitePermission proceeds despite missing permission`() = runTest {
         fillRequiredFields()
         vm.setReminderEnabled(true)
-        vm.save(notificationPermissionGranted = false, exactAlarmAvailable = true, forceSaveDespitePermission = true)
+        vm.save(notificationPermissionGranted = false, forceSaveDespitePermission = true)
         assertNull(vm.pendingPermissionConfirmation.value)
         assertEquals(SaveResult.Success, vm.saveResult.value)
     }
@@ -241,10 +242,10 @@ class CategoryEditViewModelReminderTest {
     @Test fun `missing permissions do not block a save with the reminder off`() = runTest {
         fillRequiredFields()
         vm.setReminderEnabled(false)
+        alarms.setExactAvailable(false)
         vm.save(
             notificationPermissionGranted = false,
             reminderChannelEnabled = false,
-            exactAlarmAvailable = false,
         )
         assertNull(vm.pendingPermissionConfirmation.value)
         assertEquals(SaveResult.Success, vm.saveResult.value)

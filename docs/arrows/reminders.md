@@ -64,11 +64,11 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 |----------|----------|-------------|----------|------|
 | Data model | REM-DATA-* (10) | all | 0 | 0 |
 | Category Edit UI | REM-UI-* (12) | all | 0 | 0 |
-| Scheduling engine | REM-SCHED-* (21) | 20 | 0 | 1 |
+| Scheduling engine | REM-SCHED-* (21) | all | 0 | 0 |
 | Notifications | REM-NOTIF-* (13) | all | 0 | 0 |
 | Permissions | REM-PERM-* (6) | all | 0 | 0 |
 
-**Summary:** 61 of 62 active specs implemented; 1 active gap — REM-SCHED-021's second clause, the exact-alarm check `CategoryEditViewModel.doSave` still hand-rolls instead of asking `AlarmScheduler` (backlog #18). 18 specs have no test-file `@spec` citation (finding 2), one fewer than before finding 15 covered REM-UI-006. REM-PERM-005 is among them and needs Compose UI infrastructure, as do most of the rest. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
+**Summary:** 62 of 62 active specs implemented; 0 active behavioral gaps. 18 specs have no test-file `@spec` citation (finding 2), one fewer than before finding 15 covered REM-UI-006. REM-PERM-005 is among them and needs Compose UI infrastructure, as do most of the rest. All 49 specs text-verified against actual code as of the 2026-08-12 deep pass (finding 6).
 
 ## Key Findings
 
@@ -112,14 +112,15 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 
 17. **The DI module cited a spec it did not implement, and four annotations named no spec at all (fixed 2026-08-23).** `RemindersModule` carried `@spec APP-REM-001`, which owns the manifest declaring the two receivers and is already annotated there; the module's actual content — binding `AlarmScheduler` and `ReminderNotifier` to their Android implementations — was covered by nothing. That gap traced back to the LLD, which still described `ReminderScheduler` as injected with `AlarmManager` and `Context` when it has taken the two interfaces for some time, so there was no intent for the module to cite. The LLD now describes them and what they buy, REM-SCHED-021 and REM-NOTIF-013 state it, and the module cites those. Separately, four annotations used a `REM-UI-001..011` range form that is not an EARS ID and matches nothing under `grep` — `grep REM-UI-006` did not find the ViewModel implementing it. Three were duplicates at call sites of owners already carrying literal lists and were deleted rather than expanded; the fourth, `CategoryEditViewModel`'s class annotation, became the two specs the ViewModel actually owns. A fifth range sat on a comment continuation line with no `@spec` on it, which is why earlier greps found three.
 
+18. **The save-time exact-alarm check was unreachable from a test (fixed 2026-08-23).** `CategoryEditScreen` computed `Build.VERSION.SDK_INT < S || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()` in the composable and passed the answer to `save()` as a defaulted boolean, so the branch that decides whether to block a save on a permission problem could only ever be tested by supplying the answer to it — `AndroidAlarmScheduler.canScheduleExact()` already existed, already handled the pre-API-31 case, and went uncalled. `ReminderScheduler` now exposes `canScheduleExact()` and `save()` asks it, dropping the parameter. The `ReminderScheduler` route rather than injecting `AlarmScheduler` into the ViewModel: the ViewModel already depends on the scheduler and nothing else scheduling-related, and roughly twenty construction sites across four test files would otherwise have gained an argument they have no interest in. The permission table test now sets availability on `FakeAlarmScheduler` instead of passing it, which is what makes it a test of the decision rather than of the assertion. Closes REM-SCHED-021 and returns the segment to no gaps.
+
 ## Work Required
 
 ### Must Fix
 _None._
 
 ### Should Fix
-1. Close REM-SCHED-021's second clause: `CategoryEditViewModel.doSave` reads `canScheduleExactAlarms()` through a defaulted boolean parameter the UI computes, rather than asking `AlarmScheduler.canScheduleExact()` (backlog #18).
-2. Add a Room instrumented test for `REM-DATA-001` (CASCADE DELETE + PK uniqueness on `reminders`), mirroring `MigrationTest.kt`'s approach. Written and passing on 2026-08-14, then removed at the user's request — deferred, not abandoned.
+1. Add a Room instrumented test for `REM-DATA-001` (CASCADE DELETE + PK uniqueness on `reminders`), mirroring `MigrationTest.kt`'s approach. Written and passing on 2026-08-14, then removed at the user's request — deferred, not abandoned.
 
 ### Nice to Have
 1. Screen-level Compose UI test for `CategoryEditScreen`'s Reminder section (`REM-UI-*`, `REM-PERM-001`/`002`) — no precedent yet anywhere in the project; would be a first, not a small addition.

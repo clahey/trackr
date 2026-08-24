@@ -100,6 +100,9 @@ class ReminderScheduler @Inject constructor(
         }
     }
 
+    // @spec REM-SCHED-021
+    fun canScheduleExact(): Boolean = alarmScheduler.canScheduleExact()
+
     // @spec REM-SCHED-005, REM-SCHED-017, REM-SCHED-019
     suspend fun reconcileOnStartup(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
         val wasExactAvailable = dataStore.data.map { it[lastKnownExactAlarmAvailableKey] ?: false }.first()

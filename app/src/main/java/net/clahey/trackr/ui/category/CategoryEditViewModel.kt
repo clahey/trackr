@@ -382,7 +382,6 @@ class CategoryEditViewModel @Inject constructor(
     suspend fun save(
         notificationPermissionGranted: Boolean = true,
         reminderChannelEnabled: Boolean = true,
-        exactAlarmAvailable: Boolean = true,
         forceSaveDespitePermission: Boolean = false,
     ) {
         // @spec CAT-UI-018 — saving before the seed reads land would persist defaults over stored
@@ -411,11 +410,11 @@ class CategoryEditViewModel @Inject constructor(
             return
         }
 
-        // @spec REM-PERM-003
+        // @spec REM-PERM-003, REM-SCHED-021
         val permissionProblem = reminderPermissionProblem(
             notificationsEnabled = notificationPermissionGranted,
             reminderChannelEnabled = reminderChannelEnabled,
-            exactAlarmAvailable = exactAlarmAvailable,
+            exactAlarmAvailable = reminderScheduler.canScheduleExact(),
         )
         if (_reminderUIState.value.enabled && !forceSaveDespitePermission && permissionProblem != null) {
             _pendingPermissionConfirmation.value = permissionProblem

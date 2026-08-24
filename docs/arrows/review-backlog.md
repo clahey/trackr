@@ -31,7 +31,7 @@ not survive contact with the source.
 - [x] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
 - [x] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
 - [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
-- [ ] **18** — Exact-alarm check hand-rolled instead of asking `AlarmScheduler` — *reminders*, verified
+- [x] **18** — Exact-alarm check hand-rolled instead of asking `AlarmScheduler` — *reminders*, verified
 - [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
 - [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, verified
 - [ ] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
@@ -302,8 +302,15 @@ stopped reading it at all after #29–#31. What remains is `doSave`'s check, whi
 REM-PERM-003 requires be read at the moment of the save — so it wants
 `AlarmScheduler`, not the composable.
 
-Now has a spec: REM-SCHED-021's second clause, added by #16, is the segment's
-one open gap.
+Fixed by exposing `canScheduleExact()` on `ReminderScheduler` and having `save()`
+ask it, which drops the parameter. Via `ReminderScheduler` rather than injecting
+`AlarmScheduler` into the ViewModel: the ViewModel already depends on the
+scheduler and nothing else scheduling-related, and roughly twenty construction
+sites across four test files would otherwise have gained an argument they have
+no interest in. The permission table test now sets availability on
+`FakeAlarmScheduler` instead of passing it, which is what turns it into a test
+of the decision rather than of its own assertion. Closes REM-SCHED-021, added
+by #16.
 
 ### 19 — `onAlarmFired` scans the whole event table for a MAX
 `ReminderScheduler.kt:59`

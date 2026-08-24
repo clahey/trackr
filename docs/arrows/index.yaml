@@ -103,7 +103,10 @@ arrows:
     detail: reminders.md
     # 2026-08-23: REM-SCHED-021 and REM-NOTIF-013 added (62 specs, was 60) for the two interfaces the DI
     # module binds, which no spec covered while the module cited APP-REM-001, a spec it does not
-    # implement. REM-SCHED-021's second clause is the segment's one active gap (backlog #18). Four
+    # implement. REM-SCHED-021 was closed the same day by backlog #18: the save-time exact-alarm
+    # check was computed in the composable and handed to save() as a defaulted boolean, so the
+    # branch that blocks a save on a permission problem could only be tested by supplying its own
+    # answer. ReminderScheduler now exposes canScheduleExact() and save() asks it. Four
     # REM-UI-001..011 range annotations, which match nothing under grep, are gone: three were
     # duplicates at call sites, one became literal IDs. See reminders.md finding 17.
     next: "19 of 51 specs have no test-file @spec citation (18 of 49 as of the 2026-08-14 backfill, plus REM-PERM-005, which needs Compose UI infra). REM-DATA-001 needs a Room instrumented test — one was written and passing on 2026-08-14, then removed at the user's request; deferred, not abandoned. REM-UI-*/REM-PERM-*/REM-NOTIF-*/REM-SCHED-009/010 need instrumented test infra (Compose UI, notification, real-AlarmManager) that doesn't exist anywhere in the project yet, not reminders-specific."

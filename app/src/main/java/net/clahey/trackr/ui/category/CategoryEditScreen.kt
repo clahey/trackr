@@ -1,7 +1,6 @@
 package net.clahey.trackr.ui.category
 
 import android.annotation.SuppressLint
-import android.app.AlarmManager
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -153,15 +152,12 @@ fun CategoryEditScreen(
 
     val context = LocalContext.current
     fun notificationsGranted() = NotificationManagerCompat.from(context).areNotificationsEnabled()
-    fun exactAlarmAvailable() = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-        context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
 
     fun doSave(force: Boolean = false) {
         scope.launch {
             viewModel.save(
                 notificationPermissionGranted = notificationsGranted(),
                 reminderChannelEnabled = reminderChannelEnabled(context),
-                exactAlarmAvailable = exactAlarmAvailable(),
                 forceSaveDespitePermission = force,
             )
         }
