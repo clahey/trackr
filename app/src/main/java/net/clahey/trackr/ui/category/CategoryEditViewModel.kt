@@ -124,13 +124,17 @@ class CategoryEditViewModel @Inject constructor(
     private val _hasUserEdits = MutableStateFlow(false)
     val hasUserEdits: StateFlow<Boolean> = _hasUserEdits.asStateFlow()
 
-    // @spec CAT-UI-018 — one flag per initial-state read, seeded true when the current mode doesn't
-    // issue that read (these mirror init's `when` branches). Each is flipped on the read's
-    // *completion*, not its success, so a category with no reminder row still opens the gate.
-    private val _categoryLoaded = MutableStateFlow(categoryId == null)
-    private val _reminderLoaded = MutableStateFlow(categoryId == null)
-    private val _parentLoaded = MutableStateFlow(categoryId != null || parentId == null)
-    private val _colorLoaded = MutableStateFlow(categoryId != null || parentId != null)
+    // @spec CAT-UI-018 — one flag per initial-state read, flipped on the read's *completion*, not
+    // its success, so a category with no reminder row still opens the gate. Which reads a mode
+    // issues is stated once, by init's `when`: each branch calls markNotApplicable for the rest.
+    private val _categoryLoaded = MutableStateFlow(false)
+    private val _reminderLoaded = MutableStateFlow(false)
+    private val _parentLoaded = MutableStateFlow(false)
+    private val _colorLoaded = MutableStateFlow(false)
+
+    private fun markNotApplicable(vararg flags: MutableStateFlow<Boolean>) {
+        flags.forEach { it.value = true }
+    }
 
     // @spec CAT-UI-018
     val isLoaded: StateFlow<Boolean> =
@@ -281,21 +285,15 @@ class CategoryEditViewModel @Inject constructor(
     private val _reminderUIState = MutableStateFlow(ReminderUIState.fromStored(Reminder.default("")))
     val reminderUIState: StateFlow<ReminderUIState> = _reminderUIState.asStateFlow()
 
-    fun setReminderEnabled(value: Boolean) = edit { _reminderUIState.value = _reminderUIState.value.copy(enabled = value) }
-    fun setReminderMode(value: ReminderMode) = edit { _reminderUIState.value = _reminderUIState.value.copy(mode = value) }
-    fun setReminderTimes(value: List<LocalTime>) = edit { _reminderUIState.value = _reminderUIState.value.copy(times = value) }
-    fun setReminderWindowStart(value: LocalTime) = edit { _reminderUIState.value = _reminderUIState.value.copy(windowStart = value) }
-    fun setReminderWindowEnd(value: LocalTime) = edit { _reminderUIState.value = _reminderUIState.value.copy(windowEnd = value) }
-    // The check wraps `edit` rather than sitting inside it: `edit` marks the form dirty, and a
-    // declined keystroke changed nothing.
+    // Only an edit to occurrencesPerDay can fail this, since a rejected one never enters the state
+    // the next copy() is built from. The check wraps `edit` rather than sitting inside it: `edit`
+    // marks the form dirty, and a declined keystroke changed nothing.
     // @spec REM-UI-006
-    fun setReminderOccurrencesPerDay(value: String) {
-        if (value.length <= 2 && value.all { it.isDigit() }) {
-            edit { _reminderUIState.value = _reminderUIState.value.copy(occurrencesPerDay = value) }
+    fun setReminderUIState(value: ReminderUIState) {
+        if (value.occurrencesPerDay.length <= 2 && value.occurrencesPerDay.all { it.isDigit() }) {
+            edit { _reminderUIState.value = value }
         }
     }
-    fun setReminderDaysActive(value: Set<DayOfWeek>) = edit { _reminderUIState.value = _reminderUIState.value.copy(daysActive = value) }
-    fun setReminderShowCategoryInNotification(value: Boolean) = edit { _reminderUIState.value = _reminderUIState.value.copy(showCategoryInNotification = value) }
 
     // @spec REM-PERM-003
     private val _pendingPermissionConfirmation = MutableStateFlow<ReminderPermissionProblem?>(null)
@@ -306,6 +304,7 @@ class CategoryEditViewModel @Inject constructor(
     init {
         when {
             categoryId != null -> {
+                markNotApplicable(_parentLoaded, _colorLoaded)
                 viewModelScope.launch {
                     val cat = repository.getCategoryById(categoryId).first()
                     // @spec CAT-UI-018 — the not-found navigation below is not gated; it fires as
@@ -346,6 +345,7 @@ class CategoryEditViewModel @Inject constructor(
 
             parentId != null -> {
                 // SubCategory create mode. Do NOT advance color counter (CAT-UI-043).
+                markNotApplicable(_categoryLoaded, _reminderLoaded, _colorLoaded)
                 viewModelScope.launch {
                     val parent = repository.getCategoryById(parentId).first()
                     // @spec CAT-UI-018
@@ -364,6 +364,7 @@ class CategoryEditViewModel @Inject constructor(
 
             else -> {
                 // MetaCategory create mode.
+                markNotApplicable(_categoryLoaded, _reminderLoaded, _parentLoaded)
                 _emojiUIState.value = EmojiUIState(EmojiMode.CUSTOM, "")
                 _valueTypeState.value = ValueType.None
                 // @spec CAT-UI-043

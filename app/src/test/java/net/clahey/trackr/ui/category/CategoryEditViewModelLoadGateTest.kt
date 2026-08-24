@@ -112,7 +112,7 @@ class CategoryEditViewModelLoadGateTest {
 
         val vm = editVm("c1")
         vm.setName("typed while loading")
-        vm.setReminderEnabled(true)
+        vm.setReminderUIState(vm.reminderUIState.value.copy(enabled = true))
 
         gate.complete(Unit)
 

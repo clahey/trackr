@@ -356,23 +356,9 @@ fun CategoryEditScreen(
 
             ReminderSection(
                 enabled = isLoaded,
-                reminderOn = reminderUIState.enabled,
-                mode = reminderUIState.mode,
-                times = reminderUIState.times,
-                windowStart = reminderUIState.windowStart,
-                windowEnd = reminderUIState.windowEnd,
-                occurrencesPerDay = reminderUIState.occurrencesPerDay,
-                daysActive = reminderUIState.daysActive,
-                showCategoryInNotification = reminderUIState.showCategoryInNotification,
+                state = reminderUIState,
                 validationField = (saveResult as? SaveResult.ValidationError)?.field,
-                onReminderOnChange = { viewModel.setReminderEnabled(it) },
-                onModeChange = { viewModel.setReminderMode(it) },
-                onTimesChange = { viewModel.setReminderTimes(it) },
-                onWindowStartChange = { viewModel.setReminderWindowStart(it) },
-                onWindowEndChange = { viewModel.setReminderWindowEnd(it) },
-                onOccurrencesPerDayChange = { viewModel.setReminderOccurrencesPerDay(it) },
-                onDaysActiveChange = { viewModel.setReminderDaysActive(it) },
-                onShowCategoryInNotificationChange = { viewModel.setReminderShowCategoryInNotification(it) },
+                onStateChange = { viewModel.setReminderUIState(it) },
             )
 
             // @spec CAT-UI-067, CAT-UI-018
@@ -692,26 +678,12 @@ private fun formatTime(time: LocalTime): String = time.format(DateTimeFormatter.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReminderSection(
-    // @spec CAT-UI-018 — the screen's load gate. `reminderOn` is the reminder's own on/off state
+    // @spec CAT-UI-018 — the screen's load gate. `state.enabled` is the reminder's own on/off state
     // (REM-UI-002/003); `enabled` keeps Compose's meaning of "this control accepts input".
     enabled: Boolean,
-    reminderOn: Boolean,
-    mode: ReminderMode,
-    times: List<LocalTime>,
-    windowStart: LocalTime,
-    windowEnd: LocalTime,
-    occurrencesPerDay: String,
-    daysActive: Set<DayOfWeek>,
-    showCategoryInNotification: Boolean,
+    state: ReminderUIState,
     validationField: String?,
-    onReminderOnChange: (Boolean) -> Unit,
-    onModeChange: (ReminderMode) -> Unit,
-    onTimesChange: (List<LocalTime>) -> Unit,
-    onWindowStartChange: (LocalTime) -> Unit,
-    onWindowEndChange: (LocalTime) -> Unit,
-    onOccurrencesPerDayChange: (String) -> Unit,
-    onDaysActiveChange: (Set<DayOfWeek>) -> Unit,
-    onShowCategoryInNotificationChange: (Boolean) -> Unit,
+    onStateChange: (ReminderUIState) -> Unit,
 ) {
     val context = LocalContext.current
     // The grant itself is live-checked elsewhere; this only tracks whether the dialog is up, so the
@@ -746,14 +718,14 @@ private fun ReminderSection(
                 Text(stringResource(R.string.reminder_section_title))
             }
             Switch(
-                checked = reminderOn,
+                checked = state.enabled,
                 enabled = enabled,
-                onCheckedChange = onReminderOnChange,
+                onCheckedChange = { onStateChange(state.copy(enabled = it)) },
             )
         }
 
         // @spec REM-UI-003
-        if (reminderOn) {
+        if (state.enabled) {
             // Fires once each time this content is entered — turning the section on, or
             // reopening an already-on one — which is both of the triggers REM-PERM-001 names, so
             // the Switch itself doesn't request as well.
@@ -772,22 +744,26 @@ private fun ReminderSection(
 
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
-                    selected = mode == ReminderMode.FIXED,
+                    selected = state.mode == ReminderMode.FIXED,
                     enabled = enabled,
-                    onClick = { onModeChange(ReminderMode.FIXED) },
+                    onClick = { onStateChange(state.copy(mode = ReminderMode.FIXED)) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 ) { Text(stringResource(R.string.reminder_mode_fixed)) }
                 SegmentedButton(
-                    selected = mode == ReminderMode.RANDOM,
+                    selected = state.mode == ReminderMode.RANDOM,
                     enabled = enabled,
-                    onClick = { onModeChange(ReminderMode.RANDOM) },
+                    onClick = { onStateChange(state.copy(mode = ReminderMode.RANDOM)) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 ) { Text(stringResource(R.string.reminder_mode_random)) }
             }
 
-            if (mode == ReminderMode.FIXED) {
+            if (state.mode == ReminderMode.FIXED) {
                 // @spec REM-UI-004
-                ReminderTimesEditor(times = times, enabled = enabled, onTimesChange = onTimesChange)
+                ReminderTimesEditor(
+                    times = state.times,
+                    enabled = enabled,
+                    onTimesChange = { onStateChange(state.copy(times = it)) },
+                )
                 if (validationField == "reminder_times") {
                     Text(
                         stringResource(R.string.reminder_validation_no_time),
@@ -800,16 +776,16 @@ private fun ReminderSection(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     TimePickerFieldButton(
                         label = stringResource(R.string.reminder_window_start),
-                        time = windowStart,
+                        time = state.windowStart,
                         enabled = enabled,
-                        onTimeChange = onWindowStartChange,
+                        onTimeChange = { onStateChange(state.copy(windowStart = it)) },
                         modifier = Modifier.weight(1f),
                     )
                     TimePickerFieldButton(
                         label = stringResource(R.string.reminder_window_end),
-                        time = windowEnd,
+                        time = state.windowEnd,
                         enabled = enabled,
-                        onTimeChange = onWindowEndChange,
+                        onTimeChange = { onStateChange(state.copy(windowEnd = it)) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -825,8 +801,8 @@ private fun ReminderSection(
                 // enforced there, where a test can reach it.
                 // @spec REM-UI-006
                 OutlinedTextField(
-                    value = occurrencesPerDay,
-                    onValueChange = onOccurrencesPerDayChange,
+                    value = state.occurrencesPerDay,
+                    onValueChange = { onStateChange(state.copy(occurrencesPerDay = it)) },
                     label = { Text(stringResource(R.string.reminder_occurrences_per_day)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
@@ -851,7 +827,11 @@ private fun ReminderSection(
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
             )
-            DaysOfWeekRow(daysActive = daysActive, enabled = enabled, onDaysActiveChange = onDaysActiveChange)
+            DaysOfWeekRow(
+                daysActive = state.daysActive,
+                enabled = enabled,
+                onDaysActiveChange = { onStateChange(state.copy(daysActive = it)) },
+            )
             if (validationField == "reminder_days") {
                 Text(
                     stringResource(R.string.reminder_validation_no_active_day),
@@ -871,9 +851,9 @@ private fun ReminderSection(
                     modifier = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
                 )
                 Switch(
-                    checked = showCategoryInNotification,
+                    checked = state.showCategoryInNotification,
                     enabled = enabled,
-                    onCheckedChange = onShowCategoryInNotificationChange,
+                    onCheckedChange = { onStateChange(state.copy(showCategoryInNotification = it)) },
                 )
             }
         }
