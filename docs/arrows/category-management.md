@@ -91,6 +91,8 @@ _Note: the drag-to-reorder **widget** itself (`DragReorderList.kt`) is owned by 
 
 **Audit-method lesson:** the false negative on CAT-UI-015/016 came from grepping Kotlin source for a literal UI string instead of accounting for string-resource indirection. Future audits of this segment (and others using `stringResource(R.string....)`) should grep `strings.xml` for the resolved text, or grep for the resource name itself, not the displayed string.
 
+8. **Two shape fixes in `CategoryEditViewModel`, no behavior change (2026-08-23).** Each of the eight reminder fields was spelled out five times — a `ReminderUIState` property, a `ReminderSection` parameter, an `onXChange` parameter, a wiring lambda at the call site, and a `copy()` setter — so adding a field meant editing five places and a mistyped `copy()` target compiled silently. One `setReminderUIState` plus `onStateChange` collapses all five to one. `setReminderOccurrencesPerDay` was the only setter carrying logic, the REM-UI-006 digit filter, so the single setter applies it to the whole update: only an edit to `occurrencesPerDay` can fail it, since a rejected one never enters the state the next `copy()` is built from. Separately, CAT-UI-018's four load flags were seeded with correlated expressions that re-encoded init's `when` dispatch a second time; all four now seed `false` and each branch opens by naming the reads it does not issue. No spec changed — the LLD already describes `isLoaded` as the conjunction of the flags relevant to the current mode, which holds under either shape. Backlog #21/#22.
+
 ## Work Required
 
 ### Must Fix (before MVP / Play Store testing)

@@ -34,8 +34,8 @@ not survive contact with the source.
 - [x] **18** — Exact-alarm check hand-rolled instead of asking `AlarmScheduler` — *reminders*, verified
 - [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
 - [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, verified
-- [ ] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
-- [ ] **22** — Localize the load flags to their `when` branches — *category-management*, PR comment
+- [x] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
+- [x] **22** — Localize the load flags to their `when` branches — *category-management*, PR comment
 - [x] **23** — `HomeScreen` empty check should be a positive test — *event-logging*, PR comment
 - [x] **24** — LLD should say the value is preserved — *local-storage*, PR comment
 - [x] **25** — Conversation cruft belongs in the decision table — *local-storage*, PR comment
