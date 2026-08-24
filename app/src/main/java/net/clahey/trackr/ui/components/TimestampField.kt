@@ -3,21 +3,16 @@ package net.clahey.trackr.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import net.clahey.trackr.R
 import java.time.Instant
 import java.time.LocalDate
@@ -122,26 +116,14 @@ fun TimestampField(timestamp: Instant, onTimestampChange: (Instant) -> Unit, ena
     }
 
     if (showTimePicker) {
-        val timeState = rememberTimePickerState(
-            initialHour = localDateTime.hour,
-            initialMinute = localDateTime.minute,
+        TimePickerDialog(
+            initial = LocalTime.of(localDateTime.hour, localDateTime.minute),
+            onConfirm = {
+                val date = localDateTime.toLocalDate()
+                onTimestampChange(combineDateAndTime(date, it.hour, it.minute, zone))
+                showTimePicker = false
+            },
+            onDismiss = { showTimePicker = false },
         )
-        Dialog(onDismissRequest = { showTimePicker = false }) {
-            Surface {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    TimePicker(state = timeState)
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = { showTimePicker = false }) {
-                            Text(stringResource(R.string.action_cancel))
-                        }
-                        TextButton(onClick = {
-                            val date = localDateTime.toLocalDate()
-                            onTimestampChange(combineDateAndTime(date, timeState.hour, timeState.minute, zone))
-                            showTimePicker = false
-                        }) { Text(stringResource(R.string.action_ok)) }
-                    }
-                }
-            }
-        }
     }
 }

@@ -31,7 +31,7 @@ past the merge, with the reason in its detail section.
 - [x] **14** — Fake repository does not cascade reminder deletion — *local-storage*, verified
 - [x] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
 - [x] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
-- [ ] **17** — Four copies of the time-picker dialog — *category-management*, verified
+- [x] **17** — Four copies of the time-picker dialog — *event-logging*, verified
 - [x] **18** — Exact-alarm check hand-rolled instead of asking `AlarmScheduler` — *reminders*, verified
 - [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
 - [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, verified
@@ -295,6 +295,16 @@ The same `rememberTimePickerState` + `AlertDialog` body appears three times in
 `CategoryEditScreen` and a fourth time in the shared component. Extract one
 `TimePickerDialog(initial, onConfirm, onDismiss)` into `ui/components/` and have
 all four call it.
+
+Done. The component is owned by the event-logging segment, not
+category-management as this item first labelled it: `TimestampField` is one of
+its callers, and that LLD already carried the reason the component exists — M3
+ships a `DatePickerDialog` and no `TimePicker` equivalent. A components-level
+LLD was considered and rejected; `ui/components/` is a directory, not an intent,
+and its contents belong to five different segments. Extraction surfaced that the
+add-time picker's 09:00 opening hour was hardcoded and unspecified, now stated in
+REM-UI-004. `TimestampField`'s dialog was the one hand-built from
+`Dialog`/`Surface` and picks up `AlertDialog`'s padding and elevation.
 
 ### 18 — Exact-alarm check hand-rolled instead of asking `AlarmScheduler`
 `CategoryEditScreen.kt:159`

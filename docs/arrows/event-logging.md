@@ -18,6 +18,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 - docs/specs/event-logging.md (118 specs: EL-NAV-*, EL-PROC-*, EL-UI-*)
 
 ### Tests
+- app/src/androidTest/java/net/clahey/trackr/ui/components/TimePickerDialogTest.kt
 - app/src/androidTest/java/net/clahey/trackr/ui/components/ValueInputFieldFocusTest.kt
 - app/src/test/java/net/clahey/trackr/FakeTrackrRepository.kt
 - app/src/test/java/net/clahey/trackr/ui/components/FormatValueTest.kt
@@ -37,6 +38,7 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
 - app/src/main/java/net/clahey/trackr/ui/components/ValueInputField.kt
 - app/src/main/java/net/clahey/trackr/ui/components/ValueUIState.kt
 - app/src/main/java/net/clahey/trackr/ui/components/TimestampField.kt
+- app/src/main/java/net/clahey/trackr/ui/components/TimePickerDialog.kt
 - app/src/main/java/net/clahey/trackr/data/local/EventDao.kt
 - app/src/main/java/net/clahey/trackr/data/local/LocalTrackrRepository.kt
 
@@ -94,6 +96,8 @@ Timeline screen, quick-log sheet, event edit screen, value-type-specific input w
     `MainActivity`'s notification extra is deliberately *not* cleared. It feeds only the nav graph's `startDestination`, which `NavController` ignores whenever there is a back stack to restore — and `removeExtra` would not survive process death anyway, since the system redelivers its own copy of the intent. So APP-NAV-005/006 are untouched and this stayed inside one segment.
 
 9. **Outstanding reminders listed on the timeline (added 2026-08-21).** Tapping a bundled reminder notification landed in the app with nothing to show for it, and tapping the launcher icon's notification dot never could — the launcher opens the app through its own intent, carrying no deep link, so that half was never fixable app-side. The timeline now lists reminders that have fired and not been dealt with, under the notification's own "Time to log" title (EL-UI-096..099). A row tap resolves the same `QuickLogTarget` a notification tap resolves, filter side effect included, by way of an `openQuickLogFor` extracted from the deep-link path so the two genuinely share one route rather than resembling each other. A swipe dismisses in either direction with threshold haptics and no undo, unlike the event row directly below it — deleting an event destroys something, dismissing a nudge that returns does not. The rows sit above the empty state as well as the event list, since a reminder can be outstanding for a category with no events yet. What "outstanding" means and where the answer comes from belongs to the reminders segment (REM-NOTIF-008); this screen renders it and reports taps. Header and row styling are known-rough and deliberately left for a later pass.
+
+10. **One time-picker dialog instead of four (2026-08-24).** The same `rememberTimePickerState` + dialog body appeared three times in `CategoryEditScreen.kt`'s reminder editor and a fourth time inside `TimestampField`, that one hand-built from `Dialog`/`Surface` rather than an `AlertDialog`. All four now call `TimePickerDialog(initial, onConfirm, onDismiss)` (`ui/components/TimePickerDialog.kt`), designed in this segment's LLD § Time Picker Dialog: M3 ships a `DatePickerDialog` but no `TimePicker` equivalent, which is the component's entire reason for existing, and that sentence was already written here. Closing the dialog stays with the caller, since each one already owns the state deciding whether it shows. The component carries no `@spec` of its own — the four entry points above it already cite REM-UI-004/005 and EL-UI-032/040, and it is a helper below them. `TimestampField`'s dialog picks up `AlertDialog`'s standard padding and elevation in the trade, accepted as the more consistent of the two looks. Three tests in `TimePickerDialogTest.kt`: the M3 clock face turned out to be addressable by content description, so one drives a real selection rather than only confirming the seed — minutes rather than hours, since the hour labels depend on 12-/24-hour mode. Two `@OptIn(ExperimentalMaterial3Api::class)` annotations became dead with the old bodies and were removed. Backlog #17.
 
 ## Work Required
 

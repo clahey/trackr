@@ -57,9 +57,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -92,6 +90,7 @@ import net.clahey.trackr.ui.SaveResult
 import net.clahey.trackr.ui.components.EventRow
 import net.clahey.trackr.ui.components.OutlinedFieldBox
 import net.clahey.trackr.ui.components.ReminderPermissionNotice
+import net.clahey.trackr.ui.components.TimePickerDialog
 import net.clahey.trackr.ui.components.dialogMessageRes
 import net.clahey.trackr.ui.components.dialogTitleRes
 import net.clahey.trackr.ui.components.reminderChannelEnabled
@@ -861,7 +860,6 @@ private fun ReminderSection(
 }
 
 // @spec REM-UI-004
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReminderTimesEditor(
     times: List<LocalTime>,
@@ -902,38 +900,29 @@ private fun ReminderTimesEditor(
     }
 
     editingIndex?.let { index ->
-        val state = rememberTimePickerState(initialHour = times[index].hour, initialMinute = times[index].minute)
-        AlertDialog(
-            onDismissRequest = { editingIndex = null },
-            confirmButton = {
-                TextButton(onClick = {
-                    onTimesChange(times.mapIndexed { i, t -> if (i == index) LocalTime.of(state.hour, state.minute) else t })
-                    editingIndex = null
-                }) { Text(stringResource(R.string.action_ok)) }
+        TimePickerDialog(
+            initial = times[index],
+            onConfirm = { picked ->
+                onTimesChange(times.mapIndexed { i, t -> if (i == index) picked else t })
+                editingIndex = null
             },
-            dismissButton = { TextButton(onClick = { editingIndex = null }) { Text(stringResource(R.string.action_cancel)) } },
-            text = { TimePicker(state = state) },
+            onDismiss = { editingIndex = null },
         )
     }
 
     if (showAddPicker) {
-        val state = rememberTimePickerState(initialHour = 9, initialMinute = 0)
-        AlertDialog(
-            onDismissRequest = { showAddPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    onTimesChange(times + LocalTime.of(state.hour, state.minute))
-                    showAddPicker = false
-                }) { Text(stringResource(R.string.action_ok)) }
+        TimePickerDialog(
+            initial = LocalTime.of(9, 0),
+            onConfirm = {
+                onTimesChange(times + it)
+                showAddPicker = false
             },
-            dismissButton = { TextButton(onClick = { showAddPicker = false }) { Text(stringResource(R.string.action_cancel)) } },
-            text = { TimePicker(state = state) },
+            onDismiss = { showAddPicker = false },
         )
     }
 }
 
 // @spec REM-UI-005
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimePickerFieldButton(
     label: String,
@@ -951,17 +940,13 @@ private fun TimePickerFieldButton(
         }
     }
     if (showPicker) {
-        val state = rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute)
-        AlertDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    onTimeChange(LocalTime.of(state.hour, state.minute))
-                    showPicker = false
-                }) { Text(stringResource(R.string.action_ok)) }
+        TimePickerDialog(
+            initial = time,
+            onConfirm = {
+                onTimeChange(it)
+                showPicker = false
             },
-            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) } },
-            text = { TimePicker(state = state) },
+            onDismiss = { showPicker = false },
         )
     }
 }
