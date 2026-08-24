@@ -11,7 +11,8 @@ Required. Delete this file once everything is checked.
 
 **Verified** means a reviewer constructed the failure from the code.
 **Unverified** items still need that step before they are fixed — the claim may
-not survive contact with the source.
+not survive contact with the source. `[D]` marks an item deliberately deferred
+past the merge, with the reason in its detail section.
 
 ## Items
 
@@ -26,7 +27,7 @@ not survive contact with the source.
 - [x] **10** — Duplicate notification-permission request — *reminders*, verified
 - [x] **11** — `ReminderMode.valueOf` throws on an unrecognized mode — *local-storage*, verified
 - [x] **12** — Empty `times` on a FIXED reminder throws — *reminders*, verified
-- [ ] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified
+- [D] **13** — Schema `4.json` describes an unreachable version — *local-storage*, verified; deferred past the merge on purpose
 - [x] **14** — Fake repository does not cascade reminder deletion — *local-storage*, verified
 - [x] **15** — `@spec` range shorthand is not greppable per ID — *cross-cutting*, verified
 - [x] **16** — `RemindersModule` cites a spec it does not implement — *app-shell*, verified
@@ -234,8 +235,16 @@ carries the rule.
 Version 4 existed only in unmerged commits on this branch, so no distributed
 build ever wrote `user_version = 4`. There is no 4→5 migration and no
 `fallbackToDestructiveMigration` (`DatabaseModule.kt:24-31`), so the file
-implies a reachable state that is not reachable. Either delete it or write the
-migration; the current state is a trap for a future reader.
+implies a reachable state that is not reachable. Deleting it is the right end
+state.
+
+**Do not delete it on this branch.** This branch squash-merges, so a file added
+and deleted within it nets to nothing in the squashed commit and `4.json` would
+never exist in `master`'s history at all. The schema of a version that briefly
+existed is worth keeping on the record, so the file rides through the merge and
+is deleted by a separate commit afterwards. Nothing depends on it in the
+meantime: `MigrationTest.kt` reads only the schemas its own migrations use, and
+`MIGRATION_3_5` is the sole path across that range.
 
 ### 14 — Fake repository does not cascade reminder deletion
 `FakeTrackrRepository.kt:105`
