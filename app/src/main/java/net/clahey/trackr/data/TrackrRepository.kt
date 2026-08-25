@@ -17,9 +17,7 @@ interface TrackrRepository {
      * Upserts [category], running every step that is asked for in the same transaction.
      *
      * @param reminder the reminder to store for this category, or null to leave whatever is
-     *   already stored untouched. There is no way to delete a reminder row through this call:
-     *   a reminder is switched off by storing it with `enabled = false`, and only deleting the
-     *   category removes its row.
+     *   already stored untouched.
      * @param migrateEvents converts the category's existing events to its resolved value type.
      * @param orderedSiblingIds reindexes the destination sibling group, treating the list as an
      *   ordering hint reconciled against the group's live members rather than as membership.
