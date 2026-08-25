@@ -12,6 +12,7 @@
 - [x] **APP-DI-002**: A Hilt module shall provide `TrackrDatabase`, `CategoryDao`, and `EventDao` as singletons built with `Room.databaseBuilder`.
 - [x] **APP-DI-003**: A Hilt module shall provide a singleton `DataStore<Preferences>` via the `preferencesDataStore` delegate.
 - [x] **APP-DI-004**: A Hilt module shall bind `LocalTrackrRepository` as `TrackrRepository` and `LocalImageStore` as `ImageStore`, both as singletons.
+- [x] **APP-DI-005**: A Hilt module shall provide a singleton `CoroutineScope` of `SupervisorJob() + Dispatchers.IO`, qualified `@ApplicationScope`, for startup work that must outlive whichever component launched it.
 
 ## Navigation
 
@@ -37,8 +38,9 @@
 
 ## Startup
 
-- [x] **APP-PROC-001**: On application startup, the system shall invoke `repository.onStartup()` to run the orphan image scan before any screen is shown.
-- [x] **APP-PROC-002**: On application startup, the system shall separately invoke `reminderScheduler.reconcileOnStartup()` (`docs/specs/reminders.md § Scheduling Engine`, `REM-SCHED-017`) as its own independent fire-and-forget coroutine, not composed into or dependent on `repository.onStartup()` (APP-PROC-001), so a slow or failing image scan does not block reminder re-arming or vice versa.
+- [x] **APP-PROC-001**: When `MainActivity.onCreate` runs, the system shall call `UiStartupWork.runOnce()` after `setContent`, which launches `repository.onStartup()` — the orphan image scan (`docs/specs/local-storage.md`, LS-BE-040) — fire-and-forget on the application-scoped `CoroutineScope`. `TrackrApplication.onCreate` shall not launch it, so a process Android creates only to deliver a broadcast never runs the scan.
+- [x] **APP-PROC-002**: On every app process start — including a process Android creates only to deliver a broadcast — the system shall launch `reminderScheduler.reconcileOnStartup()` (`docs/specs/reminders.md § Scheduling Engine`, `REM-SCHED-017`) from `TrackrApplication.onCreate` as a fire-and-forget coroutine on the application-scoped `CoroutineScope`. It shall not be composed into or dependent on `repository.onStartup()` (APP-PROC-001), so neither can delay or fail the other.
+- [x] **APP-PROC-003**: `UiStartupWork.runOnce()` shall launch `repository.onStartup()` at most once per app process: the first call in a process launches it; every later call shall do nothing, including one from an `Activity` recreated by a configuration change or relaunched within the same live process. The launch shall use a scope that outlives any `Activity`, so destroying the `Activity` that made the call does not cancel an in-flight scan.
 
 ## Reminder Integration
 

@@ -15,7 +15,9 @@ This segment is the connective tissue of the app. It owns no domain logic — it
 
 ## Application Class
 
-`TrackrApplication` is annotated `@HiltAndroidApp` and declared in `AndroidManifest.xml` via `android:name=".TrackrApplication"`. Its `onCreate` launches two independent fire-and-forget coroutines: `LocalTrackrRepository.onStartup()` for the orphan image scan (see LS-BE-040), and `ReminderScheduler.reconcileOnStartup()` (see `docs/llds/reminders.md § Scheduling Engine`) to re-arm any enabled reminder whose alarm is missing or stale. The two are launched separately, not composed into one call — re-arming alarms needs `AlarmManager` access, which sits outside `local-storage`'s persistence-only seam (see `docs/llds/local-storage.md § LocalTrackrRepository`), so it can't live inside `LocalTrackrRepository.onStartup()` regardless of what that method currently does (LS-BE-041).
+`TrackrApplication` is annotated `@HiltAndroidApp` and declared in `AndroidManifest.xml` via `android:name=".TrackrApplication"`. Its `onCreate` launches one fire-and-forget coroutine: `ReminderScheduler.reconcileOnStartup()` (see `docs/llds/reminders.md § Scheduling Engine`), which re-arms any enabled reminder whose alarm is missing or stale. This runs on *every* process start, including one Android creates solely to deliver an alarm broadcast.
+
+The orphan image scan (`LocalTrackrRepository.onStartup()`, LS-BE-040) is not launched here — `MainActivity` triggers it instead. See § Startup Sequence.
 
 `AndroidManifest.xml` also registers two `reminders`-owned `BroadcastReceiver`s (`ReminderReceiver`, `ReminderRearmReceiver`) — their triggers and behavior are specced in `docs/llds/reminders.md § Scheduling Engine`; this segment only owns the fact that they're declared, not what they do.
 
@@ -44,6 +46,14 @@ All modules live in `net.clahey.trackr.di`.
 | `TrackrRepository` | `@Singleton` | `@Binds` `LocalTrackrRepository` |
 | `ImageStore` | `@Singleton` | `@Binds` `LocalImageStore` |
 
+### CoroutineModule (`@Module`, `@InstallIn(SingletonComponent::class)`)
+
+| Binding | Type | How |
+|---|---|---|
+| `CoroutineScope` (`@ApplicationScope`) | `@Singleton` | `CoroutineScope(SupervisorJob() + Dispatchers.IO)` |
+
+The qualifier keeps this from being an ambiguous binding for a type as general as `CoroutineScope`. Both consumers — `TrackrApplication`'s reminder reconcile and `UiStartupWork`'s orphan scan — need work that outlives whichever component started it.
+
 ## MainActivity
 
 `MainActivity` is annotated `@AndroidEntryPoint`. It is the single Activity.
@@ -58,6 +68,8 @@ setContent {
 ```
 
 **Notification deep link.** A reminder notification's `PendingIntent` (see `docs/llds/reminders.md § Scheduling Engine`) targets `MainActivity` with a `categoryId` extra. On a cold start, `MainActivity` reads the launching `Intent`'s extra and passes it into the nav graph's start-destination route (`Routes.timeline(quickLogCategoryId = ...)`, see § Navigation Graph) instead of always starting bare at `"timeline"`. On a warm start (app already running), `MainActivity` overrides `onNewIntent` and forwards the extra the same way — `singleTop` launch semantics keep this from spawning a second Activity instance. No platform `NavDeepLink`/intent-filter URI scheme is used: the existing route-query-arg + `SavedStateHandle` pattern (already used for `EVENT_EDIT`/`CATEGORY_EDIT`) already covers passing a target into a composable on arrival, and adding a second, platform-native deep-link mechanism alongside it would be redundant.
+
+**Startup work.** `onCreate` calls `UiStartupWork.runOnce()` after `setContent` — this is what triggers the orphan image scan. See § Startup Sequence.
 
 `AppScaffold` is a composable that wraps the `NavHost` in a `Scaffold` with a `BottomBar`. The bottom bar is shown only on the two top-level destinations (`timeline`, `categoryList`).
 
@@ -143,9 +155,21 @@ All five ViewModels are annotated `@HiltViewModel`.
 
 ## Startup Sequence
 
-`TrackrApplication.onCreate()` → `repository.onStartup()` (orphan image scan) and, separately, `reminderScheduler.reconcileOnStartup()` (re-arm missing/stale reminder alarms; see `docs/llds/reminders.md § Scheduling Engine`).
+Two pieces of startup work, two triggers.
 
-The repository and `ReminderScheduler` are injected into `TrackrApplication` via field injection (`@Inject lateinit var repository: TrackrRepository`, `@Inject lateinit var reminderScheduler: ReminderScheduler`).
+```
+TrackrApplication.onCreate() → reminderScheduler.reconcileOnStartup()   every process start
+MainActivity.onCreate()      → uiStartupWork.runOnce()
+                                   → repository.onStartup()             once per process
+```
+
+`UiStartupWork` is an `@Singleton` holding an `AtomicBoolean`. `runOnce()` launches the orphan image scan on the injected application scope the first time it is called in a process, and does nothing on every call after. The guard is required because `MainActivity.onCreate` runs again on configuration change and on any relaunch within a live process. The application scope rather than `lifecycleScope` is what makes it safe to launch from an Activity: a rotation part-way through must not cancel the scan, because the guard is already set and no later call would retry it.
+
+`runOnce()` is called after `setContent`, so the scan's reads queue behind the first frame's rather than alongside them. Nothing awaits it either way — the ordering is about contention, not correctness.
+
+Tapping a reminder notification opens `MainActivity` (§ MainActivity, notification deep link), so it triggers the scan like any other launch. A device whose owner only ever acts on notifications and never opens the app from the launcher still collects orphans on every tap.
+
+`ReminderScheduler` is injected into `TrackrApplication` and `UiStartupWork` into `MainActivity`, both by field injection. `TrackrApplication` no longer injects the repository at all.
 
 ## Decisions & Alternatives
 
@@ -156,8 +180,12 @@ The repository and `ReminderScheduler` are injected into `TrackrApplication` via
 | Quick-log sheet | `ModalBottomSheet` inside timeline composable | Separate nav destination | Avoids nav animation jank; timeline state (scroll position, filter) stays alive beneath the sheet |
 | Test tags as resource-ids | `testTagsAsResourceId = true` on the app root, unconditionally | Debug-only gating; no tags | Lets tooling (the screenshot script, uiautomator) target elements by stable id instead of coordinates/text. FOSS app — nothing to hide by exposing ids in release, so gating would add plumbing for no benefit |
 | ViewModel arguments | `SavedStateHandle` | `@AssistedInject` | Idiomatic Hilt + Navigation pattern; survives process death and back-stack restoration automatically |
-| Hilt module split | Three modules (Database, DataStore, Repository) | One monolithic module | Each module is independently testable; standard Android practice |
+| Hilt module split | One module per concern — Database, DataStore, Repository, Coroutine here, plus modules other segments own | One monolithic module | Each module is independently testable; standard Android practice |
 | DataStore placement | Top-level `preferencesDataStore` delegate on Application | Manual `DataStore` construction | Delegate is the recommended API; guarantees singleton; no manual scope management |
+| Orphan-scan trigger | `MainActivity.onCreate`, once per process | `Application.onCreate`, alongside the reminder reconcile | Only UI activity produces orphans, so the uncollected set cannot grow while the app is merely being woken to deliver alarms. Triggering on process start charged a whole-event-table read and an image-directory listing to every alarm delivery — work with no deadline, competing with a broadcast that has seconds of budget — to collect a set that delivery cannot have added to |
+| Reminder-reconcile trigger | `Application.onCreate`, every process start including alarm wakes | Move it to `MainActivity` too, alongside the orphan scan | An alarm wake is a good moment to notice that *other* reminders were dropped by a reboot or a Doze eviction, and the exact-alarm upgrade check (REM-SCHED-019) wants to run often rather than only when someone opens the app. The pass is cheap — one DataStore read and a bounded walk of enabled reminders. It does mean the pass can run concurrently with the delivery it woke alongside; `docs/llds/reminders.md § Decisions & Alternatives` ("Startup reconciliation staleness threshold") is where the buffer that makes that overlap harmless is specified |
+| Once-per-process guard | `UiStartupWork`, an injectable `@Singleton` | An `AtomicBoolean` and a method on `TrackrApplication` | A separate injectable takes a fake repository in a JVM unit test, so the guarantee is actually covered. The Application-hosted version adds no new type but needs an instrumented test that cannot easily substitute the repository |
+| Application coroutine scope | Hilt-provided `@ApplicationScope CoroutineScope` | Hand-rolled `CoroutineScope` field on `TrackrApplication` | Two collaborators now need a scope that outlives any Activity; injecting it also lets a test substitute a `TestScope` |
 | Notification deep-link mechanism | Extend the existing route-query-arg + `SavedStateHandle` pattern (`quickLogCategoryId` on `Routes.TIMELINE`) | Platform `NavDeepLink` / manifest intent-filter URI scheme | The app already has a working, simple mechanism for "arrive at a composable with an argument set" (`EVENT_EDIT`/`CATEGORY_EDIT`); a second, platform-native deep-link mechanism alongside it for exactly one more argument would be redundant complexity, not added capability |
 
 ## Open Questions & Future Decisions

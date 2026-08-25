@@ -34,7 +34,7 @@ LLD: `docs/llds/local-storage.md`
 ## Startup Orphan Recovery
 
 - [x] **LS-BE-040**: `onStartup` shall scan the image storage directory and delete any file not referenced by a current event row in the database.
-- [x] **LS-BE-041**: `onStartup` shall be launched once per app process start; it is fire-and-forget and not guaranteed to complete — or even begin — before the first UI frame. This is acceptable only because `onStartup` currently does nothing but delete unreferenced image files (LS-BE-040), a purely additive cleanup that nothing in the UI depends on. If `onStartup` ever takes on a responsibility the UI *does* depend on (e.g. a data migration), this guarantee must be revisited so the first frame actually blocks on completion.
+- [x] **LS-BE-041**: `onStartup` shall be launched once per app process, at a point app-shell chooses (`docs/specs/app-shell.md`, APP-PROC-001) and not necessarily at process start; it is fire-and-forget and not guaranteed to complete — or even begin — before the first UI frame. This is acceptable only because `onStartup` currently does nothing but delete unreferenced image files (LS-BE-040), a purely additive cleanup that nothing in the UI depends on. If `onStartup` ever takes on a responsibility the UI *does* depend on (e.g. a data migration), this guarantee must be revisited so the first frame actually blocks on completion.
 
 ## TypeConverters
 

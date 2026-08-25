@@ -34,7 +34,7 @@ past the merge, with the reason in its detail section.
 - [x] **17** — Four copies of the time-picker dialog — *event-logging*, verified
 - [x] **18** — Exact-alarm check hand-rolled instead of asking `AlarmScheduler` — *reminders*, verified
 - [x] **19** — `onAlarmFired` scans the whole event table for a MAX — *reminders*, verified
-- [ ] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, verified
+- [x] **20** — App-startup work runs on every alarm-triggered process wake — *app-shell*, verified
 - [x] **21** — Collapse the eight reminder setters into one `setReminderUIState` — *category-management*, PR comment
 - [x] **22** — Localize the load flags to their `when` branches — *category-management*, PR comment
 - [x] **23** — `HomeScreen` empty check should be a positive test — *event-logging*, PR comment
@@ -358,6 +358,34 @@ every alarm wake is unconditional regardless.
 
 The least severe of the cluster and the only one needing a design decision
 rather than a fix.
+
+Done. The two jobs were split rather than gated together, because they wanted
+opposite answers. The orphan image scan moved to `MainActivity.onCreate` (after
+`setContent`) behind `UiStartupWork.runOnce()`, an `@Singleton` guarding an
+`AtomicBoolean` — the guard matters because `onCreate` runs again on every
+configuration change. The reminder reconcile stayed on process start: an alarm
+wake is a useful moment to notice that *other* reminders were dropped, and
+REM-SCHED-019's exact-alarm upgrade check wants to run often rather than only
+when someone opens the app.
+
+What makes moving the scan safe is that only UI activity produces orphans, so
+the uncollected set cannot grow during broadcast-only wakes — and a notification
+tap opens `MainActivity`, so even someone who never launches from the launcher
+collects on every tap. The write race stayed as described above: it is bounded
+by the staleness buffer and both writers compute near-identical values, so it
+was documented as an accepted cost rather than fixed.
+
+`TrackrApplication`'s hand-rolled `CoroutineScope` became a Hilt-provided
+`@ApplicationScope` singleton (new `CoroutineModule`, APP-DI-005). That is not
+cosmetic: the scan is launched from an Activity but must survive that Activity
+being destroyed mid-run, since the guard is already set and nothing would retry.
+
+APP-PROC-001 rewritten, APP-PROC-002 reworded to say which kind of process start
+it means, APP-PROC-003 added for the once-per-process guard. Cascaded into
+local-storage (LS-BE-041 now cites APP-PROC-001 as the owner of the hook rather
+than naming it a second time) and reminders (REM-SCHED-017 lost a clause about
+not blocking a UI frame that a broadcast-woken process does not have). Three
+unit tests in `UiStartupWorkTest.kt` — the segment's first test file.
 
 ### 21 — Collapse the eight reminder setters into one `setReminderUIState`
 `CategoryEditViewModel.kt:265`, `CategoryEditScreen.kt:359-378`

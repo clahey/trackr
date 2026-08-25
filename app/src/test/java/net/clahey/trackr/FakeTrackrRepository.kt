@@ -55,6 +55,11 @@ class FakeTrackrRepository : TrackrRepository {
     // while they are still in flight — the window in which a placeholder count reads as "empty".
     var countReadGate: CompletableDeferred<Unit>? = null
 
+    // Gates and counts the startup scan, so a test can hold one in flight while asking for another
+    // (APP-PROC-003).
+    var onStartupGate: CompletableDeferred<Unit>? = null
+    var onStartupCallCount = 0
+
     override fun getCategoryById(id: String): Flow<Category?> =
         categories.map { list -> categoryReadGate?.await(); list.find { c -> c.id == id } }
     // @spec DM-DATA-028
@@ -258,7 +263,10 @@ class FakeTrackrRepository : TrackrRepository {
         return toInsert.size
     }
 
-    override suspend fun onStartup() {}
+    override suspend fun onStartup() {
+        onStartupCallCount++
+        onStartupGate?.await()
+    }
 
     fun setEvents(vararg e: Event) { events.value = e.toList() }
     fun setCategories(vararg c: Category) { categories.value = c.toList() }

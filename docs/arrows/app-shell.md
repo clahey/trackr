@@ -4,7 +4,7 @@ App-level scaffolding: DI modules, application/activity entry points, and top-le
 
 ## Status
 
-**AUDITED** — last audited 2026-07-27 (re-verified; no code or spec changes since the 2026-06-17 pass — `git diff` over this segment's paths since then is empty). All 17 specs implemented; only finding is a traceability gap.
+**AUDITED** — last audited 2026-07-27. Changed 2026-08-24 by the startup-trigger split (backlog #20), which added APP-PROC-003 and APP-DI-005, rewrote APP-PROC-001/002, and gave the segment its first test file. All 19 specs implemented; remaining findings are traceability gaps.
 
 ## References
 
@@ -15,17 +15,19 @@ App-level scaffolding: DI modules, application/activity entry points, and top-le
 - docs/llds/app-shell.md
 
 ### EARS
-- docs/specs/app-shell.md (17 specs: APP-DI-*, APP-ID-*, APP-NAV-*, APP-PROC-*, APP-UI-*)
+- docs/specs/app-shell.md (19 specs: APP-DI-*, APP-ID-*, APP-NAV-*, APP-PROC-*, APP-UI-*)
 
 ### Tests
-_No dedicated test files found citing APP-* spec IDs this pass._
+- app/src/test/java/net/clahey/trackr/UiStartupWorkTest.kt (APP-PROC-001, APP-PROC-003)
 
 ### Code
+- app/src/main/java/net/clahey/trackr/di/CoroutineModule.kt
 - app/src/main/java/net/clahey/trackr/di/DatabaseModule.kt
 - app/src/main/java/net/clahey/trackr/di/DataStoreModule.kt
 - app/src/main/java/net/clahey/trackr/di/RepositoryModule.kt
 - app/src/main/java/net/clahey/trackr/MainActivity.kt
 - app/src/main/java/net/clahey/trackr/TrackrApplication.kt
+- app/src/main/java/net/clahey/trackr/UiStartupWork.kt
 - app/src/main/java/net/clahey/trackr/ui/navigation/AppNavHost.kt
 - app/src/main/java/net/clahey/trackr/ui/home/EventEditViewModel.kt
 
@@ -34,9 +36,10 @@ _No dedicated test files found citing APP-* spec IDs this pass._
 **Purpose:** App entry point, Hilt DI wiring, and the top-level `NavHost` connecting the category and event-logging screens.
 
 **Key Components:**
-1. Hilt modules (`DatabaseModule`, `DataStoreModule`, `RepositoryModule`)
-2. `TrackrApplication` — process entry, kicks off `repository.onStartup()` (see `local-storage` LS-BE-041 finding)
-3. `AppNavHost` — navigation graph
+1. Hilt modules (`DatabaseModule`, `DataStoreModule`, `RepositoryModule`, `CoroutineModule`)
+2. `TrackrApplication` — process entry, kicks off `reminderScheduler.reconcileOnStartup()` on every process start
+3. `UiStartupWork` — kicks off `repository.onStartup()` once per process, triggered by `MainActivity` (LS-BE-041)
+4. `AppNavHost` — navigation graph
 
 ## Spec Coverage
 
@@ -46,12 +49,13 @@ _No dedicated test files found citing APP-* spec IDs this pass._
 | Identity | APP-ID-001 to 003 | all | 0 | 0 |
 | Navigation/Process/UI | APP-NAV-*, APP-PROC-*, APP-UI-* | all | 0 | 0 |
 
-**Summary:** 17 of 17 active specs implemented; 0 deferred, 0 active gaps.
+**Summary:** 19 of 19 active specs implemented; 0 deferred, 0 active gaps.
 
 ## Key Findings
 
 1. **APP-ID-001, APP-ID-002, APP-ID-003 are implemented with no `@spec` annotation** anywhere in the codebase — traceability gap only, not a functional one.
-2. No dedicated test files were found citing any `APP-*` spec ID. Worth confirming whether app-shell behavior is covered indirectly (e.g., via Compose navigation tests elsewhere) or genuinely untested.
+2. Only one test file cites an `APP-*` spec ID (`UiStartupWorkTest.kt`, added 2026-08-24). Navigation, DI, and identity remain untested; this is still the segment most likely to regress silently.
+3. **The two startup jobs now have two different triggers (2026-08-24).** `TrackrApplication.onCreate` previously launched both the orphan image scan and the reminder reconcile, so a process Android created solely to deliver an alarm broadcast ran a whole-event-table read and an image-directory listing before the receiver got its few seconds of budget. The scan moved to `MainActivity.onCreate` (after `setContent`) behind `UiStartupWork.runOnce()`, an `@Singleton` guarding an `AtomicBoolean`; the reconcile stayed on process start, where an alarm wake is a useful moment to notice other reminders were dropped. The move is safe because only UI activity produces orphans — the uncollected set cannot grow during broadcast-only wakes — and a notification tap opens `MainActivity`, so even a notifications-only user collects on every tap. `TrackrApplication`'s hand-rolled `CoroutineScope` became a Hilt-provided `@ApplicationScope` singleton (APP-DI-005), which is what lets the scan survive an `Activity` destroyed mid-run. Backlog #20.
 
 ## Work Required
 
@@ -60,7 +64,7 @@ _None — fully implemented._
 
 ### Should Fix
 1. Add `@spec APP-ID-001, APP-ID-002, APP-ID-003` annotations at their implementation site.
-2. Confirm whether app-shell/navigation has any test coverage at all; if not, this is the segment most likely to regress silently.
+2. Extend test coverage beyond `UiStartupWorkTest` — navigation (APP-NAV-*), DI wiring, and the About screen have none.
 
 ### Nice to Have
 _None noted this pass._
