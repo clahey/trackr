@@ -90,11 +90,13 @@ Entities mirror domain models with Room annotations. They are package-private to
 | `windowStart` | `String` | `"HH:mm"`; RANDOM only, preserved but unused while mode == FIXED |
 | `windowEnd` | `String` | `"HH:mm"`; RANDOM only, ditto |
 | `occurrencesPerDay` | `Int` | RANDOM only, ditto |
-| `daysActive` | `String` | JSON list of `DayOfWeek` names |
+| `daysActive` | `String` | JSON list of `DayOfWeek` names, e.g. `["MON","TUE",...]` |
 | `showCategoryInNotification` | `Boolean` | default `false` |
 | `nextFireAt` | `Long?` | epoch millis; null when disabled |
 
-Field-level rationale (mode/window/frequency shape, why one row per category, why `nextFireAt` is stored rather than derived on demand) lives in `docs/llds/reminders.md § Data Model` — this segment owns the mechanical storage, not the design intent behind it.
+This table is the single copy — `docs/llds/reminders.md § Data Model` describes the `Reminder` domain type and points here for the columns. The FK's `CASCADE DELETE` is LS-BE-072, matching `EventEntity`'s (LS-BE-071); it removes the row only, and does not cancel a live `AlarmManager` alarm, which is OS state outside the database.
+
+Field-level rationale — the mode/window/frequency shape, why one row per category, why `nextFireAt` is stored rather than derived on demand — lives in `docs/llds/reminders.md § Data Model`. The line between the two: **would this be different on a document store or behind a server API?** If yes it is storage and belongs here; if no it is the feature's intent and belongs to the feature. So the column types, the JSON encodings, the FK cascade, and the `@Transaction` boundary are this segment's; the rule that a category has at most one reminder, and that a save must be atomic, are the reminders segment's.
 
 ## TypeConverters
 

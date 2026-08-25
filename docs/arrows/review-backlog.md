@@ -49,7 +49,7 @@ past the merge, with the reason in its detail section.
 - [x] **32** — A blocked notification channel is undetectable — *reminders*, verified
 - [x] **33** — Tapping an unexpanded multi-reminder row shows no reminders — *reminders*, verified on device
 - [x] **34** — Tapping the yellow-dot icon shows no reminders — *reminders*, not a defect; superseded
-- [ ] **35** — Storage detail sits in the reminders segment — *local-storage*, verified
+- [x] **35** — Storage detail sits in the reminders segment — *local-storage*, verified
 - [—] **36** — Compose BOM is ~19 months behind — moved to the HLD, see Dropped
 
 ## Detail
@@ -534,10 +534,24 @@ behind a server API?** If yes it is implementation and belongs to local-storage;
 if no it is the feature's intent and stays with the feature. Decidable, unlike
 "mechanical."
 
-Two directions, and it is not yet settled which: move reminders' storage detail
-down into local-storage so `ReminderDao` is documented like the other DAOs, or
-conclude the other DAOs are the under-documented ones and level up instead.
-Either way the `ReminderEntity` table wants one canonical copy and a pointer.
+Done — moved down. The two "directions" this item posed were not alternatives:
+applying the test clause by clause only ever points one way, and levelling the
+other DAOs up is a question about how thorough local-storage is internally, not
+about where anything belongs. Even after levelling up, the `ReminderEntity`
+table still has to live in exactly one place, and the test says which.
+
+`local-storage` gained its first two EARS for the reminders table: **LS-BE-072**
+(the `ReminderEntity` FK cascade — exactly parallel to LS-BE-071, which
+`EventEntity` had all along) and **LS-BE-015** (the `@Transaction` behind
+`saveCategoryWithReminder`, including the `nextFireAt` read-and-write-back).
+REM-DATA-001, 006, and 008 keep what holds on any backend and cite those two for
+the mechanism. `local-storage.md § ReminderEntity` is now the single copy of the
+field table — the duplicate had already drifted a second time past the `mode`
+casing the 2026-08-12 audit caught, with a different `times` note on each side.
+
+`ReminderDao` was left alone: it is documented only in local-storage already, so
+there was nothing to move. Levelling `CategoryDao`/`EventDao` up to match is
+separate work and is not tracked here.
 
 ## Dropped
 

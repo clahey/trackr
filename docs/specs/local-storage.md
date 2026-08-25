@@ -18,6 +18,7 @@ LLD: `docs/llds/local-storage.md`
 - [x] **LS-BE-012**: `reorderCategories` shall accept an ordered list of category IDs and reassign sequential `sortOrder` values (0, 1, 2…) matching that order in a single operation.
 - [x] **LS-BE-013**: `getEventCountForCategory` shall return a `Flow<Int>` that reflects the live count of events for a given category.
 - [x] **LS-BE-014**: `getLatestEventTimestampIncludingChildren(categoryId)` shall return, in a single aggregate query, the greatest event `timestamp` among the category's own events and those of all its SubCategories, or null when neither has any. It is a `suspend` one-shot rather than a `Flow`: the caller is a fired alarm computing a single decision, with no subscriber to update.
+- [x] **LS-BE-015**: `saveCategoryWithReminder` shall run the category upsert and the reminder upsert-or-delete inside one Room `@Transaction`, and shall read the reminder row's stored `nextFireAt` and write it back within that same transaction. This is the storage mechanism behind the atomicity and the `nextFireAt` preservation that `docs/specs/reminders.md` REM-DATA-006 and REM-DATA-008 require; those specs own *what* must hold, this one owns *how* it is achieved here.
 
 ## Event Persistence
 
@@ -66,3 +67,4 @@ LLD: `docs/llds/local-storage.md`
 
 - [x] **LS-BE-070**: The Room database shall have destructive migration disabled; any schema change must be accompanied by an explicit migration.
 - [x] **LS-BE-071**: The `EventEntity.categoryId` foreign key shall be declared with `CASCADE DELETE` so that deleting a category atomically removes all its child events.
+- [x] **LS-BE-072**: The `ReminderEntity.categoryId` foreign key shall be declared with `CASCADE DELETE` so that deleting a category atomically removes its reminder row — the storage mechanism behind the one-reminder-per-category rule (`docs/specs/reminders.md`, REM-DATA-001). Cancelling that category's live `AlarmManager` alarm is not part of this and is the caller's job (`docs/llds/reminders.md § Data Model`).

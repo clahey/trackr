@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 
-// @spec REM-DATA-001, REM-DATA-002
+// @spec REM-DATA-001, REM-DATA-002, LS-BE-072
 @Entity(
     tableName = "reminders",
     foreignKeys = [ForeignKey(

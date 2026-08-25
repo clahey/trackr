@@ -239,7 +239,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         reminderDao.upsert(reminder.toEntity())
     }
 
-    // @spec REM-DATA-006, REM-DATA-008
+    // @spec REM-DATA-006, REM-DATA-008, LS-BE-015
     override suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType?) {
         db.withTransaction {
             if (category is Category.SubCategory) requireNoChildren(category)

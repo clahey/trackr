@@ -33,24 +33,13 @@ data class Reminder(
 enum class ReminderMode { FIXED, RANDOM }
 ```
 
-One `Reminder` per category (zero or one row) — `FIXED` mode's `times` list covers "multiple fixed times a day" (e.g. `[08:00, 20:00]`) and `RANDOM` mode's `occurrencesPerDay` covers "multiple random times a day" (e.g. 4 occurrences spread across a 9am–9pm window), so a single row per category covers every recurrence shape without needing multiple independent reminder rules.
+One `Reminder` per category, or none — `FIXED` mode's `times` list covers "multiple fixed times a day" (e.g. `[08:00, 20:00]`) and `RANDOM` mode's `occurrencesPerDay` covers "multiple random times a day" (e.g. 4 occurrences spread across a 9am–9pm window), so a single row per category covers every recurrence shape without needing multiple independent reminder rules.
 
-### ReminderEntity (Room)
+### Storage
 
-| Column | Type | Notes |
-|---|---|---|
-| `categoryId` | `String` PK, FK → categories(id) CASCADE DELETE | one row per category |
-| `enabled` | `Boolean` | |
-| `mode` | `String` | `ReminderMode.name`: `"FIXED"` / `"RANDOM"`; lowercase `"fixed"`/`"random"` is accepted on decode only, as a compatibility fallback for rows written by earlier app versions that used that encoding |
-| `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only; null encodes an empty list |
-| `windowStart` | `String` | `"HH:mm"`; RANDOM only, preserved but unused while mode == FIXED |
-| `windowEnd` | `String` | `"HH:mm"`; RANDOM only, ditto |
-| `occurrencesPerDay` | `Int` | RANDOM only, ditto |
-| `daysActive` | `String` | JSON list of `DayOfWeek` names, e.g. `["MON","TUE",...]` |
-| `showCategoryInNotification` | `Boolean` | default `false` |
-| `nextFireAt` | `Long?` | epoch millis; null when disabled |
+How a `Reminder` is stored — the columns, their types, the JSON encodings, and the foreign key — is `local-storage`'s (`docs/llds/local-storage.md § ReminderEntity`, LS-BE-072). This section owns what a reminder *means*, not how it is written down.
 
-CASCADE DELETE mirrors `EventEntity`'s FK — deleting a category removes its reminder row automatically. **This does not cancel a live `AlarmManager` alarm**, which is OS state outside the DB. That cancellation can't live inside `LocalTrackrRepository.deleteCategory()` itself — `ReminderScheduler` already depends on `TrackrRepository`, so the reverse call would be a circular dependency between segments. Instead, the **caller** of `deleteCategory` (`category-management`'s `CategoryListViewModel`/`CategoryEditViewModel`, both of which already sit above both `TrackrRepository` and can be given `ReminderScheduler` via DI) calls `repository.deleteCategory(id)` first, then `reminderScheduler.cancel(categoryId)` second — DB delete authoritative and first, OS alarm cleanup best-effort and second, mirroring this repository's existing image-deletion ordering (DB first, files after). `cancel()` rebuilds the `PendingIntent` via the same shared helper `enableReminder`/rearming use (see § Scheduling Engine), so it matches and actually cancels the pending alarm rather than silently no-op'ing on a mismatched `PendingIntent`. If the process dies between the two calls, the orphaned alarm is still safe: it fires once, `onAlarmFired`'s existence check (see § Scheduling Engine) finds no `Reminder` row and no-ops. This is a cross-segment touch into `category-management.md`'s delete flow (§ Category List Screen delete flow).
+**Deleting a category deletes its reminder.** Storage enforces that (LS-BE-072), and it removes the row only — it does **not** cancel a live `AlarmManager` alarm, which is OS state outside the DB. That cancellation can't live inside `LocalTrackrRepository.deleteCategory()` itself — `ReminderScheduler` already depends on `TrackrRepository`, so the reverse call would be a circular dependency between segments. Instead, the **caller** of `deleteCategory` (`category-management`'s `CategoryListViewModel`/`CategoryEditViewModel`, both of which already sit above both `TrackrRepository` and can be given `ReminderScheduler` via DI) calls `repository.deleteCategory(id)` first, then `reminderScheduler.cancel(categoryId)` second — DB delete authoritative and first, OS alarm cleanup best-effort and second, mirroring `local-storage`'s existing image-deletion ordering (DB first, files after). `cancel()` rebuilds the `PendingIntent` via the same shared helper `enableReminder`/rearming use (see § Scheduling Engine), so it matches and actually cancels the pending alarm rather than silently no-op'ing on a mismatched `PendingIntent`. If the process dies between the two calls, the orphaned alarm is still safe: it fires once, `onAlarmFired`'s existence check (see § Scheduling Engine) finds no `Reminder` row and no-ops. This is a cross-segment touch into `category-management.md`'s delete flow (§ Category List Screen delete flow).
 
 ### Decoding a stored row
 
@@ -67,16 +56,16 @@ Decoding does not write, so the row stays on disk as it was and every later read
 ```kotlin
 fun getReminderForCategory(categoryId: String): Flow<Reminder?>
 suspend fun saveReminder(reminder: Reminder)                          // upsert, standalone
-suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?)  // atomic: category upsert + reminder upsert/clear in one transaction; reminder.nextFireAt is ignored — the DB's current value is preserved
+suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?)  // atomic: category upsert + reminder upsert/clear; reminder.nextFireAt is ignored — the stored value is preserved
 suspend fun getAllEnabledRemindersOnce(): List<Reminder>              // boot / time-change re-arm
 fun hasEnabledReminder(): Flow<Boolean>                               // drives the permission banner
 ```
 
-`saveCategoryWithReminder` is what `CategoryEditViewModel.save()` actually calls — the category's other fields and its reminder config are edited on the same screen and saved together, so they persist atomically in one transaction rather than as two independent writes (`reminder = null` clears any existing row). Arming/cancelling the `AlarmManager` alarm is **not** part of this transaction — it's a post-commit side effect the ViewModel triggers via `ReminderScheduler` once the save succeeds (see § Scheduling Engine), consistent with how image file deletion already happens after, not inside, this repository's transactions elsewhere. `saveCategoryWithReminder` ignores any `nextFireAt` value present on the passed `Reminder` object and instead preserves, within the same transaction, whatever `nextFireAt` is currently stored for that category — the edit screen never needs to track or carry it forward itself, and a save can never clobber a `nextFireAt` that `ReminderReceiver`/`onAlarmFired` updated concurrently while the screen was open (see § Scheduling Engine).
+`saveCategoryWithReminder` is what `CategoryEditViewModel.save()` actually calls — the category's other fields and its reminder config are edited on the same screen and saved together, so they persist atomically rather than as two independent writes that could leave a category's fields disagreeing with its reminder (`reminder = null` clears any existing reminder). The `@Transaction` that delivers that atomicity is `local-storage`'s (LS-BE-015). Arming/cancelling the `AlarmManager` alarm is **not** part of the save — it's a post-commit side effect the ViewModel triggers via `ReminderScheduler` once the save succeeds (see § Scheduling Engine), consistent with how image file deletion already happens after, not inside, `local-storage`'s writes elsewhere. `saveCategoryWithReminder` ignores any `nextFireAt` value present on the passed `Reminder` object and instead preserves, atomically with that same save, whatever `nextFireAt` is currently stored for that category — the edit screen never needs to track or carry it forward itself, and a save can never clobber a `nextFireAt` that `ReminderReceiver`/`onAlarmFired` updated concurrently while the screen was open (see § Scheduling Engine).
 
 `hasEnabledReminder()` asks the banner's precondition (§ Permission handling, point 3) of the reminder store directly rather than deriving it from anything upstream, so it re-emits when and only when that answer changes.
 
-These live in `local-storage.md`'s `TrackrRepository`/`LocalTrackrRepository`/a new `ReminderDao` (§ Room Entities, § DAOs, § LocalTrackrRepository).
+These live in `local-storage.md`'s `TrackrRepository`/`LocalTrackrRepository`/`ReminderDao` (§ Room Entities, § DAOs, § LocalTrackrRepository).
 
 ## Category Edit Integration (UI)
 
