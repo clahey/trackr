@@ -90,7 +90,7 @@ Entities mirror domain models with Room annotations. They are package-private to
 | `categoryId` | `String` PK, FK → categories(id) CASCADE DELETE | one row per category |
 | `enabled` | `Boolean` | |
 | `mode` | `String` | `ReminderMode.name`: `"FIXED"` / `"RANDOM"`; lowercase `"fixed"`/`"random"` accepted on decode only, as a compatibility fallback |
-| `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only, preserved but unused while mode == RANDOM; null encodes an empty list |
+| `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only, preserved but unused while mode == RANDOM. Always written, never null; the column stays nullable and the decoder reads null as an empty list, for rows this app did not write |
 | `windowStart` | `String` | `"HH:mm"`; RANDOM only, preserved but unused while mode == FIXED |
 | `windowEnd` | `String` | `"HH:mm"`; RANDOM only, ditto |
 | `occurrencesPerDay` | `Int` | RANDOM only, ditto |

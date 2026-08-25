@@ -123,6 +123,11 @@ class MappersTest {
         val fixed = reminderEntity(mode = "fixed").toDomain()
         assertEquals(ReminderMode.FIXED, fixed.mode)
         assertEquals(listOf(LocalTime.of(8, 0)), fixed.times)
+
+        // occurrencesPerDay is RANDOM's divisor; FIXED never reads it, so it cannot make a row unusable.
+        val fixedZeroOccurrences = reminderEntity(mode = "fixed", occurrencesPerDay = 0).toDomain()
+        assertEquals(ReminderMode.FIXED, fixedZeroOccurrences.mode)
+        assertEquals(listOf(LocalTime.of(8, 0)), fixedZeroOccurrences.times)
     }
 
     // @spec REM-DATA-010

@@ -18,7 +18,7 @@ data class Reminder(
     val times: List<LocalTime>,              // FIXED only; one or more clock times, non-empty when mode == FIXED
     val windowStart: LocalTime,              // RANDOM only; preserved but unused while mode == FIXED (REM-DATA-002)
     val windowEnd: LocalTime,                // RANDOM only, ditto; a value of 00:00 means end-of-day, not start-of-day — see Decisions
-    val occurrencesPerDay: Int,              // RANDOM only, ditto; >= 1
+    val occurrencesPerDay: Int,              // RANDOM only, ditto; >= 1 while mode == RANDOM
     val daysActive: Set<DayOfWeek>,          // non-empty; all 7 on a fresh reminder. ReminderScheduling.kt's day-walking loops would spin forever against an empty set — see § Decoding a stored row
     val showCategoryInNotification: Boolean, // default false, per HLD "public surfaces default to discreet" guideline
     val nextFireAt: Instant?,                // the currently-armed alarm's target instant; null when disabled or not yet armed. Written only by ReminderScheduler — saveCategory ignores this field and preserves the DB's current value (see § Data Model, § Scheduling Engine)
@@ -43,7 +43,7 @@ How a `Reminder` is stored — the columns, their types, the JSON encodings, and
 
 ### Decoding a stored row
 
-`ReminderEntity.toDomain()` is total. Any row it cannot turn into a reminder every scheduling path can handle decodes as `Reminder.default(categoryId)` instead. Two kinds of row reach that fallback: ones that fail to parse at all — an unrecognized `mode` or weekday name, a time that is not `HH:mm` — and ones that parse cleanly into a reminder something downstream cannot use — no active days, a FIXED reminder with no times, or an `occurrencesPerDay` below 1, which is the divisor for RANDOM's sub-windows.
+`ReminderEntity.toDomain()` is total. Any row it cannot turn into a reminder every scheduling path can handle decodes as `Reminder.default(categoryId)` instead. Two kinds of row reach that fallback: ones that fail to parse at all — an unrecognized `mode` or weekday name, a time that is not `HH:mm` — and ones that parse cleanly into a reminder something downstream cannot use — no active days, a FIXED reminder with no times, or a RANDOM reminder with an `occurrencesPerDay` below 1, the divisor for its sub-windows. Each unusable case is scoped to the mode that reads the field, so a row is never rejected over a field its own mode ignores.
 
 The edit screen writes none of these, so the fallback is there for rows the app did not write: a backup restored from a different version, a downgraded build, a migration that goes wrong later. It matters because the decode runs somewhere a thrown exception is fatal — `reconcileOnStartup` decodes every enabled row on a coroutine whose only exception handler is the one that ends the process, so a single bad row would crash every launch. Decoding as disabled is also enough on its own to keep the row out of scheduling, since `getAllEnabledRemindersOnce` filters on `enabled` after decoding.
 

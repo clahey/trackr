@@ -107,7 +107,7 @@ fun ReminderEntity.toDomain(): Reminder = try {
     val decodedMode = ReminderMode.valueOf(mode.uppercase())
     require(decodedDaysActive.isNotEmpty())
     require(decodedMode != ReminderMode.FIXED || decodedTimes.isNotEmpty())
-    require(occurrencesPerDay >= 1)
+    require(decodedMode != ReminderMode.RANDOM || occurrencesPerDay >= 1)
     Reminder(
         categoryId = categoryId,
         enabled = enabled,
@@ -128,7 +128,7 @@ fun Reminder.toEntity(): ReminderEntity = ReminderEntity(
     categoryId = categoryId,
     enabled = enabled,
     mode = mode.name,
-    times = if (times.isNotEmpty()) StringListConverter.encode(times.map { it.toHHmm() }) else null,
+    times = StringListConverter.encode(times.map { it.toHHmm() }),
     windowStart = windowStart.toHHmm(),
     windowEnd = windowEnd.toHHmm(),
     occurrencesPerDay = occurrencesPerDay,
