@@ -54,6 +54,16 @@ All modules live in `net.clahey.trackr.di`.
 
 The qualifier keeps this from being an ambiguous binding for a type as general as `CoroutineScope`. Both consumers — `TrackrApplication`'s reminder reconcile and `UiStartupWork`'s orphan scan — need work that outlives whichever component started it.
 
+### ClockModule (`@Module`, `@InstallIn(SingletonComponent::class)`)
+
+| Binding | Type | How |
+|---|---|---|
+| `java.time.Clock` | `@Singleton` | `Clock.systemDefaultZone()` |
+
+A testability seam, not a feature: `QuickLogViewModel` reads "now" through it for the sheet's opening timestamp, its `createdAt` stamp, and its reset, so `QuickLogViewModelTest` can substitute `Clock.fixed(...)` and assert on exact instants instead of racing the wall clock (APP-DI-006, `docs/llds/event-logging.md § Quick-Log Sheet`).
+
+It is the only consumer. `ReminderScheduler` needs the same thing and solves it differently — every entry point takes `now`/`firedAt` as a parameter defaulted to `Instant.now()`, which its tests pass explicitly (`docs/llds/reminders.md § Scheduling Engine`). Two seams for one problem; neither is wrong, and nothing forces a choice, so both stand.
+
 ## MainActivity
 
 `MainActivity` is annotated `@AndroidEntryPoint`. It is the single Activity.

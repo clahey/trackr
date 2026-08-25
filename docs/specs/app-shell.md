@@ -13,6 +13,7 @@
 - [x] **APP-DI-003**: A Hilt module shall provide a singleton `DataStore<Preferences>` via the `preferencesDataStore` delegate.
 - [x] **APP-DI-004**: A Hilt module shall bind `LocalTrackrRepository` as `TrackrRepository` and `LocalImageStore` as `ImageStore`, both as singletons.
 - [x] **APP-DI-005**: A Hilt module shall provide a singleton `CoroutineScope` of `SupervisorJob() + Dispatchers.IO`, qualified `@ApplicationScope`, for startup work that must outlive whichever component launched it.
+- [x] **APP-DI-006**: A Hilt module shall provide a singleton `java.time.Clock` of `Clock.systemDefaultZone()`, so that a component whose current-instant reads must be pinnable in a test can inject it rather than calling `Instant.now()` directly. `QuickLogViewModel` is its only consumer, for the sheet's opening timestamp (`docs/specs/event-logging.md`, EL-UI-032).
 
 ## Navigation
 

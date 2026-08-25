@@ -302,7 +302,7 @@ sealed class DayEntry {
 - `selectedCategory: StateFlow<Category?>` — set when user picks in step 1
 - `expandedMetaCategoryId: MutableStateFlow<String?>` — which MetaCategory is shown in the drill-down view; null = top-level grid is shown
 - Form state: `timestamp`, `value: MutableStateFlow<ValueUIState>`, `notes`, `imagePath` (single, nullable)
-- `timestamp` defaults to `Instant.now()` at sheet open; user-editable
+- `timestamp` defaults to the current instant at sheet open; user-editable. Read through an injected `java.time.Clock` (`docs/llds/app-shell.md § ClockModule`, APP-DI-006) rather than a bare `Instant.now()`, so a test can pin it and assert on an exact value — this ViewModel is the binding's only consumer
 - `value` is initialized to `ValueUIState.None`; updated to the type-appropriate default when a category is selected (see `selectCategory` below)
 - `valueDirty: MutableStateFlow<Boolean>` — tracks whether the user has interacted with the value input during this sheet session. Set to `false` on init and `reset()`; set to `true` when the UI calls `updateValue()`. Never reset on `selectCategory` — edits persist across back-and-forth category navigation within one session.
 - `updateValue(state: ValueUIState)`: sets `value.value = state` and `valueDirty.value = true`. The UI calls this instead of writing to `value` directly, so dirty tracking is centralised.

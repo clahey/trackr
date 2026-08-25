@@ -46,7 +46,7 @@ interface TrackrRepository {
 
     // @spec REM-DATA-006
     fun getReminderForCategory(categoryId: String): Flow<Reminder?>
-    // @spec REM-DATA-006
+    // @spec REM-DATA-005
     suspend fun saveReminder(reminder: Reminder)
     // @spec REM-DATA-006, REM-DATA-008
     suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType? = null)

@@ -279,7 +279,7 @@ class FakeTrackrRepository : TrackrRepository {
     override fun getReminderForCategory(categoryId: String): Flow<Reminder?> =
         reminders.map { map -> reminderReadGate?.await(); map[categoryId] }
 
-    // @spec REM-DATA-006
+    // @spec REM-DATA-005
     override suspend fun saveReminder(reminder: Reminder) {
         reminders.update { it + (reminder.categoryId to reminder) }
     }

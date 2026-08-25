@@ -234,7 +234,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     override fun getReminderForCategory(categoryId: String): Flow<Reminder?> =
         reminderDao.getByCategoryId(categoryId).map { it?.toDomain() }
 
-    // @spec REM-DATA-006
+    // @spec REM-DATA-005
     override suspend fun saveReminder(reminder: Reminder) {
         reminderDao.upsert(reminder.toEntity())
     }
