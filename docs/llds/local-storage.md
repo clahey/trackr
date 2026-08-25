@@ -90,7 +90,7 @@ Entities mirror domain models with Room annotations. They are package-private to
 | `categoryId` | `String` PK, FK → categories(id) CASCADE DELETE | one row per category |
 | `enabled` | `Boolean` | |
 | `mode` | `String` | `ReminderMode.name`: `"FIXED"` / `"RANDOM"`; lowercase `"fixed"`/`"random"` accepted on decode only, as a compatibility fallback |
-| `times` | `String?` | JSON list of `"HH:mm"` strings; FIXED only, preserved but unused while mode == RANDOM. Always written, never null; the column stays nullable and the decoder reads null as an empty list, for rows this app did not write |
+| `times` | `String` | JSON list of `"HH:mm"` strings; FIXED only, preserved but unused while mode == RANDOM. An empty list encodes as `"[]"` |
 | `windowStart` | `String` | `"HH:mm"`; RANDOM only, preserved but unused while mode == FIXED |
 | `windowEnd` | `String` | `"HH:mm"`; RANDOM only, ditto |
 | `occurrencesPerDay` | `Int` | RANDOM only, ditto |
@@ -233,7 +233,7 @@ Jetpack DataStore Preferences stores simple app-wide state that doesn't belong i
 
 ## Room Database
 
-Three entities (`CategoryEntity`, `EventEntity`, `ReminderEntity`), version 5, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
+Three entities (`CategoryEntity`, `EventEntity`, `ReminderEntity`), version 6, `exportSchema = true` (schema JSON exported to `app/schemas/`). Four TypeConverters registered at the database level: `EventValueConverter`, `InstantConverter`, `StringListConverter`, `ValueTypeConverter`. Destructive migration disabled — data loss on schema change is never acceptable.
 
 ## Migration Strategy
 
@@ -249,8 +249,14 @@ Removes `unit` column and adds `default_value` column on `categories`. SQLite do
 4. Rename `categories_new` to `categories`.
 5. Recreate any indexes dropped by the table recreation.
 
-### Version 3 → 5
-Adds the `reminders` table (`ReminderEntity`, § Room Entities) directly in its current shape, a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`. `windowStart`/`windowEnd`/`occurrencesPerDay` are `NOT NULL` from creation, matching the fact that the app never actually leaves them null (REM-DATA-002 — preserved across mode switches, never cleared) and eliminating a `!!` at every read site in `ReminderScheduling.kt`.
+### Version 3 → 6
+Adds the `reminders` table (`ReminderEntity`, § Room Entities) directly in its current shape, a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`. Every column the app always writes is `NOT NULL` from creation, matching the fact that it never actually leaves them null (REM-DATA-002 — a mode's fields are preserved across mode switches, never cleared) and eliminating a `!!` at every read site in `ReminderScheduling.kt`. Only `nextFireAt` is nullable, because null is a state the scheduler writes deliberately: not armed.
+
+### Version 5 → 6
+Makes `times` `NOT NULL`, the last reminder column whose null nothing wrote. SQLite cannot alter a column's nullability, so the table is recreated on the § Version 2 → 3 pattern; `COALESCE(times, '[]')` turns a stored null into the empty list it already decoded as. `reminders` is the child end of its only foreign key, so dropping it cascades nothing, and it carries no indexes to recreate — `categoryId` is indexed as the primary key.
+
+### Retiring transitional migrations
+Reaching a version by a two-step path and then collapsing it to one is the normal shape here: 3 → 4 → 5 became 3 → 5 once the only device that had reached 4 was confirmed at 5, and 5 → 6 exists for exactly as long as a device sits at 5. A transitional migration is deleted only after the devices it serves have moved past it, together with its exported schema and its `MigrationTest` case. What survives is the single migration from the oldest version still in the wild.
 
 ### Testing
 `app/src/androidTest/java/net/clahey/trackr/data/local/MigrationTest.kt` uses Room's `MigrationTestHelper` to run each migration above (except 1 → 2 — see Decisions) against a real device/emulator, seeding "before" data via raw SQL and asserting on the resulting rows; this is the only instrumented Room test in the project. `app/schemas/` is wired into the `androidTest` source set as assets so `MigrationTestHelper` can load each version's exported schema.

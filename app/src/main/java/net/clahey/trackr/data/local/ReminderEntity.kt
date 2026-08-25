@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 
-// @spec REM-DATA-001, REM-DATA-002, LS-BE-072
+// @spec REM-DATA-001, REM-DATA-002, LS-BE-072, LS-BE-073
 @Entity(
     tableName = "reminders",
     foreignKeys = [ForeignKey(
@@ -18,7 +18,7 @@ data class ReminderEntity(
     @PrimaryKey val categoryId: String,
     val enabled: Boolean,
     val mode: String, // ReminderMode.name, e.g. "FIXED" / "RANDOM"
-    val times: String?, // JSON list of "HH:mm" strings; FIXED only
+    val times: String, // JSON list of "HH:mm" strings; FIXED only
     val windowStart: String, // "HH:mm"; RANDOM only, preserved but unused while mode == FIXED
     val windowEnd: String, // "HH:mm"; RANDOM only, preserved but unused while mode == FIXED
     val occurrencesPerDay: Int, // RANDOM only, preserved but unused while mode == FIXED

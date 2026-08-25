@@ -4,7 +4,7 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 
 ## Status
 
-**PARTIAL** — last audited 2026-08-12 (deep full-text pass; supersedes the 2026-07-27 reference-only audit), annotation backfill completed 2026-08-14. 33 of 33 specs implemented and annotated. LS-BE-010 and LS-BE-011 were reworded in the 2026-08-12 pass to match actual (and correct) behavior — hierarchical category ordering and caller-assigned `sortOrder`, respectively — rather than changing code; see finding 6. Remaining work is test-file citations (finding 4) and one cross-segment reconciliation this segment can't make alone (see Work Required).
+**PARTIAL** — last audited 2026-08-12 (deep full-text pass; supersedes the 2026-07-27 reference-only audit), annotation backfill completed 2026-08-14. 36 of 36 specs implemented and annotated. LS-BE-010 and LS-BE-011 were reworded in the 2026-08-12 pass to match actual (and correct) behavior — hierarchical category ordering and caller-assigned `sortOrder`, respectively — rather than changing code; see finding 6. Remaining work is test-file citations (finding 4) and one cross-segment reconciliation this segment can't make alone (see Work Required).
 
 ## References
 
@@ -15,7 +15,7 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 - docs/llds/local-storage.md
 
 ### EARS
-- docs/specs/local-storage.md (33 specs: LS-BE-*)
+- docs/specs/local-storage.md (36 specs: LS-BE-*)
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/data/local/converters/InstantConverterTest.kt
@@ -72,10 +72,14 @@ Room persistence layer: `TrackrRepository` interface, entities, DAOs, type conve
 
 10. **Five category-write methods became one (2026-08-24).** `saveCategory`, `saveCategoryAndMigrateEvents`, `moveCategory`, `moveCategoryAndMigrateEvents`, and `saveCategoryWithReminder` were one transaction with three optional steps — reindex, migrate, reminder — so five of the eight combinations had names and the rest would have been written the day someone needed them. Now one `saveCategory(category, reminder, migrateEvents, orderedSiblingIds)`. Two findings fell out of reading them side by side: the `fromType: ValueType` parameter on all three migrating variants was **never read** — every one passed `category.resolvedValueType` to `migrateEventsForCategory`, so it was a Boolean flag wearing a type's clothes, and DM-PROC-021 wants nothing from the source type either; and `reminder = null` meaning *delete the row* was **unreachable in production** — `toReminder()` returns non-null and the two edit-screen call sites are its only callers, so the only thing exercising deletion was one fake-repository test. Null now means *leave the stored reminder untouched*, which is what 8 of the 10 call sites want, and `ReminderDao.deleteByCategoryId` is gone: a reminder is switched off with `enabled = false`, and only deleting the category removes a row (LS-BE-072). LS-BE-015 was widened to cover all three optional steps and now records the one ordering constraint that is not free — the category upsert must precede the reminder upsert, because `ReminderEntity`'s FK needs the row to exist. The interface method carries the codebase's first KDoc, since a nullable parameter whose null means "don't touch" is not guessable from a call site.
 
+11. **`times` was the last defensively-nullable column (2026-08-25, schema version 6).** `toEntity` encoded an empty times list as null and `toDomain` read null back as an empty list — but nothing produces an empty list to begin with (`ReminderUIState.fromStored` refills one, and the screen's remove-icon is gated on `times.size > 1`), and `"[]"` already decodes to exactly what the null decoded to. Removing the write branch left a nullable column nothing wrote null to, which is the case the v4 → v5 tightening of `windowStart`/`windowEnd`/`occurrencesPerDay` already settled the other way. A survey of all nine nullable columns found `times` was the only one left whose null was not a state something writes on purpose: `categories.parentId` (top-level), `categories.emoji`/`color`/`valueType` (inherit from parent), `categories.defaultValue` and `events.value`/`notes` (absent), and `reminders.nextFireAt` (not armed) all mean something. LS-BE-073 now states the rule for the whole reminders row rather than leaving each column's nullability to be decided one at a time, and gives the two migrations something to cite that is about column shape rather than REM-DATA-002's preservation-across-mode-switch.
+
+    Two migrations, on the pattern the v4 → v5 change used: `MIGRATION_3_6` creates the table in the version-6 shape for a device that never had a `reminders` table, and `MIGRATION_5_6` rebuilds it with `COALESCE(times, '[]')` for the one device sitting at 5. `MIGRATION_3_5` and `MIGRATION_5_6` are **transitional and scheduled for deletion** once that device is confirmed at version 6, along with `5.json` and their `MigrationTest` cases — leaving `MIGRATION_3_6` as the sole path, exactly as `MIGRATION_3_5` was left when `MIGRATION_3_4`/`MIGRATION_4_5` were retired (finding 7). Until then all three are registered. 36 specs, was 35.
+
 ## Work Required
 
 ### Must Fix
-_None._
+1. **Blocked on device confirmation.** Once the installed app is confirmed at schema version 6 (`PRAGMA user_version` on its database, as was done for the version-4 → 5 retirement), delete `MIGRATION_3_5`, `MIGRATION_5_6`, `5.json`, and the `migrate3To5Directly_runs` and `migrate5To6_backfillsNullTimesToAnEmptyList` tests, and drop the two from `DatabaseModule`. See finding 11.
 
 ### Should Fix
 1. Add test-file `@spec` citations for the specs listed in finding 4.

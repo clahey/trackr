@@ -102,7 +102,7 @@ private fun String.toLocalTimeHHmm(): LocalTime = LocalTime.parse(this, hhMm)
 // @spec REM-DATA-002, REM-DATA-010
 fun ReminderEntity.toDomain(): Reminder = try {
     val decodedDaysActive = StringListConverter.decode(daysActive).map { DayOfWeek.valueOf(it) }.toSet()
-    val decodedTimes = times?.let { StringListConverter.decode(it).map { t -> t.toLocalTimeHHmm() } } ?: emptyList()
+    val decodedTimes = StringListConverter.decode(times).map { it.toLocalTimeHHmm() }
     // Lowercase is the legacy encoding, accepted on decode only.
     val decodedMode = ReminderMode.valueOf(mode.uppercase())
     require(decodedDaysActive.isNotEmpty())

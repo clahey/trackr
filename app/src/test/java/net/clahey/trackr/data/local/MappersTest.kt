@@ -73,7 +73,7 @@ class MappersTest {
     private fun reminderEntity(
         enabled: Boolean = true,
         mode: String = "random",
-        times: String? = StringListConverter.encode(listOf("08:00")),
+        times: String = StringListConverter.encode(listOf("08:00")),
         windowStart: String = "09:00",
         windowEnd: String = "21:00",
         occurrencesPerDay: Int = 4,
@@ -101,7 +101,7 @@ class MappersTest {
             "unparseable windowEnd" to reminderEntity(windowEnd = "nope"),
             "no active days" to reminderEntity(daysActive = emptyList()),
             "no active days on an already-disabled row" to reminderEntity(enabled = false, daysActive = emptyList()),
-            "FIXED with no times" to reminderEntity(mode = "fixed", times = null),
+            "FIXED with no times" to reminderEntity(mode = "fixed", times = StringListConverter.encode(emptyList())),
             "occurrencesPerDay below 1" to reminderEntity(occurrencesPerDay = 0),
         )
         for ((name, entity) in cases) {
