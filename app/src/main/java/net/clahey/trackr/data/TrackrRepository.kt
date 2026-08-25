@@ -13,15 +13,27 @@ import java.time.Instant
 interface TrackrRepository {
     fun getCategories(): Flow<List<Category>>
     fun getCategoryById(id: String): Flow<Category?>
-    suspend fun saveCategory(category: Category)
-    suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)
+    /**
+     * Upserts [category], running every step that is asked for in the same transaction.
+     *
+     * @param reminder the reminder to store for this category, or null to leave whatever is
+     *   already stored untouched. There is no way to delete a reminder row through this call:
+     *   a reminder is switched off by storing it with `enabled = false`, and only deleting the
+     *   category removes its row.
+     * @param migrateEvents converts the category's existing events to its resolved value type.
+     * @param orderedSiblingIds reindexes the destination sibling group, treating the list as an
+     *   ordering hint reconciled against the group's live members rather than as membership.
+     */
+    // @spec LS-BE-003, LS-BE-015, DM-DATA-028, CAT-UI-080, REM-DATA-006, REM-DATA-008
+    suspend fun saveCategory(
+        category: Category,
+        reminder: Reminder? = null,
+        migrateEvents: Boolean = false,
+        orderedSiblingIds: List<String>? = null,
+    )
     // @spec CAT-UI-006
     suspend fun deleteCategory(id: String)
     suspend fun reorderCategories(orderedIds: List<String>)
-    // @spec CAT-UI-080
-    suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>)
-    // @spec CAT-UI-080, CAT-UI-081
-    suspend fun moveCategoryAndMigrateEvents(category: Category, orderedSiblingIds: List<String>, fromType: ValueType)
     fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
     fun getSubCategoryCount(categoryId: String): Flow<Int>
 
@@ -48,8 +60,6 @@ interface TrackrRepository {
     fun getReminderForCategory(categoryId: String): Flow<Reminder?>
     // @spec REM-DATA-005
     suspend fun saveReminder(reminder: Reminder)
-    // @spec REM-DATA-006, REM-DATA-008
-    suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType? = null)
     // @spec REM-DATA-007
     suspend fun getAllEnabledRemindersOnce(): List<Reminder>
 

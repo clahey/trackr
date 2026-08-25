@@ -124,6 +124,8 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 
     Two neighbours carry the same ID and were **left alone pending a decision**: `getReminderForCategory` cites REM-DATA-006 at all three of its sites (interface, `LocalTrackrRepository`, fake), which is a read citing a write-atomicity spec and cannot be right — but no REM-DATA spec covers "expose a category's reminder as a `Flow`", so fixing it means either writing one or dropping the annotation. `ReminderDao`'s class-level `@spec REM-DATA-006, REM-DATA-007, REM-DATA-008` is weaker than wrong: 007 and 008 fit methods it has, while 006's transaction belongs to the repository above it.
 
+23. **`saveCategoryWithReminder` merged into `saveCategory` (2026-08-25).** It was one of five repository methods that were the same transaction with different optional steps; `local-storage` collapsed them into arguments (`docs/arrows/local-storage.md` finding 10). This segment's stake is the null case: `reminder = null` used to *delete* the reminder row and now *leaves it untouched*. That is a behavior change on paper and none in practice — no production caller ever passed null, because `ReminderUIState.toReminder()` returns non-null and the edit screen is the only caller. Deletion had no user-facing route either: a reminder is switched off by storing `enabled = false`, and only deleting the category removes a row (LS-BE-072). REM-DATA-006 now says so explicitly rather than leaving null to mean the destructive thing by default. `ReminderDao.deleteByCategoryId` was removed as dead.
+
 ## Work Required
 
 ### Must Fix

@@ -145,7 +145,7 @@ class CategoryListViewModelTest {
         repo.setCategories(category)
         vm.hasEnabledReminder.test {
             assertFalse(awaitItem())
-            repo.saveCategoryWithReminder(category, makeReminder("c1"))
+            repo.saveCategory(category, makeReminder("c1"))
             assertTrue(awaitItem())
         }
     }

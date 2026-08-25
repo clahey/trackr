@@ -15,12 +15,17 @@ interface TrackrRepository {
     // Categories
     fun getCategories(): Flow<List<Category>>  // hierarchical sort: MetaCategories by sortOrder, SubCategories after parent
     fun getCategoryById(id: String): Flow<Category?>
-    suspend fun saveCategory(category: Category)   // upsert; caller sets sortOrder
-    suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType)  // atomic upsert + event migration
+    // upsert; caller sets sortOrder. Every optional step runs in the same transaction:
+    // reminder != null upserts it (null leaves the stored one alone), migrateEvents converts
+    // the category's events to its resolved type, orderedSiblingIds reindexes the destination group
+    suspend fun saveCategory(
+        category: Category,
+        reminder: Reminder? = null,
+        migrateEvents: Boolean = false,
+        orderedSiblingIds: List<String>? = null,
+    )
     suspend fun deleteCategory(id: String)  // promotes SubCategories if MetaCategory; atomic
     suspend fun reorderCategories(orderedIds: List<String>)  // reassigns sortOrder to match list
-    suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>)  // reparent + reindex destination group in one transaction
-    suspend fun moveCategoryAndMigrateEvents(category: Category, orderedSiblingIds: List<String>, fromType: ValueType)  // moveCategory + event migration when the effective valueType changed
     fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean = false): Flow<Int>
     fun getSubCategoryCount(categoryId: String): Flow<Int>
     suspend fun addStarterCategories(specs: List<StarterCategoryInput>): Int  // transactional insert-missing; returns count created
@@ -40,7 +45,6 @@ interface TrackrRepository {
     // Reminders (persistence only — no AlarmManager access; see docs/llds/reminders.md)
     fun getReminderForCategory(categoryId: String): Flow<Reminder?>
     suspend fun saveReminder(reminder: Reminder)                                  // upsert, standalone
-    suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType? = null) // atomic: category upsert + reminder upsert/clear (+ optional event migration) in one transaction
     suspend fun getAllEnabledRemindersOnce(): List<Reminder>                      // boot / time-change re-arm
 
     // Lifecycle
@@ -168,7 +172,6 @@ Sort order is `timestamp DESC, createdAt DESC, id ASC` (LS-BE-020/021). The `id 
 | `getAllEnabledOnce()` | `List<ReminderEntity>` | suspend; boot / time-change re-arm and startup reconciliation |
 | `hasEnabled()` | `Flow<Boolean>` | `SELECT EXISTS(...)` over `enabled = 1`; Room re-emits on any write to the table |
 | `upsert(entity)` | `Unit` | suspend |
-| `deleteByCategoryId(categoryId)` | `Unit` | suspend; clearing a reminder while its category survives. Deleting the category itself takes the `categories` row's CASCADE DELETE instead |
 
 ## Entity ↔ Domain Mappers
 
@@ -188,7 +191,15 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **`deleteCategory`:** runs inside a single Room transaction. Within the transaction: fetches child entities (by parentId); if any exist, upserts each child with `parentId = null` (resolving null emoji/color/valueType fields to the parent's stored values); collects image paths for the parent's own events; deletes the parent DB row (CASCADE removes its own events but not promoted children). Image file deletion happens after the transaction commits. When there are no children the transaction is a no-op promotion step followed by the same delete.
 
-**`moveCategory` / `moveCategoryAndMigrateEvents`:** the general "reparent a category and reorder its destination sibling group" capability. Both run inside a single Room transaction: upsert the reparented row (reusing `saveCategory`'s childlessness guard, DM-DATA-028), then re-read the destination group's *current* members within that same transaction (`getChildrenByParentIdOnce` for a nest, `getTopLevelOnce` for a top-level move) and dense-reindex them via `updateSortOrders`, ordering them by reconciling the caller's `orderedSiblingIds` against those live members through the pure function `reconcileSiblingOrder` (`domain/SiblingReindex.kt`) — shared by both this real repository and the test `FakeTrackrRepository`, and unit-tested in isolation, so the fake stays behavior-consistent with the real reindex. Re-reading membership *inside* the transaction — rather than reindexing the caller's `orderedSiblingIds` directly — closes a **read-outside-transaction (TOCTOU) gap**: the reindex list is derived from state read inside the transaction, so a concurrent change to the destination group between the caller's read and the commit can no longer strand a sibling at a stale, colliding `sortOrder`. This is general to any caller that supplies an explicit new order (drag today; a future menu/keyboard Move Up/Down would use the same method). The **source** group (when the move changes which group the row belongs to) is left untouched — `sortOrder` only has to express relative order among current siblings, and removing a member doesn't invalidate the relative order of the ones left behind, so no renumbering is needed there. The migrating variant additionally runs the `convertEventValue` pass over the category's own events, mirroring `saveCategoryAndMigrateEvents`. The reconcile ordering rule is specified by CAT-UI-083; the caller-side concern of *where `orderedSiblingIds` comes from* (a drag drop's snapshot, possibly held across a CAT-UI-081 dialog) is `category-management.md § Drag-to-Reorder: Adapter & Persistence`.
+**`saveCategory`:** one Room transaction with three optional steps — upsert the category (childlessness guard first, DM-DATA-028), reindex the destination sibling group when `orderedSiblingIds` is given, migrate the category's events when `migrateEvents` is set, upsert the reminder when one is passed.
+
+The category upsert has to come first, and not merely for tidiness: `ReminderEntity`'s foreign key (LS-BE-072) points at `categories(id)`, so writing a reminder for a category being created in this same transaction would violate the constraint if the order were reversed. The three optional steps are independent of each other and their relative order is free.
+
+Each optional step is what a different caller needs, and no caller needs all three: the category list screen reparents and reindexes, the edit screen writes a reminder, and either can change a value type. They are one method because they are one transaction — a reparent that migrates events must not half-commit, and neither must a category save that writes a reminder.
+
+`reminder = null` leaves whatever reminder is stored **untouched**, which is what every caller outside the edit screen wants. There is deliberately no way to delete a reminder row through this method: a reminder is switched off by storing it with `enabled = false`, and a category nobody configured one for simply never has a row written. The only thing that removes a row is deleting the category itself, via the FK cascade (LS-BE-072).
+
+**Reindexing the destination group** re-reads its *current* members within that same transaction (`getChildrenByParentIdOnce` for a nest, `getTopLevelOnce` for a top-level move) and dense-reindexes them via `updateSortOrders`, ordering them by reconciling the caller's `orderedSiblingIds` against those live members through the pure function `reconcileSiblingOrder` (`domain/SiblingReindex.kt`) — shared by both this real repository and the test `FakeTrackrRepository`, and unit-tested in isolation, so the fake stays behavior-consistent with the real reindex. Re-reading membership *inside* the transaction — rather than reindexing the caller's `orderedSiblingIds` directly — closes a **read-outside-transaction (TOCTOU) gap**: the reindex list is derived from state read inside the transaction, so a concurrent change to the destination group between the caller's read and the commit can no longer strand a sibling at a stale, colliding `sortOrder`. This is general to any caller that supplies an explicit new order (drag today; a future menu/keyboard Move Up/Down would use the same method). The **source** group (when the move changes which group the row belongs to) is left untouched — `sortOrder` only has to express relative order among current siblings, and removing a member doesn't invalidate the relative order of the ones left behind, so no renumbering is needed there. The reconcile ordering rule is specified by CAT-UI-083; the caller-side concern of *where `orderedSiblingIds` comes from* (a drag drop's snapshot, possibly held across a CAT-UI-081 dialog) is `category-management.md § Drag-to-Reorder: Adapter & Persistence`.
 
 **Orphaned SubCategory handling in `toDomainList()`:** if a `CategoryEntity` has a non-null `parentId` that is not present among the loaded entities, it is surfaced as a `Category.MetaCategory` using its own stored fields, with null-field fallbacks matching MetaCategory assembly (`"" / 0xFFE53935L / ValueType.None`). This can occur when a MetaCategory is deleted mid-session or when the DB is in an inconsistent state; see DM-PROC-022.
 
@@ -198,7 +209,7 @@ Implements `TrackrRepository`. Injected with `CategoryDao`, `EventDao`, and `Ima
 
 **`saveReminder` / `getReminderForCategory` / `getAllEnabledRemindersOnce`:** thin pass-throughs to `ReminderDao`, mapping via `ReminderEntity.toDomain()`/`Reminder.toEntity()`. No transaction needed — each is one DAO call, with no read-then-write pair to hold together.
 
-**`saveCategoryWithReminder`:** runs inside a single Room transaction: upserts the `CategoryEntity` (via the same path `saveCategory` uses, including its childlessness guard); when `migrateFromType` is non-null, migrates that category's existing events to the new value type first (`migrateEventsForCategory`); then, for the reminder, either upserts the `ReminderEntity` (when `reminder != null`) or explicitly deletes it via `reminderDao.deleteByCategoryId` (when `reminder == null` — clearing a reminder while the category still exists is not implicit or CASCADE-driven; CASCADE only fires when the category row itself is deleted). Before upserting a non-null reminder, the method reads the existing row's `nextFireAt` inside the same transaction and copies it onto the entity being saved, discarding whatever `nextFireAt` the caller passed in — this is what keeps an edit-screen save from clobbering a value `ReminderScheduler` set concurrently (REM-DATA-008). This is a persistence-only transaction — it does not touch `AlarmManager`; arming or cancelling the alarm is a separate post-commit step the caller (`ReminderScheduler`, per `docs/llds/reminders.md § Scheduling Engine`) performs after this method returns successfully.
+**Writing the reminder** happens last. Before upserting, the method reads the existing row's `nextFireAt` inside the same transaction and copies it onto the entity being saved, discarding whatever `nextFireAt` the caller passed — this is what keeps an edit-screen save from clobbering a value `ReminderScheduler` set concurrently (REM-DATA-008, LS-BE-015). The transaction is persistence-only and never touches `AlarmManager`; arming or cancelling the alarm is a separate post-commit step the caller performs once this method returns (`docs/llds/reminders.md § Scheduling Engine`).
 
 ## ImageStore
 
@@ -273,6 +284,8 @@ Both files declare the same include set. Only the three entries above are backed
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Repository interface location | Defined in this segment | Separate `domain` module | No separate module at this scale; the interface is the seam, not the module boundary |
+| Category writes | One `saveCategory` with optional reminder, migrate, and reindex arguments | A named function per combination (`saveCategoryAndMigrateEvents`, `moveCategory`, `moveCategoryAndMigrateEvents`, `saveCategoryWithReminder`) | The named variants were one transaction with three optional steps, so five of the eight combinations had names and the rest would be written the day someone needed them — adding a fourth optional step would have doubled the count again. Arguments make the combinations free, and the transaction, which is the part that actually has to hold together, is written once |
+| `reminder = null` means | Leave the stored reminder untouched | Delete the reminder row (the earlier meaning); a three-state `Unchanged`/`Set`/`Clear` type | Eight of ten call sites do not touch reminders at all, so "leave it alone" is the case that deserves the default and the safe reading. Deletion turned out to be unreachable — a reminder is switched off with `enabled = false`, and only deleting the category removes a row — so a third state would have been a name for something nothing does |
 | Next color index storage | DataStore Preferences | Room metadata table; SharedPreferences | DataStore is the idiomatic Jetpack replacement for SharedPreferences; a Room table would be over-engineered for a single integer |
 | Next color index strategy | Wrapping counter `(n + 1) % paletteSize`; never reset on deletion | Compute from current category count | Count-based would repeat colors after deletions; a stored counter that cycles through the palette guarantees even distribution |
 | DAO write style | `@Upsert` (Room 2.5+) | `@Insert(onConflict = REPLACE)`; separate insert/update | `@Upsert` is correct and idiomatic; REPLACE deletes-then-inserts which resets FKs |

@@ -74,16 +74,16 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec DM-DATA-028
-    @Test fun `saveCategoryAndMigrateEvents throws when nesting a category that has children`() = runTest {
+    @Test fun `saveCategory with migrateEvents throws when nesting a category that has children`() = runTest {
         val repo = FakeTrackrRepository()
         val parent = makeCategory("parent")
         val newParent = makeCategory("newParent")
         val child = makeSubCategory("child", parent = parent)
         repo.setCategories(parent, newParent, child)
         try {
-            repo.saveCategoryAndMigrateEvents(
+            repo.saveCategory(
                 makeSubCategory("parent", parent = newParent),
-                fromType = ValueType.None,
+                migrateEvents = true,
             )
             fail("Expected CategoryHasChildrenException")
         } catch (e: CategoryHasChildrenException) {
@@ -92,7 +92,7 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec CAT-UI-080
-    @Test fun `moveCategory reindexes only the destination sibling group leaving other categories untouched`() = runTest {
+    @Test fun `saveCategory reindexes only the destination sibling group leaving other categories untouched`() = runTest {
         val repo = FakeTrackrRepository()
         val groupA = makeCategory("groupA", sortOrder = 0)
         val a1 = makeSubCategory("a1", parent = groupA, sortOrder = 5)
@@ -100,7 +100,7 @@ class FakeTrackrRepositoryTest {
         val groupB = makeCategory("groupB", sortOrder = 1)
         repo.setCategories(groupA, a1, a2, groupB)
         // Reorder a1/a2 within groupA — groupB's own sortOrder must be unaffected.
-        repo.moveCategory(a2, orderedSiblingIds = listOf("a2", "a1"))
+        repo.saveCategory(a2, orderedSiblingIds = listOf("a2", "a1"))
         val cats = repo.getCategories().first().associateBy { it.id }
         assertEquals(0, (cats["a2"] as Category.SubCategory).sortOrder)
         assertEquals(1, (cats["a1"] as Category.SubCategory).sortOrder)
@@ -108,14 +108,14 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec CAT-UI-080
-    @Test fun `moveCategory reparents a SubCategory to a new MetaCategory and reindexes the destination group`() = runTest {
+    @Test fun `saveCategory reparents a SubCategory to a new MetaCategory and reindexes the destination group`() = runTest {
         val repo = FakeTrackrRepository()
         val oldParent = makeCategory("oldParent")
         val newParent = makeCategory("newParent")
         val existingChild = makeSubCategory("existing", parent = newParent, sortOrder = 0)
         val moved = makeSubCategory("moved", parent = oldParent, sortOrder = 0)
         repo.setCategories(oldParent, newParent, existingChild, moved)
-        repo.moveCategory(moved.copy(parent = newParent), orderedSiblingIds = listOf("existing", "moved"))
+        repo.saveCategory(moved.copy(parent = newParent), orderedSiblingIds = listOf("existing", "moved"))
         val cats = repo.getCategories().first().associateBy { it.id }
         val movedResult = cats["moved"] as Category.SubCategory
         assertEquals("newParent", movedResult.parent.id)
@@ -124,7 +124,7 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec CAT-UI-080, CAT-UI-081
-    @Test fun `moveCategoryAndMigrateEvents reindexes siblings and converts the category's own events`() = runTest {
+    @Test fun `saveCategory reindexes siblings and converts the category's own events`() = runTest {
         val repo = FakeTrackrRepository()
         val oldParent = makeCategory("oldParent")
         val newParent = makeCategory("newParent").copy(valueType = ValueType.Text)
@@ -132,10 +132,10 @@ class FakeTrackrRepositoryTest {
         repo.setCategories(oldParent, newParent, moved)
         val anchor = Instant.parse("2024-01-15T12:00:00Z")
         repo.setEvents(Event("e1", "moved", anchor, null, null, emptyList(), anchor))
-        repo.moveCategoryAndMigrateEvents(
+        repo.saveCategory(
             moved.copy(parent = newParent),
+            migrateEvents = true,
             orderedSiblingIds = listOf("moved"),
-            fromType = ValueType.None,
         )
         val movedResult = repo.getCategoryById("moved").first() as Category.SubCategory
         assertEquals("newParent", movedResult.parent.id)
@@ -143,7 +143,7 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec CAT-UI-080, CAT-UI-083
-    @Test fun `moveCategory reindexes the destination group's live members, not the stale hint`() = runTest {
+    @Test fun `saveCategory reindexes the destination group's live members, not the stale hint`() = runTest {
         val repo = FakeTrackrRepository()
         // Snapshot the top-level order [m1, m2, m3], then a concurrent create adds m4 at the
         // top (sortOrder min-1, per CAT-UI-041) before the drop of m3-to-front is applied.
@@ -153,7 +153,7 @@ class FakeTrackrRepositoryTest {
         val m4 = makeCategory("m4", sortOrder = -1)
         repo.setCategories(m1, m2, m3, m4)
         // The widget's stale snapshot never saw m4.
-        repo.moveCategory(m3, orderedSiblingIds = listOf("m3", "m1", "m2"))
+        repo.saveCategory(m3, orderedSiblingIds = listOf("m3", "m1", "m2"))
         val cats = repo.getCategories().first()
         // m4 (unknown to the hint, currently ahead of all) stays at the front; the user's
         // arranged [m3, m1, m2] follows it — m4 is not stranded at a colliding sortOrder.
@@ -162,14 +162,14 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec CAT-UI-080, CAT-UI-083
-    @Test fun `moveCategory drops a hint id that is no longer a member of the destination group`() = runTest {
+    @Test fun `saveCategory drops a hint id that is no longer a member of the destination group`() = runTest {
         val repo = FakeTrackrRepository()
         val parent = makeCategory("parent", sortOrder = 0)
         val a1 = makeSubCategory("a1", parent = parent, sortOrder = 0)
         val a3 = makeSubCategory("a3", parent = parent, sortOrder = 2)
         // a2 was in the snapshot but got deleted/reparented away before the drop applied.
         repo.setCategories(parent, a1, a3)
-        repo.moveCategory(a3, orderedSiblingIds = listOf("a3", "a2", "a1"))
+        repo.saveCategory(a3, orderedSiblingIds = listOf("a3", "a2", "a1"))
         val cats = repo.getCategories().first().associateBy { it.id }
         assertEquals(0, (cats["a3"] as Category.SubCategory).sortOrder)
         assertEquals(1, (cats["a1"] as Category.SubCategory).sortOrder)
@@ -233,7 +233,7 @@ class FakeTrackrRepositoryTest {
     }
 
     // @spec REM-DATA-008
-    @Test fun `saveCategoryWithReminder ignores the passed nextFireAt and preserves the store's current value`() = runTest {
+    @Test fun `saveCategory ignores the passed nextFireAt and preserves the store's current value`() = runTest {
         val repo = FakeTrackrRepository()
         val category = makeCategory("cat1")
         repo.setCategories(category)
@@ -241,18 +241,28 @@ class FakeTrackrRepositoryTest {
         repo.setReminders(makeReminder("cat1", nextFireAt = armedAt))
         // Simulate onAlarmFired having already advanced nextFireAt while the edit screen was open.
         val staleFromScreen = Instant.parse("2024-01-15T20:00:00Z")
-        repo.saveCategoryWithReminder(category, makeReminder("cat1", nextFireAt = staleFromScreen))
+        repo.saveCategory(category, makeReminder("cat1", nextFireAt = staleFromScreen))
         val result = repo.getReminderForCategory("cat1").first()
         assertEquals(armedAt, result!!.nextFireAt)
     }
 
     // @spec REM-DATA-006
-    @Test fun `saveCategoryWithReminder with a null reminder clears any existing row`() = runTest {
+    @Test fun `saveCategory without a reminder leaves the stored one untouched`() = runTest {
         val repo = FakeTrackrRepository()
         val category = makeCategory("cat1")
         repo.setCategories(category)
-        repo.setReminders(makeReminder("cat1"))
-        repo.saveCategoryWithReminder(category, null)
+        val stored = makeReminder("cat1")
+        repo.setReminders(stored)
+        repo.saveCategory(category.copy(name = "renamed"))
+        assertEquals(stored, repo.getReminderForCategory("cat1").first())
+    }
+
+    // @spec REM-DATA-006
+    @Test fun `saveCategory without a reminder writes no row for a category that has none`() = runTest {
+        val repo = FakeTrackrRepository()
+        val category = makeCategory("cat1")
+        repo.setCategories(category)
+        repo.saveCategory(category.copy(name = "renamed"))
         assertNull(repo.getReminderForCategory("cat1").first())
     }
 
@@ -300,7 +310,7 @@ class FakeTrackrRepositoryTest {
         repo.setCategories(category)
         repo.hasEnabledReminder().test {
             assertFalse(awaitItem())
-            repo.saveCategoryWithReminder(category, makeReminder("cat1"))
+            repo.saveCategory(category, makeReminder("cat1"))
             assertTrue(awaitItem())
         }
     }

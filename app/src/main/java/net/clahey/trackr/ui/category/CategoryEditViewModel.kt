@@ -80,7 +80,7 @@ data class ReminderUIState(
         occurrencesPerDay = occurrencesPerDay.toIntOrNull()?.coerceAtLeast(1) ?: 1,
         daysActive = daysActive,
         showCategoryInNotification = showCategoryInNotification,
-        nextFireAt = null, // ignored by saveCategoryWithReminder; the DB's current value survives (REM-DATA-008)
+        nextFireAt = null, // ignored by saveCategory; the DB's current value survives (REM-DATA-008)
     )
 
     companion object {
@@ -472,11 +472,9 @@ class CategoryEditViewModel @Inject constructor(
 
         val originalType = _originalValueType.value
         // @spec DM-PROC-021
-        if (categoryId != null && originalType != null && category.resolvedValueType != originalType) {
-            repository.saveCategoryWithReminder(category, reminder, migrateFromType = originalType)
-        } else {
-            repository.saveCategoryWithReminder(category, reminder)
-        }
+        val migrateEvents =
+            categoryId != null && originalType != null && category.resolvedValueType != originalType
+        repository.saveCategory(category, reminder, migrateEvents = migrateEvents)
         // @spec REM-SCHED-013, REM-SCHED-014
         if (reminder.enabled) reminderScheduler.enableReminder(reminder) else reminderScheduler.disableReminder(category.id)
 

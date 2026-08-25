@@ -66,20 +66,24 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
         }
     }
 
-    // @spec LS-BE-003, DM-DATA-028
-    override suspend fun saveCategory(category: Category) {
+    // @spec LS-BE-003, LS-BE-015, DM-DATA-028, CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035,
+    // @spec CAT-UI-080, CAT-UI-081, CAT-UI-083, DM-PROC-021, REM-DATA-006, REM-DATA-008
+    override suspend fun saveCategory(
+        category: Category,
+        reminder: Reminder?,
+        migrateEvents: Boolean,
+        orderedSiblingIds: List<String>?,
+    ) {
         db.withTransaction {
             if (category is Category.SubCategory) requireNoChildren(category)
+            // Before the reminder write: ReminderEntity's FK needs this row to exist.
             categoryDao.upsert(category.toEntity())
-        }
-    }
-
-    // @spec CAT-UI-032, CAT-UI-033, CAT-UI-034, CAT-UI-035, DM-PROC-021, DM-DATA-028
-    override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
-        db.withTransaction {
-            if (category is Category.SubCategory) requireNoChildren(category)
-            categoryDao.upsert(category.toEntity())
-            migrateEventsForCategory(category.id, category.resolvedValueType)
+            if (orderedSiblingIds != null) reindexDestinationGroup(category, orderedSiblingIds)
+            if (migrateEvents) migrateEventsForCategory(category.id, category.resolvedValueType)
+            if (reminder != null) {
+                val storedNextFireAt = reminderDao.getByCategoryIdOnce(category.id)?.nextFireAt
+                reminderDao.upsert(reminder.toEntity().copy(nextFireAt = storedNextFireAt))
+            }
         }
     }
 
@@ -96,29 +100,6 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
             orderedSiblingIds,
         )
         categoryDao.updateSortOrders(ordered)
-    }
-
-    // @spec CAT-UI-080, CAT-UI-083
-    override suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>) {
-        db.withTransaction {
-            if (category is Category.SubCategory) requireNoChildren(category)
-            categoryDao.upsert(category.toEntity())
-            reindexDestinationGroup(category, orderedSiblingIds)
-        }
-    }
-
-    // @spec CAT-UI-080, CAT-UI-081, CAT-UI-083
-    override suspend fun moveCategoryAndMigrateEvents(
-        category: Category,
-        orderedSiblingIds: List<String>,
-        fromType: ValueType,
-    ) {
-        db.withTransaction {
-            if (category is Category.SubCategory) requireNoChildren(category)
-            categoryDao.upsert(category.toEntity())
-            reindexDestinationGroup(category, orderedSiblingIds)
-            migrateEventsForCategory(category.id, category.resolvedValueType)
-        }
     }
 
     // @spec LS-BE-031
@@ -237,26 +218,6 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     // @spec REM-DATA-005
     override suspend fun saveReminder(reminder: Reminder) {
         reminderDao.upsert(reminder.toEntity())
-    }
-
-    // @spec REM-DATA-006, REM-DATA-008, LS-BE-015
-    override suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType?) {
-        db.withTransaction {
-            if (category is Category.SubCategory) requireNoChildren(category)
-            categoryDao.upsert(category.toEntity())
-            if (migrateFromType != null) {
-                migrateEventsForCategory(category.id, category.resolvedValueType)
-            }
-            if (reminder == null) {
-                reminderDao.deleteByCategoryId(category.id)
-            } else {
-                // nextFireAt is ignored on `reminder` — the DB's current value survives this
-                // write untouched, so a save can never clobber a value ReminderScheduler set
-                // concurrently while the edit screen was open (REM-DATA-008).
-                val currentNextFireAt = reminderDao.getByCategoryIdOnce(category.id)?.nextFireAt
-                reminderDao.upsert(reminder.toEntity().copy(nextFireAt = currentNextFireAt))
-            }
-        }
     }
 
     // @spec REM-DATA-007

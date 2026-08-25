@@ -24,7 +24,4 @@ interface ReminderDao {
 
     @Upsert
     suspend fun upsert(entity: ReminderEntity)
-
-    @Query("DELETE FROM reminders WHERE categoryId = :categoryId")
-    suspend fun deleteByCategoryId(categoryId: String)
 }

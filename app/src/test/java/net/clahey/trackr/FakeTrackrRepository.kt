@@ -62,8 +62,23 @@ class FakeTrackrRepository : TrackrRepository {
 
     override fun getCategoryById(id: String): Flow<Category?> =
         categories.map { list -> categoryReadGate?.await(); list.find { c -> c.id == id } }
-    // @spec DM-DATA-028
-    override suspend fun saveCategory(category: Category) {
+    // @spec DM-DATA-028, DM-PROC-021, LS-BE-015, CAT-UI-080, CAT-UI-083, REM-DATA-006, REM-DATA-008
+    override suspend fun saveCategory(
+        category: Category,
+        reminder: Reminder?,
+        migrateEvents: Boolean,
+        orderedSiblingIds: List<String>?,
+    ) {
+        upsertCategory(category)
+        if (orderedSiblingIds != null) reindexDestinationGroup(category, orderedSiblingIds)
+        if (migrateEvents) migrateEventsForCategory(category)
+        if (reminder != null) {
+            val storedNextFireAt = reminders.value[category.id]?.nextFireAt
+            reminders.update { it + (category.id to reminder.copy(nextFireAt = storedNextFireAt)) }
+        }
+    }
+
+    private fun upsertCategory(category: Category) {
         categories.update { list ->
             if (category is Category.SubCategory) {
                 val childCount = list.count { c ->
@@ -81,9 +96,7 @@ class FakeTrackrRepository : TrackrRepository {
         }
     }
 
-    // @spec DM-PROC-021, DM-DATA-028
-    override suspend fun saveCategoryAndMigrateEvents(category: Category, fromType: ValueType) {
-        saveCategory(category)  // constraint check is inside saveCategory
+    private fun migrateEventsForCategory(category: Category) {
         val targetType = category.resolvedValueType
         val affectedIds = buildAffectedIds(category)
         events.update { list ->
@@ -173,22 +186,6 @@ class FakeTrackrRepository : TrackrRepository {
             orderedSiblingIds,
         )
         updateSortOrdersFor(ordered)
-    }
-
-    // @spec CAT-UI-080, CAT-UI-083
-    override suspend fun moveCategory(category: Category, orderedSiblingIds: List<String>) {
-        saveCategory(category)  // constraint check is inside saveCategory
-        reindexDestinationGroup(category, orderedSiblingIds)
-    }
-
-    // @spec CAT-UI-080, CAT-UI-081, CAT-UI-083
-    override suspend fun moveCategoryAndMigrateEvents(
-        category: Category,
-        orderedSiblingIds: List<String>,
-        fromType: ValueType,
-    ) {
-        saveCategoryAndMigrateEvents(category, fromType)
-        reindexDestinationGroup(category, orderedSiblingIds)
     }
 
     override fun getEventCountForCategory(categoryId: String, includeSubCategoriesWithNullType: Boolean): Flow<Int> {
@@ -282,20 +279,6 @@ class FakeTrackrRepository : TrackrRepository {
     // @spec REM-DATA-005
     override suspend fun saveReminder(reminder: Reminder) {
         reminders.update { it + (reminder.categoryId to reminder) }
-    }
-
-    // @spec REM-DATA-006, REM-DATA-008
-    override suspend fun saveCategoryWithReminder(category: Category, reminder: Reminder?, migrateFromType: ValueType?) {
-        if (migrateFromType != null) saveCategoryAndMigrateEvents(category, migrateFromType) else saveCategory(category)
-        reminders.update { map ->
-            if (reminder == null) {
-                map - category.id
-            } else {
-                // nextFireAt on `reminder` is ignored; the store's current value survives (REM-DATA-008).
-                val currentNextFireAt = map[category.id]?.nextFireAt
-                map + (category.id to reminder.copy(nextFireAt = currentNextFireAt))
-            }
-        }
     }
 
     // @spec REM-DATA-007

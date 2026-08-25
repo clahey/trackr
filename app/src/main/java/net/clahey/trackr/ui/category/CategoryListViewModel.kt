@@ -213,8 +213,7 @@ class CategoryListViewModel @Inject constructor(
     ) {
         if (!valueTypeChangeNeeded(category, effectiveTypeBefore)) {
             persistOrReject(category) {
-                if (orderedSiblingIds != null) repository.moveCategory(category, orderedSiblingIds)
-                else repository.saveCategory(category)
+                repository.saveCategory(category, orderedSiblingIds = orderedSiblingIds)
             }
             onSettled()
             return
@@ -223,11 +222,11 @@ class CategoryListViewModel @Inject constructor(
         val tier = warningTierFor(effectiveTypeBefore, category.resolvedValueType)
         if (ownEventCount == 0 || tier == null) {
             persistOrReject(category) {
-                if (orderedSiblingIds != null) {
-                    repository.moveCategoryAndMigrateEvents(category, orderedSiblingIds, effectiveTypeBefore)
-                } else {
-                    repository.saveCategoryAndMigrateEvents(category, effectiveTypeBefore)
-                }
+                repository.saveCategory(
+                    category,
+                    migrateEvents = true,
+                    orderedSiblingIds = orderedSiblingIds,
+                )
             }
             onSettled()
         } else {
@@ -256,11 +255,11 @@ class CategoryListViewModel @Inject constructor(
         val pending = _pendingValueTypeConfirmation.value ?: return
         viewModelScope.launch {
             persistOrReject(pending.category) {
-                if (pending.orderedSiblingIds != null) {
-                    repository.moveCategoryAndMigrateEvents(pending.category, pending.orderedSiblingIds, pending.fromType)
-                } else {
-                    repository.saveCategoryAndMigrateEvents(pending.category, pending.fromType)
-                }
+                repository.saveCategory(
+                    pending.category,
+                    migrateEvents = true,
+                    orderedSiblingIds = pending.orderedSiblingIds,
+                )
             }
             _pendingValueTypeConfirmation.value = null
             pending.onSettled()

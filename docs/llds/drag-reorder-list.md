@@ -130,7 +130,7 @@ The state divides into two lifetimes. The **per-drag substate** — the picked-u
 
 ## Category-Management Integration
 
-The category list is the only current caller. How it maps `Category` ↔ the widget's `DragListItem` tree, gates a reparent on a value-type change, and persists a drop — the `moveCategory` / `moveCategoryAndMigrateEvents` repository methods, the destination-group `sortOrder` reindex, and its transactional reconciliation against live state — is category-management's concern, not the generic widget's. It is specced as `CAT-UI-080`/`CAT-UI-081`/`CAT-UI-082` and designed in `docs/llds/category-management.md § Drag-to-Reorder: Adapter & Persistence`. The widget's only obligations to any caller are the `DragMoveResult` contract (§ Generic Widget API) and the `onSettled` protocol (§ Settling).
+The category list is the only current caller. How it maps `Category` ↔ the widget's `DragListItem` tree, gates a reparent on a value-type change, and persists a drop — the repository's `saveCategory` call, the destination-group `sortOrder` reindex, and its transactional reconciliation against live state — is category-management's concern, not the generic widget's. It is specced as `CAT-UI-080`/`CAT-UI-081`/`CAT-UI-082` and designed in `docs/llds/category-management.md § Drag-to-Reorder: Adapter & Persistence`. The widget's only obligations to any caller are the `DragMoveResult` contract (§ Generic Widget API) and the `onSettled` protocol (§ Settling).
 
 ## Visual Design
 
@@ -193,5 +193,5 @@ The category list is the only current caller. How it maps `Category` ↔ the wid
 - `docs/llds/category-management.md` — owns the `Category` domain mapping, the adapter, and the existing context-menu reparent actions this design subsumes positionally
 - `docs/high-level-design.md § Key Design Decisions` — "Two-level category hierarchy" (the invariant the eligibility rules are derived from)
 - `docs/specs/drag-reorder-list.md` — `DRAG-UI-001` through `DRAG-UI-016` (this widget's own behavior)
-- `docs/llds/category-management.md § Drag-to-Reorder: Adapter & Persistence` — the category-specific glue: `Category` ↔ tree mapping, the value-type-change gate, and the `moveCategory`/`moveCategoryAndMigrateEvents` persistence with its live-state reconciliation
+- `docs/llds/category-management.md § Drag-to-Reorder: Adapter & Persistence` — the category-specific glue: `Category` ↔ tree mapping, the value-type-change gate, and the `saveCategory` persistence with its live-state reconciliation
 - `docs/specs/category-management.md` — `CAT-UI-002`, `CAT-UI-080`, `CAT-UI-081`, `CAT-UI-082` (the category-specific adapter mapping, persistence, and value-type-change handling)

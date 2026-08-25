@@ -280,7 +280,7 @@ All four live in `domain/ValueTypeConversion.kt` alongside `convertEventValue`.
 
 ### ValueType change on a Category
 
-Changing a category's `valueType` is permitted and handled at the repository layer — the domain model does not prevent it. When a type change is saved, `TrackrRepository.saveCategoryAndMigrateEvents(category, fromType)` runs an atomic transaction: it upserts the category and migrates all historical events by calling `convertEventValue(event.value, category.valueType)` on each one.
+Changing a category's `valueType` is permitted and handled at the repository layer — the domain model does not prevent it. When a type change is saved, `TrackrRepository.saveCategory(category, migrateEvents = true)` runs an atomic transaction: it upserts the category and migrates all historical events by calling `convertEventValue(event.value, category.valueType)` on each one.
 
 For a `MetaCategory`, the migration also covers events belonging to any `SubCategory` whose `valueType` is null (inheriting the parent's type) — those subcategories' effective type changes alongside the parent's. SubCategories with an explicit `valueType` override are excluded from the migration pass and keep their own type unchanged.
 
