@@ -4,7 +4,7 @@ App-level scaffolding: DI modules, application/activity entry points, and top-le
 
 ## Status
 
-**AUDITED** — last audited 2026-07-27. Changed 2026-08-24 by the startup-trigger split (backlog #20), which added APP-PROC-003 and APP-DI-005, rewrote APP-PROC-001/002, and gave the segment its first test file. All 20 specs implemented; remaining findings are traceability gaps.
+**AUDITED** — last audited 2026-07-27. Changed 2026-08-24 by the startup-trigger split (backlog #20), which added APP-PROC-003 and APP-DI-005, rewrote APP-PROC-001/002, and gave the segment its first test file. All 26 specs implemented; remaining findings are traceability gaps.
 
 ## References
 
@@ -15,7 +15,7 @@ App-level scaffolding: DI modules, application/activity entry points, and top-le
 - docs/llds/app-shell.md
 
 ### EARS
-- docs/specs/app-shell.md (20 specs: APP-DI-*, APP-ID-*, APP-NAV-*, APP-PROC-*, APP-UI-*)
+- docs/specs/app-shell.md (26 specs: APP-DI-*, APP-ID-*, APP-NAV-*, APP-PROC-*, APP-UI-*)
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/UiStartupWorkTest.kt (APP-PROC-001, APP-PROC-003)

@@ -315,6 +315,20 @@ class FakeTrackrRepositoryTest {
         }
     }
 
+    // Held open across the write for the same reason: a re-subscribe would re-read and hide a
+    // stream that had gone stale under a collector.
+    // @spec REM-DATA-011
+    @Test fun `getReminderForCategory re-emits when the stored reminder changes`() = runTest {
+        val repo = FakeTrackrRepository()
+        val category = makeCategory("cat1")
+        repo.setCategories(category)
+        repo.getReminderForCategory("cat1").test {
+            assertNull(awaitItem())
+            repo.saveCategory(category, makeReminder("cat1"))
+            assertEquals("cat1", awaitItem()!!.categoryId)
+        }
+    }
+
     // @spec REM-DATA-009
     @Test fun `hasEnabledReminder ignores a disabled reminder`() = runTest {
         val repo = FakeTrackrRepository()

@@ -4,7 +4,7 @@ Category list and edit screens: hierarchy (MetaCategory/SubCategory), inheritanc
 
 ## Status
 
-**PARTIAL** — last audited 2026-08-14. 75 of 77 specs confirmed implemented, 2 legitimately deferred, 0 genuine gaps remain. CAT-UI-018 (initial-load edit gate) was added 2026-08-14 to close a real data-loss defect — see finding 6. CAT-UI-002 (drag-to-reorder) is now fully resolved — the generic widget landed as its own segment (`drag-reorder-list`) and this segment gained five new specs (CAT-UI-080-084) covering the category-specific adapter/persistence/reparent logic, all implemented. CAT-UI-011a was reworded this pass to match accepted current behavior (no minimum-value enforcement on Exercise default sets/reps) rather than fixed in code — see finding 0. 10 previously-stale `[ ]` markers (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) reconciled to `[x]` this pass — the spec file was stale, not the code.
+**PARTIAL** — last audited 2026-08-14. 79 of 81 specs confirmed implemented, 2 legitimately deferred, 0 genuine gaps remain. CAT-UI-018 (initial-load edit gate) was added 2026-08-14 to close a real data-loss defect — see finding 6. CAT-UI-002 (drag-to-reorder) is now fully resolved — the generic widget landed as its own segment (`drag-reorder-list`) and this segment gained five new specs (CAT-UI-080-084) covering the category-specific adapter/persistence/reparent logic, all implemented. CAT-UI-011a was reworded this pass to match accepted current behavior (no minimum-value enforcement on Exercise default sets/reps) rather than fixed in code — see finding 0. 10 previously-stale `[ ]` markers (CAT-NAV-001-004, CAT-UI-010, CAT-UI-011, CAT-UI-063-066) reconciled to `[x]` this pass — the spec file was stale, not the code.
 
 ## References
 
@@ -15,7 +15,7 @@ Category list and edit screens: hierarchy (MetaCategory/SubCategory), inheritanc
 - docs/llds/category-management.md
 
 ### EARS
-- docs/specs/category-management.md (77 specs: CAT-NAV-*, CAT-UI-*)
+- docs/specs/category-management.md (81 specs: CAT-NAV-*, CAT-UI-*)
 
 ### Tests
 - app/src/androidTest/java/net/clahey/trackr/ui/components/OutlinedFieldBoxTest.kt

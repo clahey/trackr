@@ -272,7 +272,7 @@ class FakeTrackrRepository : TrackrRepository {
     fun resetColorCounter(value: Int) { nextColorIndex = value }
     fun peekColorCounter(): Int = nextColorIndex
 
-    // @spec REM-DATA-006
+    // @spec REM-DATA-011
     override fun getReminderForCategory(categoryId: String): Flow<Reminder?> =
         reminders.map { map -> reminderReadGate?.await(); map[categoryId] }
 

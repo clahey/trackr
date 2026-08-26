@@ -211,7 +211,7 @@ class LocalTrackrRepository @javax.inject.Inject constructor(
     private fun EventEntity.imagePaths(): List<String> =
         net.clahey.trackr.data.local.converters.StringListConverter.decode(imagePaths)
 
-    // @spec REM-DATA-006
+    // @spec REM-DATA-011
     override fun getReminderForCategory(categoryId: String): Flow<Reminder?> =
         reminderDao.getByCategoryId(categoryId).map { it?.toDomain() }
 

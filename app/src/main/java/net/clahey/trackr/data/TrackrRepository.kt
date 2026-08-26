@@ -54,7 +54,7 @@ interface TrackrRepository {
 
     suspend fun onStartup()
 
-    // @spec REM-DATA-006
+    // @spec REM-DATA-011
     fun getReminderForCategory(categoryId: String): Flow<Reminder?>
     // @spec REM-DATA-005
     suspend fun saveReminder(reminder: Reminder)
