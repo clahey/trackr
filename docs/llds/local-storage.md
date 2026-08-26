@@ -252,11 +252,8 @@ Removes `unit` column and adds `default_value` column on `categories`. SQLite do
 ### Version 3 → 6
 Adds the `reminders` table (`ReminderEntity`, § Room Entities) directly in its current shape, a plain `CREATE TABLE` — no existing table is altered, so no row copy or recreation is needed. `categoryId` carries the FK → `categories(id) ON DELETE CASCADE`. Every column the app always writes is `NOT NULL` from creation, matching the fact that it never actually leaves them null (REM-DATA-002 — a mode's fields are preserved across mode switches, never cleared) and eliminating a `!!` at every read site in `ReminderScheduling.kt`. Only `nextFireAt` is nullable, because null is a state the scheduler writes deliberately: not armed.
 
-### Version 5 → 6
-Makes `times` `NOT NULL`, the last reminder column whose null nothing wrote. SQLite cannot alter a column's nullability, so the table is recreated on the § Version 2 → 3 pattern; `COALESCE(times, '[]')` turns a stored null into the empty list it already decoded as. `reminders` is the child end of its only foreign key, so dropping it cascades nothing, and it carries no indexes to recreate — `categoryId` is indexed as the primary key.
-
 ### Retiring transitional migrations
-A migration that exists only to carry a device off an intermediate version is transitional: it is deleted, with its `MigrationTest` case, once the devices it serves have moved past it. What survives is the single migration from the oldest version still in the wild, which is why § Version 3 → 6 covers ground § Version 5 → 6 also covers — the two coexist for exactly as long as a device sits at 5.
+A migration that exists only to carry a device off an intermediate version is transitional: it is deleted, with its `MigrationTest` case, once the devices it serves have moved past it. What survives is the single migration from the oldest version still in the wild. While such a migration is alive, two paths to the current version coexist and both are registered.
 
 A retired version's exported schema goes at the same time, with one constraint on *where*: it is deleted in a commit on `master`, after the branch that introduced it has merged, never on the branch itself. A schema version that reached a real device is a record, and deleting it before the branch lands means it never entered history at all. This is why `app/schemas/` still holds versions no migration targets.
 

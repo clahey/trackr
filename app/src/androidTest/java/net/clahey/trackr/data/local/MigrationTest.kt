@@ -59,74 +59,12 @@ class MigrationTest {
         }
     }
 
-    // Fresh table creation (no pre-existing rows to preserve or lose) — runMigrationsAndValidate
-    // already fails the test if the resulting schema doesn't match the target version's schema, so
-    // these two only have to prove the migration runs at all for a device starting fresh at
-    // version 3. MIGRATION_3_5 is the interim path, retired once every device has reached 6.
-    @Test fun migrate3To5Directly_runs() {
-        helper.createDatabase(TEST_DB, 3).apply { close() }
-        helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_3_5)
-    }
-
+    // No rows to preserve, and runMigrationsAndValidate fails the test itself when the result does
+    // not match 6.json — so there is nothing left for this to assert.
+    // @spec LS-BE-073
     @Test fun migrate3To6Directly_runs() {
         helper.createDatabase(TEST_DB, 3).apply { close() }
         helper.runMigrationsAndValidate(TEST_DB, 6, true, MIGRATION_3_6)
-    }
-
-    // The only migration that has to preserve reminder rows: `times` becomes NOT NULL, so a stored
-    // null has to arrive as an empty list.
-    // @spec LS-BE-073
-    @Test fun migrate5To6_backfillsNullTimesToAnEmptyList() {
-        helper.createDatabase(TEST_DB, 5).apply {
-            execSQL(
-                """
-                INSERT INTO categories (id, name, emoji, color, valueType, defaultValue, allowEmptyText, sortOrder, parentId)
-                VALUES ('c1', 'Water', '💧', 100, 'number', NULL, 1, 0, NULL)
-                """.trimIndent(),
-            )
-            execSQL(
-                """
-                INSERT INTO categories (id, name, emoji, color, valueType, defaultValue, allowEmptyText, sortOrder, parentId)
-                VALUES ('c2', 'Mood', '🙂', 200, 'scale', NULL, 1, 1, NULL)
-                """.trimIndent(),
-            )
-            execSQL(
-                """
-                INSERT INTO reminders (categoryId, enabled, mode, times, windowStart, windowEnd,
-                    occurrencesPerDay, daysActive, showCategoryInNotification, nextFireAt)
-                VALUES ('c1', 1, 'RANDOM', NULL, '09:00', '21:00', 4, '["MONDAY"]', 0, 1700000000000)
-                """.trimIndent(),
-            )
-            execSQL(
-                """
-                INSERT INTO reminders (categoryId, enabled, mode, times, windowStart, windowEnd,
-                    occurrencesPerDay, daysActive, showCategoryInNotification, nextFireAt)
-                VALUES ('c2', 1, 'FIXED', '["08:00","20:00"]', '00:00', '00:00', 1, '["TUESDAY"]', 1, NULL)
-                """.trimIndent(),
-            )
-            close()
-        }
-
-        val db = helper.runMigrationsAndValidate(TEST_DB, 6, true, MIGRATION_5_6)
-        db.query("SELECT times FROM reminders WHERE categoryId = 'c1'").use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals("[]", cursor.getString(cursor.getColumnIndexOrThrow("times")))
-        }
-        // Every other column rides along untouched.
-        db.query("SELECT * FROM reminders WHERE categoryId = 'c2'").use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals("""["08:00","20:00"]""", cursor.getString(cursor.getColumnIndexOrThrow("times")))
-            assertEquals("FIXED", cursor.getString(cursor.getColumnIndexOrThrow("mode")))
-            assertEquals(1, cursor.getInt(cursor.getColumnIndexOrThrow("showCategoryInNotification")))
-            assertNull(cursor.getString(cursor.getColumnIndexOrThrow("nextFireAt")))
-        }
-        // The rebuilt table keeps the CASCADE that LS-BE-072 requires.
-        db.execSQL("PRAGMA foreign_keys = ON")
-        db.execSQL("DELETE FROM categories WHERE id = 'c1'")
-        db.query("SELECT COUNT(*) FROM reminders WHERE categoryId = 'c1'").use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals(0, cursor.getInt(0))
-        }
     }
 
     @Test fun migrateAllTheWayFrom2To6_succeeds() {
