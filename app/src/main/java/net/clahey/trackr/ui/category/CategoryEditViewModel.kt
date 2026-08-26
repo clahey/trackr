@@ -284,6 +284,7 @@ class CategoryEditViewModel @Inject constructor(
 
     private val _reminderUIState = MutableStateFlow(ReminderUIState.fromStored(Reminder.default("")))
     val reminderUIState: StateFlow<ReminderUIState> = _reminderUIState.asStateFlow()
+    private var reminderDirty = false
 
     // Only an edit to occurrencesPerDay can fail this, since a rejected one never enters the state
     // the next copy() is built from. The check wraps `edit` rather than sitting inside it: `edit`
@@ -291,7 +292,7 @@ class CategoryEditViewModel @Inject constructor(
     // @spec REM-UI-006
     fun setReminderUIState(value: ReminderUIState) {
         if (value.occurrencesPerDay.length <= 2 && value.occurrencesPerDay.all { it.isDigit() }) {
-            edit { _reminderUIState.value = value }
+            edit { _reminderUIState.value = value; reminderDirty = true }
         }
     }
 
@@ -474,9 +475,12 @@ class CategoryEditViewModel @Inject constructor(
         // @spec DM-PROC-021
         val migrateEvents =
             categoryId != null && originalType != null && category.resolvedValueType != originalType
-        repository.saveCategory(category, reminder, migrateEvents = migrateEvents)
-        // @spec REM-SCHED-013, REM-SCHED-014
-        if (reminder.enabled) reminderScheduler.enableReminder(reminder) else reminderScheduler.disableReminder(category.id)
+        // @spec REM-UI-012
+        repository.saveCategory(category, reminder.takeIf { reminderDirty }, migrateEvents = migrateEvents)
+        // @spec REM-SCHED-013, REM-SCHED-014, REM-UI-012
+        if (reminderDirty) {
+            if (reminder.enabled) reminderScheduler.enableReminder(reminder) else reminderScheduler.disableReminder(category.id)
+        }
 
         _isDirty.value = false
         // @spec CAT-NAV-020

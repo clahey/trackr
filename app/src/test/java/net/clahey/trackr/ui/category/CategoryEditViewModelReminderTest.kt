@@ -185,6 +185,52 @@ class CategoryEditViewModelReminderTest {
         assertEquals(99, repo.getReminderForCategory(saved.id).first()!!.occurrencesPerDay)
     }
 
+    // The section seeds with Reminder.default()'s values, so an untouched save and a save of a
+    // deliberately-default reminder look identical in the state — only the edit flag separates them.
+    // @spec REM-UI-012
+    @Test fun `saving without touching the Reminder section writes no reminder row`() = runTest {
+        fillRequiredFields()
+        vm.save()
+        assertEquals(SaveResult.Success, vm.saveResult.value)
+        val saved = vm.savedCategoryId.value!!
+        assertNull(repo.getReminderForCategory(saved).first())
+    }
+
+    // @spec REM-UI-012
+    @Test fun `saving without touching the Reminder section leaves a stored reminder alone`() = runTest {
+        val category = Category.MetaCategory(
+            id = "cat1", name = "Category", emoji = "📌", color = 0xFFE53935L,
+            valueType = ValueType.None, defaultValue = null, allowEmptyText = true, sortOrder = 0,
+        )
+        repo.setCategories(category)
+        val stored = Reminder(
+            categoryId = "cat1", enabled = true, mode = ReminderMode.RANDOM,
+            times = emptyList(), windowStart = LocalTime.of(9, 0), windowEnd = LocalTime.of(21, 0),
+            occurrencesPerDay = 4, daysActive = setOf(DayOfWeek.MONDAY),
+            showCategoryInNotification = true, nextFireAt = null,
+        )
+        repo.setReminders(stored)
+        vm = CategoryEditViewModel(
+            repo,
+            ReminderScheduler(repo, alarms, FakeReminderNotifier(), FakePreferencesDataStore()),
+            SavedStateHandle(mapOf("categoryId" to "cat1")),
+        )
+        vm.setName("Renamed")
+        vm.save()
+        assertEquals(SaveResult.Success, vm.saveResult.value)
+        assertEquals(stored, repo.getReminderForCategory("cat1").first())
+    }
+
+    // @spec REM-UI-012
+    @Test fun `saving after editing the Reminder section writes the row`() = runTest {
+        fillRequiredFields()
+        vm.setReminderUIState(vm.reminderUIState.value.copy(enabled = true))
+        vm.save()
+        assertEquals(SaveResult.Success, vm.saveResult.value)
+        val saved = repo.getReminderForCategory(vm.savedCategoryId.value!!).first()
+        assertEquals(true, saved?.enabled)
+    }
+
     // @spec REM-UI-006
     @Test fun `a stored times-per-day seeds the field as text`() = runTest {
         val category = Category.MetaCategory(

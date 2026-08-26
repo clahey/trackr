@@ -4,7 +4,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 
 ## Status
 
-**PARTIAL** — audited 2026-08-12 (two passes same day: a reference/citation audit, then a deep full-text pass reading all 49 specs then present against actual code); test-citation backfill 2026-08-14. The segment has grown to 63 specs since that audit, all implemented and annotated in code; the findings below record what changed. 21 specs have no test-file `@spec` citation; what remains is the structural gap (no instrumented Compose UI tests, notification tests, or real-`AlarmManager` tests exist anywhere in this project yet — not unique to reminders). The deep pass found and fixed a real design gap: `AndroidReminderNotifier`'s notification `PendingIntent`/id used `categoryId.hashCode()`, the exact collision-risk pattern this LLD's own "One alarm per category" decision rejected for alarms — now uses the same `data`-`Uri` identity technique as alarms (see finding 6). Four spec-wording imprecisions (REM-DATA-003, REM-DATA-004, REM-PERM-004, REM-NOTIF-005) were reworded to match actual behavior; none were behavioral bugs.
+**PARTIAL** — audited 2026-08-12 (two passes same day: a reference/citation audit, then a deep full-text pass reading all 49 specs then present against actual code); test-citation backfill 2026-08-14. The segment has grown to 64 specs since that audit, all implemented and annotated in code; the findings below record what changed. 21 specs have no test-file `@spec` citation; what remains is the structural gap (no instrumented Compose UI tests, notification tests, or real-`AlarmManager` tests exist anywhere in this project yet — not unique to reminders). The deep pass found and fixed a real design gap: `AndroidReminderNotifier`'s notification `PendingIntent`/id used `categoryId.hashCode()`, the exact collision-risk pattern this LLD's own "One alarm per category" decision rejected for alarms — now uses the same `data`-`Uri` identity technique as alarms (see finding 6). Four spec-wording imprecisions (REM-DATA-003, REM-DATA-004, REM-PERM-004, REM-NOTIF-005) were reworded to match actual behavior; none were behavioral bugs.
 
 ## References
 
@@ -15,7 +15,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 - docs/llds/reminders.md
 
 ### EARS
-- docs/specs/reminders.md (63 specs: REM-DATA-* [11], REM-UI-* [12], REM-SCHED-* [21], REM-NOTIF-* [13], REM-PERM-* [6])
+- docs/specs/reminders.md (64 specs: REM-DATA-* [11], REM-UI-* [13], REM-SCHED-* [21], REM-NOTIF-* [13], REM-PERM-* [6])
 
 ### Tests
 - app/src/test/java/net/clahey/trackr/domain/ReminderSchedulingTest.kt
@@ -131,6 +131,10 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 25. **The reminder read had no spec of its own (fixed 2026-08-25).** `getReminderForCategory` cited REM-DATA-006 at all three of its sites — a read citing the atomicity of a write it does not perform — because nothing covered "expose a category's reminder as a stream", the one thing it does. REM-DATA-011 now does, and states the two properties a caller depends on and cannot see from the signature: it re-emits when the row changes underneath a screen that is showing it, which is why `onAlarmFired` advancing `nextFireAt` during an edit is safe; and a row that fails to decode arrives as the default reminder (REM-DATA-010), never as null, so null means only "no reminder configured". A test pins the re-emission with one collector held open across the write, on the pattern REM-DATA-009's tests use. `ReminderDao`'s class-level `@spec REM-DATA-006, REM-DATA-007, REM-DATA-008` is gone in favour of per-method annotations, which is what `hasEnabled` already had: 006's transaction belongs to the repository above the DAO, and `getByCategoryIdOnce` and `upsert` carry nothing, since their behaviour's entry point is the repository method that composes them.
 
     The LLD's § TrackrRepository additions still said `reminder = null` clears the stored reminder, which finding 23 reversed — it now leaves it untouched, and the surrounding sentence already said so. Two readings of the same parameter, one paragraph apart.
+
+26. **Every category save wrote a reminder row (fixed 2026-08-25).** `_reminderUIState` seeds from `Reminder.default("")` and the load path only overwrites it when a stored reminder exists, so a save read the section unconditionally and every category ended up with a row — disabled, FIXED 09:00, all seven days — including for a user who never opened the section. REM-UI-011 already said the section behaves "exactly like Name, Emoji, or Default Value", and Default Value's rule is the `defaultValueDirty` preserve one screen over, so the intent was stated and the code diverged from it. REM-UI-012 makes it explicit; a `reminderDirty` flag on the same pattern implements it. This is also what makes REM-DATA-011's null reachable — before, null meant "no reminder configured" but no saved category could produce it.
+
+    Gating the `saveCategory` write alone was not enough, and the test that pins the stored-reminder case is what showed it: `enableReminder`/`disableReminder` persist the reminder they are handed in order to record `nextFireAt`, making them a second writer of the row. An untouched RANDOM reminder came back with `times` changed from `[]` to `[09:00]` — the value `ReminderUIState.fromStored` refills so a mode switch has something to edit — written by the scheduler after the gated save had correctly skipped it. The arm/cancel is now gated on the same flag. The cost is that saving a category no longer heals an enabled reminder with no live alarm; `reconcileOnStartup` (REM-SCHED-017) is what actually owns that, and did already.
 
 ## Work Required
 
