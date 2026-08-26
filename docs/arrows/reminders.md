@@ -142,9 +142,10 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 _None._
 
 ### Should Fix
-1. Add a Room instrumented test for `REM-DATA-001` (CASCADE DELETE + PK uniqueness on `reminders`), mirroring `MigrationTest.kt`'s approach. Written and passing on 2026-08-14, then removed at the user's request — deferred, not abandoned.
+_None._
 
 ### Nice to Have
-1. Screen-level Compose UI test for `CategoryEditScreen`'s Reminder section (`REM-UI-*`, `REM-PERM-001`/`002`) — no precedent yet anywhere in the project; would be a first, not a small addition.
-2. Notification-content test for `AndroidReminderNotifier` (`REM-NOTIF-*`) — same "no precedent yet" caveat.
-3. Instrumented test for `AndroidAlarmScheduler`'s `PendingIntent` construction and exact/inexact API selection (`REM-SCHED-009`/`010`).
+1. Room instrumented test for `REM-DATA-001`'s CASCADE DELETE and PK uniqueness on `reminders`. The rule is covered only against `FakeTrackrRepository`, whose cascade is hand-modelled, so nothing exercises the real `ON DELETE CASCADE` (LS-BE-072).
+2. Screen-level Compose UI test for `CategoryEditScreen`'s Reminder section (`REM-UI-*`, `REM-PERM-001`/`002`) — no precedent yet anywhere in the project; would be a first, not a small addition.
+3. Notification-content test for `AndroidReminderNotifier` (`REM-NOTIF-*`) — same "no precedent yet" caveat.
+4. Instrumented test for `AndroidAlarmScheduler`'s `PendingIntent` construction and exact/inexact API selection (`REM-SCHED-009`/`010`).
