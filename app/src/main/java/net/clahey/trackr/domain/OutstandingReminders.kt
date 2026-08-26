@@ -15,11 +15,11 @@ data class ShowingNotification(
 /** A reminder that has fired and not yet been dealt with. */
 data class OutstandingReminder(
     val categoryId: String,
-    val firedAt: Instant,
+    val postedAt: Instant,
 )
 
 /**
- * The outstanding reminders implied by what the app currently has showing, most recently fired
+ * The outstanding reminders implied by what the app currently has showing, most recently posted
  * first.
  *
  * The group summary comes back from the same read as its children and is not itself a reminder.
@@ -31,6 +31,6 @@ fun outstandingReminders(showing: List<ShowingNotification>): List<OutstandingRe
     showing
         .filterNot { it.isGroupSummary }
         .mapNotNull { notification ->
-            notification.tag?.let { OutstandingReminder(categoryId = it, firedAt = notification.postedAt) }
+            notification.tag?.let { OutstandingReminder(categoryId = it, postedAt = notification.postedAt) }
         }
-        .sortedByDescending { it.firedAt }
+        .sortedByDescending { it.postedAt }

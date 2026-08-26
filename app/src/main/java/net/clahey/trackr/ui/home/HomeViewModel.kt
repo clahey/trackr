@@ -45,7 +45,7 @@ data class OutstandingReminderRow(
     val categoryId: String,
     val emoji: String,
     val name: String,
-    val firedAt: Instant,
+    val postedAt: Instant,
 )
 
 // @spec EL-UI-092, EL-UI-093, EL-UI-094
@@ -94,7 +94,7 @@ class HomeViewModel @Inject constructor(
                     categoryId = reminder.categoryId,
                     emoji = category.resolvedEmoji,
                     name = category.name,
-                    firedAt = reminder.firedAt,
+                    postedAt = reminder.postedAt,
                 )
             }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

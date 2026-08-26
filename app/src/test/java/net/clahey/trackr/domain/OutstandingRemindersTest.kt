@@ -59,6 +59,6 @@ class OutstandingRemindersTest {
     // @spec EL-UI-096
     @Test fun `each outstanding reminder carries the time its notification was posted`() {
         val result = outstandingReminders(listOf(showing("cat1", 20)))
-        assertEquals(noon.minusSeconds(20 * 60), result.single().firedAt)
+        assertEquals(noon.minusSeconds(20 * 60), result.single().postedAt)
     }
 }

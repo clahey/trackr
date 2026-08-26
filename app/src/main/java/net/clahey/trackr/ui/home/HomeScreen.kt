@@ -710,7 +710,7 @@ private fun OutstandingReminderRowItem(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                row.firedAt.atZone(ZoneId.systemDefault())
+                row.postedAt.atZone(ZoneId.systemDefault())
                     .format(DateTimeFormatter.ofPattern("HH:mm")),
                 style = MaterialTheme.typography.bodySmall,
             )
