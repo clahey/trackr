@@ -74,7 +74,7 @@ class MigrationTest {
     }
 
     // The only migration that has to preserve reminder rows: `times` becomes NOT NULL, so a stored
-    // null has to arrive as the empty list it always meant.
+    // null has to arrive as an empty list.
     // @spec LS-BE-073
     @Test fun migrate5To6_backfillsNullTimesToAnEmptyList() {
         helper.createDatabase(TEST_DB, 5).apply {

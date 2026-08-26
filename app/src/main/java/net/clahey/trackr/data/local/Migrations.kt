@@ -26,9 +26,8 @@ val MIGRATION_3_6 = object : Migration(3, 6) {
     }
 }
 
-// Retires the last nullable reminder column. SQLite cannot ALTER a column's nullability, so the
-// table is rebuilt; `reminders` is the child end of its only foreign key, so dropping it cascades
-// nothing. A stored null is an empty times list (docs/llds/local-storage.md § ReminderEntity).
+// Rebuilds the table to make `times` NOT NULL, which SQLite cannot do with ALTER. `reminders` is
+// the child end of its only foreign key, so dropping it cascades nothing.
 // @spec LS-BE-073
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
