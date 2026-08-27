@@ -62,8 +62,7 @@ fun shouldSuppressFixedNotification(
     val previousTrigger = computePreviousFixedFireTime(reminder, scheduledAt, zone)
     val tenPercent = Duration.between(previousTrigger, scheduledAt).dividedBy(10)
     val lookback = minOf(tenPercent, MAX_SUPPRESSION_LOOKBACK)
-    return !latestEventLoggedAt.isBefore(scheduledAt.minus(lookback)) &&
-        !latestEventLoggedAt.isAfter(firedAt)
+    return latestEventLoggedAt in scheduledAt.minus(lookback)..firedAt
 }
 
 private fun computeNextRandomFireTime(reminder: Reminder, after: Instant, zone: ZoneId, random: Random): Instant {
