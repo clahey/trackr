@@ -46,11 +46,10 @@ private fun computeFixedFireTime(reminder: Reminder, pivot: Instant, zone: ZoneI
 
 private val MAX_SUPPRESSION_LOOKBACK: Duration = Duration.ofHours(1)
 
-// The window spans `scheduledAt - lookback` through `firedAt`, and the two instants are only equal when
-// delivery is perfectly punctual — which it never is. Sizing pivots on `scheduledAt` because the backward
-// walk qualifies candidates strictly before its pivot: `scheduledAt` is itself one of the reminder's
-// times, so pivoting on delivery returns the occurrence being delivered and shrinks the lookback to the
-// delivery jitter.
+// The window spans `scheduledAt - lookback` through `firedAt`. Sizing pivots on `scheduledAt` because the
+// backward walk qualifies candidates before its pivot: pivoting on delivery would come back with
+// `scheduledAt` as the previous trigger, the gap between the two would be just the delivery jitter, a
+// tenth of that is no lookback at all, and suppression would never trigger.
 // @spec REM-SCHED-020
 fun shouldSuppressFixedNotification(
     reminder: Reminder,
