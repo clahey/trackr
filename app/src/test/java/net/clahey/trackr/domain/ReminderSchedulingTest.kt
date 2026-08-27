@@ -194,13 +194,6 @@ class ReminderSchedulingTest {
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid is false when nextFireAt is null`() {
-        val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
-        val now = instant(monday, LocalTime.of(9, 0))
-        assertFalse(isNextFireAtValid(reminder, null, now, zone))
-    }
-
-    // @spec REM-SCHED-018
     @Test fun `isNextFireAtValid is true when nextFireAt is in the box containing now`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
         // sub-windows: [08:00,14:00), [14:00,20:00)

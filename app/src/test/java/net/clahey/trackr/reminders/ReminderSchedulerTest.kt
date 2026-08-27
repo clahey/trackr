@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -140,6 +141,22 @@ class ReminderSchedulerTest {
         sched.enableReminder(edited, now = Instant.parse("2024-01-01T09:00:00Z"), zone = zone)
 
         assertTrue("a recompute should have armed a new instant", alarms.armCalls.isNotEmpty())
+    }
+
+    // @spec REM-SCHED-013, REM-SCHED-018
+    @Test fun `enableReminder recomputes when there is no stored nextFireAt`() = runTest {
+        val repo = FakeTrackrRepository()
+        val alarms = FakeAlarmScheduler()
+        val sched = scheduler(repo, alarms)
+        repo.setReminders(randomReminder(nextFireAt = null))
+
+        sched.enableReminder(randomReminder(), now = Instant.parse("2024-01-01T09:00:00Z"), zone = zone)
+
+        // RANDOM draws its instant, so the exact value can't be pinned; that one exists and matches
+        // what was armed is what shows the recompute ran.
+        val saved = repo.getReminderForCategory("cat1").first()!!.nextFireAt
+        assertNotNull(saved)
+        assertEquals(saved, alarms.armed["cat1"])
     }
 
     // ---- disableReminder / cancel — REM-SCHED-012, REM-SCHED-014 ----

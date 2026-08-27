@@ -80,11 +80,11 @@ private fun computeNextRandomFireTime(reminder: Reminder, after: Instant, zone: 
 // @spec REM-SCHED-018
 fun isNextFireAtValid(
     reminder: Reminder,
-    nextFireAt: Instant?,
+    nextFireAt: Instant,
     now: Instant,
     zone: ZoneId,
 ): Boolean {
-    if (nextFireAt == null || reminder.mode != ReminderMode.RANDOM) return false
+    if (reminder.mode != ReminderMode.RANDOM) return false
     val (currentBox, nextBox) = currentAndNextBox(reminder, now, zone)
     return currentBox.contains(nextFireAt) || nextBox.contains(nextFireAt)
 }

@@ -34,18 +34,17 @@ class ReminderScheduler @Inject constructor(
 
     // @spec REM-SCHED-002, REM-SCHED-013, REM-SCHED-015, REM-SCHED-018
     suspend fun enableReminder(reminder: Reminder, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
-        val currentNextFireAt = repository.getReminderForCategory(reminder.categoryId).first()?.nextFireAt
-        // A valid stored nextFireAt means the occurrence doesn't need recomputing — not that an
-        // alarm is still pending for it. Force-stop, app update, and OEM task-kill all clear
-        // pending alarms while leaving the row intact, so this arms either way; re-arming an alarm
-        // that is already pending replaces it rather than stacking.
-        val nextFireAt = if (isNextFireAtValid(reminder, currentNextFireAt, now, zone)) {
-            currentNextFireAt!!
+        val storedNextFireAt = repository.getReminderForCategory(reminder.categoryId).first()?.nextFireAt
+        // A valid stored nextFireAt means the occurrence doesn't need recomputing, not that an alarm
+        // is still pending for it. Force-stop, app update, and OEM task-kill all clear pending alarms
+        // while leaving the row intact, so this arms either way; re-arming an alarm that is already
+        // pending replaces it rather than stacking.
+        val nextFireAt = if (storedNextFireAt != null && isNextFireAtValid(reminder, storedNextFireAt, now, zone)) {
+            storedNextFireAt
         } else {
-            val recomputed = computeNextFireTime(reminder, now, zone)
-            repository.saveReminder(reminder.copy(nextFireAt = recomputed))
-            recomputed
+            computeNextFireTime(reminder, now, zone)
         }
+        if (nextFireAt != storedNextFireAt) repository.saveReminder(reminder.copy(nextFireAt = nextFireAt))
         alarmScheduler.arm(reminder.categoryId, nextFireAt)
     }
 
@@ -86,18 +85,9 @@ class ReminderScheduler @Inject constructor(
         alarmScheduler.arm(categoryId, nextFireAt)
     }
 
-    // @spec REM-SCHED-004, REM-SCHED-016, REM-SCHED-018
+    // @spec REM-SCHED-004, REM-SCHED-016
     suspend fun rearmAll(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
-        repository.getAllEnabledRemindersOnce().forEach { reminder ->
-            val nextFireAt = if (isNextFireAtValid(reminder, reminder.nextFireAt, now, zone)) {
-                reminder.nextFireAt!!
-            } else {
-                val recomputed = computeNextFireTime(reminder, now, zone)
-                repository.saveReminder(reminder.copy(nextFireAt = recomputed))
-                recomputed
-            }
-            alarmScheduler.arm(reminder.categoryId, nextFireAt)
-        }
+        repository.getAllEnabledRemindersOnce().forEach { enableReminder(it, now, zone) }
     }
 
     // @spec REM-SCHED-021
