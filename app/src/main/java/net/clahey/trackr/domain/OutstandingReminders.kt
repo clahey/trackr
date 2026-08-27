@@ -23,8 +23,8 @@ data class OutstandingReminder(
  * first.
  *
  * The group summary comes back from the same read as its children and is not itself a reminder.
- * An untagged notification cannot be attributed to a category — nothing this app posts is untagged
- * — so it is dropped rather than rendered as a row naming nothing.
+ * Every reminder is posted with a tag, but the shade reports it as nullable, so an untagged
+ * notification is dropped rather than rendered as a row naming nothing.
  */
 // @spec REM-NOTIF-008
 fun outstandingReminders(showing: List<ShowingNotification>): List<OutstandingReminder> =
