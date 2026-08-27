@@ -1,6 +1,7 @@
 package net.clahey.trackr.data.local
 
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -10,6 +11,13 @@ import org.junit.Rule
 import org.junit.Test
 
 private const val TEST_DB = "migration-test"
+private const val WATER_DEFAULT_VALUE = """{"type":"NumberValue","value":0.0,"unit":"oz"}"""
+
+private fun SupportSQLiteDatabase.defaultValueOf(id: String): String? =
+    query("SELECT defaultValue FROM categories WHERE id = ?", arrayOf(id)).use { cursor ->
+        assertTrue(cursor.moveToFirst())
+        cursor.getString(cursor.getColumnIndexOrThrow("defaultValue"))
+    }
 
 // @spec LS-BE-070
 class MigrationTest {
@@ -25,56 +33,38 @@ class MigrationTest {
     // MIGRATION_1_2 itself is untestable via MigrationTestHelper: no 1.json schema was ever
     // exported (exportSchema wasn't enabled yet at that point in the project's history, and it
     // isn't reconstructable after the fact), so there's no "before" schema to build a v1 database
-    // from. It's the one migration in this file this doesn't cover — see docs/arrows/local-storage.md.
+    // from. It is the one migration this file does not cover — see docs/arrows/local-storage.md.
 
     @Test fun migrate2To3_convertsNumberUnitToDefaultValueJson() {
         helper.createDatabase(TEST_DB, 2).apply {
-            execSQL(
-                """
+            // c2 is not a number type, so its unit must not be converted.
+            execSQL("""
                 INSERT INTO categories (id, name, emoji, color, valueType, unit, allowEmptyText, sortOrder, parentId)
-                VALUES ('c1', 'Water', '💧', 100, 'number', 'oz', 1, 0, NULL)
-                """.trimIndent(),
-            )
-            // A non-number category's unit (if ever set) must not leak into defaultValue.
-            execSQL(
-                """
-                INSERT INTO categories (id, name, emoji, color, valueType, unit, allowEmptyText, sortOrder, parentId)
-                VALUES ('c2', 'Mood', '🙂', 200, 'scale', NULL, 1, 1, NULL)
-                """.trimIndent(),
-            )
+                VALUES ('c1', 'Water', '💧', 100, 'number', 'oz', 1, 0, NULL),
+                       ('c2', 'Mood', '🙂', 200, 'scale', 'stars', 1, 1, NULL)
+            """)
             close()
         }
 
         val db = helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_2_3)
-        db.query("SELECT defaultValue FROM categories WHERE id = 'c1'").use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals(
-                """{"type":"NumberValue","value":0.0,"unit":"oz"}""",
-                cursor.getString(cursor.getColumnIndexOrThrow("defaultValue")),
-            )
-        }
-        db.query("SELECT defaultValue FROM categories WHERE id = 'c2'").use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertNull(cursor.getString(cursor.getColumnIndexOrThrow("defaultValue")))
-        }
+        assertEquals(WATER_DEFAULT_VALUE, db.defaultValueOf("c1"))
+        assertNull(db.defaultValueOf("c2"))
     }
 
-    // No rows to preserve, and runMigrationsAndValidate fails the test itself when the result does
-    // not match 6.json — so there is nothing left for this to assert.
+    // There are no rows to preserve, and runMigrationsAndValidate fails the test when the result
+    // does not match 6.json — the call is the whole assertion.
     // @spec LS-BE-073
-    @Test fun migrate3To6Directly_runs() {
+    @Test fun migrate3To6_runs() {
         helper.createDatabase(TEST_DB, 3).apply { close() }
         helper.runMigrationsAndValidate(TEST_DB, 6, true, MIGRATION_3_6)
     }
 
-    @Test fun migrateAllTheWayFrom2To6_succeeds() {
+    @Test fun migrate2To6_preservesConvertedDefaultValue() {
         helper.createDatabase(TEST_DB, 2).apply {
-            execSQL(
-                """
+            execSQL("""
                 INSERT INTO categories (id, name, emoji, color, valueType, unit, allowEmptyText, sortOrder, parentId)
                 VALUES ('c1', 'Water', '💧', 100, 'number', 'oz', 1, 0, NULL)
-                """.trimIndent(),
-            )
+            """)
             close()
         }
 
@@ -82,12 +72,6 @@ class MigrationTest {
             TEST_DB, 6, true,
             MIGRATION_2_3, MIGRATION_3_6,
         )
-        db.query("""SELECT defaultValue FROM categories WHERE id = 'c1'""").use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals(
-                """{"type":"NumberValue","value":0.0,"unit":"oz"}""",
-                cursor.getString(cursor.getColumnIndexOrThrow("defaultValue")),
-            )
-        }
+        assertEquals(WATER_DEFAULT_VALUE, db.defaultValueOf("c1"))
     }
 }
