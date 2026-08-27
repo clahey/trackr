@@ -85,7 +85,6 @@ LLD: `docs/llds/reminders.md`
 
 ## References
 
-- `docs/high-level-design.md § Key Design Decisions` — `AlarmManager.setExactAndAllowWhileIdle()` choice
 - `docs/high-level-design.md § Guidelines` — "Silence over spam," "Public surfaces default to discreet"
 - `docs/specs/category-management.md § Category List` — `CAT-UI-007`, the delete-flow call into `ReminderScheduler.cancel()`
 - `docs/specs/app-shell.md § Navigation` / `§ Startup` / `§ Reminder Integration` — the notification deep-link's receiving side, and `reconcileOnStartup()`'s invocation

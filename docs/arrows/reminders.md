@@ -9,7 +9,7 @@ Per-category logging reminders: FIXED/RANDOM scheduling, `AlarmManager` integrat
 ## References
 
 ### HLD
-- docs/high-level-design.md (System Design, "Silence over spam" / "Public surfaces default to discreet" guidelines, `AlarmManager.setExactAndAllowWhileIdle()` decision)
+- docs/high-level-design.md (System Design, "Silence over spam" / "Public surfaces default to discreet" guidelines)
 
 ### LLD
 - docs/llds/reminders.md
