@@ -84,35 +84,34 @@ fun shouldPreserveNextFireAt(
 ): Boolean {
     if (reminder.mode != ReminderMode.RANDOM) return false
     val (currentBox, nextBox) = currentAndNextBox(reminder, now, zone)
-    return currentBox.contains(nextFireAt) || nextBox.contains(nextFireAt)
+    return nextFireAt in currentBox || nextFireAt in nextBox
 }
 
 private data class SubWindow(val start: Instant, val end: Instant) {
-    fun contains(instant: Instant): Boolean = !instant.isBefore(start) && instant.isBefore(end)
+    operator fun contains(instant: Instant): Boolean = instant in start..<end
 }
 
-// A day's RANDOM-mode window start and per-box step (subNanos), the two date/zone-dependent values
-// the box functions below need; occurrencesPerDay is already on Reminder, no need to carry it here.
-// subNanos truncates totalNanos / occurrencesPerDay, so the last box can end up to
-// occurrencesPerDay - 1 nanoseconds short of the literal window end — irrelevant at any real
-// clock's millisecond-scale precision. A fixed per-box step keeps "which box contains an instant" a
-// single division, the exact inverse of the boundary formula below.
-private fun windowStep(reminder: Reminder, date: LocalDate, zone: ZoneId): Pair<Instant, Long> {
-    val windowStart = reminder.windowStart
-    val windowEnd = reminder.windowEnd
-    val startInstant = date.atTime(windowStart).atZone(zone).toInstant()
+private fun windowStartInstant(reminder: Reminder, date: LocalDate, zone: ZoneId): Instant =
+    date.atTime(reminder.windowStart).atZone(zone).toInstant()
+
+// Truncating division, so the last box can end up to occurrencesPerDay - 1 nanoseconds short of the
+// literal window end — irrelevant at any real clock's millisecond-scale precision. One length shared
+// by every box keeps "which box contains an instant" a single division, the exact inverse of the
+// boundary formula below.
+private fun subWindowLength(reminder: Reminder, date: LocalDate, zone: ZoneId): Long {
     // A windowEnd of midnight is the end-of-day sentinel (REM-UI-010), never literal start-of-day.
-    val endInstant = if (windowEnd == LocalTime.MIDNIGHT) {
+    val endInstant = if (reminder.windowEnd == LocalTime.MIDNIGHT) {
         date.plusDays(1).atStartOfDay(zone).toInstant()
     } else {
-        date.atTime(windowEnd).atZone(zone).toInstant()
+        date.atTime(reminder.windowEnd).atZone(zone).toInstant()
     }
-    val totalNanos = Duration.between(startInstant, endInstant).toNanos()
-    return startInstant to totalNanos / reminder.occurrencesPerDay
+    val totalNanos = Duration.between(windowStartInstant(reminder, date, zone), endInstant).toNanos()
+    return totalNanos / reminder.occurrencesPerDay
 }
 
 private fun subWindowAt(reminder: Reminder, date: LocalDate, zone: ZoneId, index: Int): SubWindow {
-    val (startInstant, subNanos) = windowStep(reminder, date, zone)
+    val startInstant = windowStartInstant(reminder, date, zone)
+    val subNanos = subWindowLength(reminder, date, zone)
     return SubWindow(startInstant.plusNanos(subNanos * index), startInstant.plusNanos(subNanos * (index + 1)))
 }
 
@@ -129,9 +128,9 @@ private fun indexOfFirstStartAfter(reminder: Reminder, date: LocalDate, zone: Zo
     boxIndex(reminder, date, zone, instant, offset = 1)
 
 private fun boxIndex(reminder: Reminder, date: LocalDate, zone: ZoneId, instant: Instant, offset: Int): Int {
-    val (startInstant, subNanos) = windowStep(reminder, date, zone)
-    val offsetNanos = Duration.between(startInstant, instant).toNanos()
+    val offsetNanos = Duration.between(windowStartInstant(reminder, date, zone), instant).toNanos()
     if (offsetNanos < 0) return 0
+    val subNanos = subWindowLength(reminder, date, zone)
     return minOf(offsetNanos / subNanos + offset, reminder.occurrencesPerDay.toLong()).toInt()
 }
 

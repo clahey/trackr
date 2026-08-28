@@ -278,6 +278,26 @@ class ReminderSchedulingTest {
         assertFalse(shouldPreserveNextFireAt(editedReminder, nextFireAt, now, zone))
     }
 
+    // @spec REM-SCHED-007, REM-SCHED-018
+    @Test fun `sub-windows tile the real length of a DST transition day`() {
+        val dstZone = ZoneId.of("America/New_York")
+        fun nyc(hour: Int, minute: Int = 0): Instant =
+            LocalDate.of(2024, 3, 10).atTime(hour, minute).atZone(dstZone).toInstant()
+
+        // Clocks jump 02:00 to 03:00 that morning, so the day is 23 hours and four boxes over a
+        // full-day window are 5h45m of real time each: [00:00,06:45) [06:45,12:30) [12:30,18:15)
+        // [18:15,24:00). Sizing them off a 24-hour assumption would give 6h boxes instead:
+        // [00:00,07:00) [07:00,13:00) [13:00,19:00) [19:00,01:00), the last overrunning the very
+        // day it is supposed to tile.
+        val reminder = randomReminder(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT, occurrencesPerDay = 4)
+        val now = nyc(4) // box 0 under either tiling
+        // Box 1 under either tiling, so this only shows the window is being divided at all.
+        assertTrue(shouldPreserveNextFireAt(reminder, nyc(12), now, dstZone))
+        // Box 2 under the real 23-hour tiling and two boxes ahead of now; a 24-hour assumption would
+        // place it in box 1 and preserve an instant that no longer belongs to the next occurrence.
+        assertFalse(shouldPreserveNextFireAt(reminder, nyc(12, 45), now, dstZone))
+    }
+
     // ---- Already-logged suppression (REM-SCHED-020) ----
 
     // @spec REM-SCHED-020
