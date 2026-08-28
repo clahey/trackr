@@ -10,7 +10,7 @@ import net.clahey.trackr.data.TrackrRepository
 import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.ReminderMode
 import net.clahey.trackr.domain.computeNextFireTime
-import net.clahey.trackr.domain.isNextFireAtValid
+import net.clahey.trackr.domain.shouldPreserveNextFireAt
 import net.clahey.trackr.domain.shouldSuppressFixedNotification
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -35,11 +35,11 @@ class ReminderScheduler @Inject constructor(
     // @spec REM-SCHED-002, REM-SCHED-013, REM-SCHED-015, REM-SCHED-018
     suspend fun enableReminder(reminder: Reminder, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
         val storedNextFireAt = repository.getReminderForCategory(reminder.categoryId).first()?.nextFireAt
-        // A valid stored nextFireAt means the occurrence doesn't need recomputing, not that an alarm
-        // is still pending for it. Force-stop, app update, and OEM task-kill all clear pending alarms
-        // while leaving the row intact, so this arms either way; re-arming an alarm that is already
-        // pending replaces it rather than stacking.
-        val nextFireAt = if (storedNextFireAt != null && isNextFireAtValid(reminder, storedNextFireAt, now, zone)) {
+        // Preserving the stored nextFireAt means the occurrence doesn't need recomputing, not that an
+        // alarm is still pending for it. Force-stop, app update, and OEM task-kill all clear pending
+        // alarms while leaving the row intact, so this arms either way; re-arming an alarm that is
+        // already pending replaces it rather than stacking.
+        val nextFireAt = if (storedNextFireAt != null && shouldPreserveNextFireAt(reminder, storedNextFireAt, now, zone)) {
             storedNextFireAt
         } else {
             computeNextFireTime(reminder, now, zone)

@@ -76,7 +76,7 @@ private fun computeNextRandomFireTime(reminder: Reminder, after: Instant, zone: 
 }
 
 // @spec REM-SCHED-018
-fun isNextFireAtValid(
+fun shouldPreserveNextFireAt(
     reminder: Reminder,
     nextFireAt: Instant,
     now: Instant,

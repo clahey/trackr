@@ -171,7 +171,7 @@ class ReminderSchedulingTest {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 7)
         val now = instant(monday, LocalTime.of(19, 0)) // inside the last box
         val nextFireAt = instant(monday, LocalTime.of(19, 30))
-        assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertTrue(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-001, REM-SCHED-007
@@ -183,60 +183,60 @@ class ReminderSchedulingTest {
         assertEquals(r1, r2)
     }
 
-    // ---- Edit-time nextFireAt validity (REM-SCHED-018) ----
+    // ---- Edit-time nextFireAt preservation (REM-SCHED-018) ----
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid is false for FIXED mode regardless of nextFireAt`() {
+    @Test fun `shouldPreserveNextFireAt is false for FIXED mode regardless of nextFireAt`() {
         val reminder = fixedReminder(times = listOf(LocalTime.of(8, 0)))
         val now = instant(monday, LocalTime.of(7, 0))
         val nextFireAt = instant(monday, LocalTime.of(8, 0))
-        assertFalse(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertFalse(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid is true when nextFireAt is in the box containing now`() {
+    @Test fun `shouldPreserveNextFireAt is true when nextFireAt is in the box containing now`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
         // sub-windows: [08:00,14:00), [14:00,20:00)
         val now = instant(monday, LocalTime.of(9, 0))
         val nextFireAt = instant(monday, LocalTime.of(10, 30))
-        assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertTrue(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid is true when nextFireAt is in the box immediately after now's box`() {
+    @Test fun `shouldPreserveNextFireAt is true when nextFireAt is in the box immediately after now's box`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
         val now = instant(monday, LocalTime.of(9, 0)) // box [08:00,14:00)
         val nextFireAt = instant(monday, LocalTime.of(16, 0)) // box [14:00,20:00)
-        assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertTrue(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid is false when nextFireAt is two or more boxes ahead of now`() {
+    @Test fun `shouldPreserveNextFireAt is false when nextFireAt is two or more boxes ahead of now`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 4)
         // sub-windows of 3h each: [08,11) [11,14) [14,17) [17,20)
         val now = instant(monday, LocalTime.of(9, 0)) // box 0
         val nextFireAt = instant(monday, LocalTime.of(15, 0)) // box 2
-        assertFalse(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertFalse(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid is false when nextFireAt is a box that has already fully elapsed`() {
+    @Test fun `shouldPreserveNextFireAt is false when nextFireAt is a box that has already fully elapsed`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
         val now = instant(monday, LocalTime.of(15, 0)) // box [14:00,20:00)
         val nextFireAt = instant(monday, LocalTime.of(10, 0)) // box [08:00,14:00), already elapsed
-        assertFalse(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertFalse(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid treats the not-yet-started first box of today as the current box`() {
+    @Test fun `shouldPreserveNextFireAt treats the not-yet-started first box of today as the current box`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
         val now = instant(monday, LocalTime.of(6, 0)) // before windowStart
         val nextFireAt = instant(monday, LocalTime.of(10, 0)) // today's first box
-        assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertTrue(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid places an instant exactly on an uneven interior boundary in the box that starts there`() {
+    @Test fun `shouldPreserveNextFireAt places an instant exactly on an uneven interior boundary in the box that starts there`() {
         // 481s window / 3 doesn't divide evenly: boundary(1) = floor(481e9/3)ns = 08:02:40.333333333.
         // now sits exactly on that boundary, so the current box is box1 [08:02:40.333333333, 08:05:20.666666666),
         // not box0 [08:00:00, 08:02:40.333333333) — box0 has already fully elapsed as of now.
@@ -244,38 +244,38 @@ class ReminderSchedulingTest {
         val now = instant(monday, LocalTime.of(8, 2, 40, 333_333_333))
         val nextFireAtInBox1 = instant(monday, LocalTime.of(8, 3, 0))
         val nextFireAtInBox0 = instant(monday, LocalTime.of(8, 1, 0))
-        assertTrue(isNextFireAtValid(reminder, nextFireAtInBox1, now, zone))
-        assertFalse(isNextFireAtValid(reminder, nextFireAtInBox0, now, zone))
+        assertTrue(shouldPreserveNextFireAt(reminder, nextFireAtInBox1, now, zone))
+        assertFalse(shouldPreserveNextFireAt(reminder, nextFireAtInBox0, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid rolls the current box into the next active day when now is past today's window`() {
+    @Test fun `shouldPreserveNextFireAt rolls the current box into the next active day when now is past today's window`() {
         val reminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2)
         val now = instant(monday, LocalTime.of(21, 0)) // past today's window
         val nextFireAt = instant(monday.plusDays(1), LocalTime.of(10, 0)) // tomorrow's first box
-        assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertTrue(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-018
-    @Test fun `isNextFireAtValid rolls to the next active day when today is no longer an active day`() {
+    @Test fun `shouldPreserveNextFireAt rolls to the next active day when today is no longer an active day`() {
         val reminder = randomReminder(
             LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 2,
             daysActive = setOf(DayOfWeek.WEDNESDAY),
         )
         val now = instant(monday, LocalTime.of(9, 0)) // Monday isn't active
         val nextFireAt = instant(monday.plusDays(2), LocalTime.of(10, 0)) // Wednesday's first box
-        assertTrue(isNextFireAtValid(reminder, nextFireAt, now, zone))
+        assertTrue(shouldPreserveNextFireAt(reminder, nextFireAt, now, zone))
     }
 
     // @spec REM-SCHED-013, REM-SCHED-015, REM-SCHED-018
-    @Test fun `isNextFireAtValid re-derives box boundaries from the reminder's current configuration`() {
+    @Test fun `shouldPreserveNextFireAt re-derives box boundaries from the reminder's current configuration`() {
         // nextFireAt was drawn under a 2-occurrence-per-day config's second box [14:00,20:00);
         // the reminder has since been edited to 4 occurrences per day, so that same clock
         // time now falls in box index 2 of [08,11)[11,14)[14,17)[17,20) — two boxes ahead.
         val editedReminder = randomReminder(LocalTime.of(8, 0), LocalTime.of(20, 0), occurrencesPerDay = 4)
         val now = instant(monday, LocalTime.of(9, 0)) // box 0 under the new config
         val nextFireAt = instant(monday, LocalTime.of(16, 0)) // box 2 under the new config
-        assertFalse(isNextFireAtValid(editedReminder, nextFireAt, now, zone))
+        assertFalse(shouldPreserveNextFireAt(editedReminder, nextFireAt, now, zone))
     }
 
     // ---- Already-logged suppression (REM-SCHED-020) ----
