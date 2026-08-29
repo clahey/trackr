@@ -616,6 +616,18 @@ class HomeViewModelTest {
         assertEquals(meta.resolvedEmoji, row.emoji)
     }
 
+    // An alarm delivered to a dead process starts one, posts, and lets it go, so the process that
+    // shows the timeline is routinely not the one that posted what it has to show.
+    // @spec REM-NOTIF-009
+    @Test fun `a notification left showing by an earlier process is outstanding at startup`() = runTest {
+        repo.setCategories(makeMeta("meta1"))
+        val coldNotifier = FakeReminderNotifier(alreadyShowing = listOf("meta1"))
+
+        val coldVm = HomeViewModel(repo, coldNotifier, SavedStateHandle())
+
+        assertEquals(listOf("meta1"), coldVm.outstandingReminders.value.map { it.categoryId })
+    }
+
     // Posting does not move window focus, so without the notifier announcing it, a reminder that
     // fires while the timeline is being looked at would not appear until the user left and returned.
     // @spec REM-NOTIF-009

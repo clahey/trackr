@@ -34,3 +34,31 @@ fun outstandingReminders(showing: List<ShowingNotification>): List<OutstandingRe
             notification.tag?.let { OutstandingReminder(categoryId = it, postedAt = notification.postedAt) }
         }
         .sortedByDescending { it.postedAt }
+
+/**
+ * The outstanding reminders once the app's own cancellation of [categoryId] is accounted for, given
+ * a [showing] that may have been read before the cancellation took effect.
+ */
+// @spec REM-NOTIF-014
+fun outstandingRemindersAfterCancel(
+    showing: List<ShowingNotification>,
+    categoryId: String,
+): List<OutstandingReminder> = outstandingReminders(showing.filterNot { it.tag == categoryId })
+
+/**
+ * The outstanding reminders once the app's own post for [categoryId] at [postedAt] is accounted for,
+ * given a [showing] that may have been read before the post took effect. A [showing] that already
+ * carries the category keeps its own entry, since posting replaces rather than adds.
+ */
+// @spec REM-NOTIF-014
+fun outstandingRemindersAfterPost(
+    showing: List<ShowingNotification>,
+    categoryId: String,
+    postedAt: Instant,
+): List<OutstandingReminder> = outstandingReminders(
+    if (showing.none { it.tag == categoryId }) {
+        showing + ShowingNotification(tag = categoryId, isGroupSummary = false, postedAt = postedAt)
+    } else {
+        showing
+    },
+)

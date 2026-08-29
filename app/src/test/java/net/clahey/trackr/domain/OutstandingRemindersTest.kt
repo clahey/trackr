@@ -61,4 +61,54 @@ class OutstandingRemindersTest {
         val result = outstandingReminders(listOf(showing("cat1", 20)))
         assertEquals(noon.minusSeconds(20 * 60), result.single().postedAt)
     }
+
+    // ---- Reads taken while the app's own change is still in flight (REM-NOTIF-014) ----
+
+    // @spec REM-NOTIF-014
+    @Test fun `a cancelled reminder is out even while the read still shows it`() {
+        val result = outstandingRemindersAfterCancel(
+            listOf(showing("cat1", 10), showing("cat2", 5)),
+            categoryId = "cat1",
+        )
+        assertEquals(listOf("cat2"), result.map { it.categoryId })
+    }
+
+    // What the summary's fate turns on: the last reminder cancelled has to leave nothing behind.
+    // @spec REM-NOTIF-004, REM-NOTIF-014
+    @Test fun `cancelling the only reminder leaves nothing outstanding while the read lags`() {
+        val result = outstandingRemindersAfterCancel(
+            listOf(showing("cat1", 10), showing(null, 10, isGroupSummary = true)),
+            categoryId = "cat1",
+        )
+        assertTrue(result.isEmpty())
+    }
+
+    // @spec REM-NOTIF-014
+    @Test fun `a cancel the read has already applied is not undone`() {
+        val result = outstandingRemindersAfterCancel(listOf(showing("cat2", 5)), categoryId = "cat1")
+        assertEquals(listOf("cat2"), result.map { it.categoryId })
+    }
+
+    // @spec REM-NOTIF-014
+    @Test fun `a posted reminder is outstanding even while the read still omits it`() {
+        val result = outstandingRemindersAfterPost(
+            listOf(showing("cat1", 10)),
+            categoryId = "cat2",
+            postedAt = noon,
+        )
+        assertEquals(listOf("cat2", "cat1"), result.map { it.categoryId })
+    }
+
+    // Re-posting for a category already showing replaces that notification (REM-NOTIF-007), so it
+    // must not produce a second row for it.
+    // @spec REM-NOTIF-007, REM-NOTIF-014
+    @Test fun `a post the read has already applied is not duplicated`() {
+        val result = outstandingRemindersAfterPost(
+            listOf(showing("cat1", 10)),
+            categoryId = "cat1",
+            postedAt = noon,
+        )
+        assertEquals(listOf("cat1"), result.map { it.categoryId })
+        assertEquals(noon.minusSeconds(10 * 60), result.single().postedAt)
+    }
 }

@@ -11,7 +11,10 @@ import net.clahey.trackr.domain.outstandingReminders
 import java.time.Instant
 
 // @spec REM-NOTIF-013
-class FakeReminderNotifier : ReminderNotifier {
+class FakeReminderNotifier(
+    /** Categories whose notifications a previous process left showing, for a cold-start test. */
+    alreadyShowing: List<String> = emptyList(),
+) : ReminderNotifier {
     val posted = mutableListOf<Reminder>()
 
     // Modelled, not stubbed: a notification stays showing until something cancels it, so a test
@@ -23,6 +26,11 @@ class FakeReminderNotifier : ReminderNotifier {
 
     private val _outstanding = MutableStateFlow<List<OutstandingReminder>>(emptyList())
     override val outstanding: StateFlow<List<OutstandingReminder>> = _outstanding.asStateFlow()
+
+    init {
+        alreadyShowing.forEach { showing[it] = base.plusSeconds(postCount++) }
+        refreshOutstanding()
+    }
 
     override suspend fun postReminderNotification(reminder: Reminder) {
         posted += reminder

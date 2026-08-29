@@ -21,6 +21,8 @@ import net.clahey.trackr.domain.Reminder
 import net.clahey.trackr.domain.ShowingNotification
 import net.clahey.trackr.reminders.ReminderDismissReceiver
 import net.clahey.trackr.domain.outstandingReminders
+import net.clahey.trackr.domain.outstandingRemindersAfterCancel
+import net.clahey.trackr.domain.outstandingRemindersAfterPost
 import net.clahey.trackr.reminders.ReminderReceiver
 import kotlinx.coroutines.flow.first
 import java.time.Instant
@@ -61,11 +63,16 @@ class AndroidReminderNotifier @Inject constructor(
     // @spec REM-NOTIF-008, REM-NOTIF-009
     override val outstanding: StateFlow<List<OutstandingReminder>> = _outstanding.asStateFlow()
 
+    init {
+        refreshOutstanding()
+    }
+
     // @spec REM-NOTIF-012
     override fun refreshOutstanding() {
         _outstanding.value = outstandingReminders(showingNotifications())
     }
 
+    // @spec REM-NOTIF-014
     override suspend fun postReminderNotification(reminder: Reminder) {
         val category = repository.getCategoryById(reminder.categoryId).first()
         val body = if (reminder.showCategoryInNotification && category != null) {
@@ -103,16 +110,16 @@ class AndroidReminderNotifier @Inject constructor(
         // hashed int id would leave (REM-NOTIF-007).
         notificationManager.notify(reminder.categoryId, REMINDER_NOTIFICATION_ID, notification)
         notificationManager.notify(null, SUMMARY_NOTIFICATION_ID, buildSummary())
-        refreshOutstanding()
+        _outstanding.value =
+            outstandingRemindersAfterPost(showingNotifications(), reminder.categoryId, Instant.now())
     }
 
-    // @spec REM-NOTIF-011
+    // @spec REM-NOTIF-011, REM-NOTIF-014
     override fun cancelReminderNotification(categoryId: String) {
         notificationManager.cancel(categoryId, REMINDER_NOTIFICATION_ID)
-        if (outstandingReminders(showingNotifications()).isEmpty()) {
-            notificationManager.cancel(null, SUMMARY_NOTIFICATION_ID)
-        }
-        refreshOutstanding()
+        val remaining = outstandingRemindersAfterCancel(showingNotifications(), categoryId)
+        if (remaining.isEmpty()) notificationManager.cancel(null, SUMMARY_NOTIFICATION_ID)
+        _outstanding.value = remaining
     }
 
     // @spec REM-NOTIF-008
